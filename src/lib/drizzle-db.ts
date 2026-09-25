@@ -58,7 +58,11 @@ function withConnectRetry(pool: Pool): Pool {
 }
 
 export function getDrizzleDb() {
-  let connectionString = process.env.DATABASE_URL;
+  let connectionString =
+    process.env.DATABASE_URL ||
+    process.env.STORAGE_PRISMA_DATABASE_URL ||
+    process.env.STORAGE_DATABASE_URL ||
+    process.env.STORAGE_POSTGRES_URL;
   let onWorkers = false;
   try {
     const env = getCloudflareContext().env;
