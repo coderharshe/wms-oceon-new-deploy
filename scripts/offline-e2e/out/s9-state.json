@@ -1,0 +1,151 @@
+{
+ "url": "http://localhost:3000/finance/orders/new",
+ "header": "Waiting to sync (2)",
+ "outbox": [
+  {
+   "id": "0cc75e8a-6fa8-440e-b6d4-bef92b3074ff",
+   "kind": "bill",
+   "url": "/api/finance/orders",
+   "body": {
+    "customer": {
+     "ownerName": "E2E-S9-2",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ],
+    "offlineRef": "OFF-FIN1-WZ5-0919-013",
+    "billedAt": "2026-09-19T06:45:20.537Z"
+   },
+   "queuedAt": "2026-09-19T06:45:20.547Z"
+  },
+  {
+   "id": "60f7ad16-4267-4bb2-8a0c-5467e4443328",
+   "kind": "bill",
+   "url": "/api/finance/orders",
+   "body": {
+    "customer": {
+     "ownerName": "E2E-S9-1",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ],
+    "offlineRef": "OFF-FIN1-WZ5-0919-012",
+    "billedAt": "2026-09-19T06:45:13.700Z"
+   },
+   "queuedAt": "2026-09-19T06:45:13.702Z",
+   "attempted": true,
+   "attempts": 6,
+   "lastError": "The server returned 500"
+  }
+ ],
+ "localBills": [
+  {
+   "requestId": "0cc75e8a-6fa8-440e-b6d4-bef92b3074ff",
+   "offlineRef": "OFF-FIN1-WZ5-0919-013",
+   "billedAt": "2026-09-19T06:45:20.537Z",
+   "payload": {
+    "customer": {
+     "ownerName": "E2E-S9-2",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ]
+   },
+   "display": {
+    "customerName": "E2E-S9-2",
+    "customerMobile": null,
+    "sellingMode": "WHOLESALE",
+    "notes": null,
+    "lines": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "name": "0 HELL CAN",
+      "unit": "pc",
+      "quantity": 3,
+      "unitPrice": 9,
+      "discount": 0,
+      "lineTotal": 27
+     }
+    ],
+    "subtotal": 27,
+    "discountTotal": 0,
+    "taxTotal": 0,
+    "total": 27
+   },
+   "state": "pending",
+   "cash": [],
+   "updatedAt": "2026-09-19T06:45:20.537Z"
+  },
+  {
+   "requestId": "60f7ad16-4267-4bb2-8a0c-5467e4443328",
+   "offlineRef": "OFF-FIN1-WZ5-0919-012",
+   "billedAt": "2026-09-19T06:45:13.700Z",
+   "payload": {
+    "customer": {
+     "ownerName": "E2E-S9-1",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ]
+   },
+   "display": {
+    "customerName": "E2E-S9-1",
+    "customerMobile": null,
+    "sellingMode": "WHOLESALE",
+    "notes": null,
+    "lines": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "name": "0 HELL CAN",
+      "unit": "pc",
+      "quantity": 3,
+      "unitPrice": 9,
+      "discount": 0,
+      "lineTotal": 27
+     }
+    ],
+    "subtotal": 27,
+    "discountTotal": 0,
+    "taxTotal": 0,
+    "total": 27
+   },
+   "state": "pending",
+   "cash": [],
+   "updatedAt": "2026-09-19T06:45:13.700Z"
+  }
+ ]
+}

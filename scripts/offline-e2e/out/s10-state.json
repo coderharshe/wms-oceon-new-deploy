@@ -1,0 +1,22 @@
+{
+ "url": "http://localhost:3000/finance/orders/new",
+ "header": "Needs attention (1)",
+ "outbox": [
+  {
+   "id": "eed52aee-f972-4c85-826c-e7165e51d29a",
+   "url": "/api/finance/payments/cash",
+   "body": {
+    "billId": "bd5970a4-4a27-464b-8424-710734c6619a",
+    "amountReceived": 18,
+    "clickedAt": "2026-09-21T18:48:40.008Z"
+   },
+   "queuedAt": "2026-09-21T18:53:40.025Z",
+   "attempts": 4,
+   "attempted": false,
+   "failedAt": "2026-09-21T18:53:45.006Z",
+   "error": "Bill is already fully paid",
+   "status": 409
+  }
+ ],
+ "localBills": []
+}

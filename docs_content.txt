@@ -1,0 +1,1113 @@
+
+================================================================================
+FILE: OCEON ADMIN DASHBOARD.docx
+================================================================================
+ADMIN / SIR DASHBOARD
+1. 🏠 Executive Dashboard
+Sir login karein aur first screen par pura business:
+💰 Total Sales
+🛒 Orders
+📦 Inventory Value
+💵 Cash
+🏦 Bank
+📱 UPI
+📥 Receivables
+📤 Payables
+🛒 Purchase
+📈 Gross Margin
+⚠️ Critical Alerts
+🏢 Active Warehouses/FCs
+👥 Active Employees
+Period filter:
+Today | 7 Days | 30 Days | Custom
+2. 👥 USER & ROLE MANAGEMENT
+Sir decide kare:
+ADMIN / SIR
+│
+├── Manager
+├── Finance
+├── Procurement
+├── Inventory
+├── Billing
+└── Other Employees
+Admin:
+Create user
+Disable user
+Activate user
+Assign role
+Assign warehouse/
+Reset access
+Change permissions
+Login/session management
+3. 🔐 PERMISSION CONTROL
+Har module ke liye separate permission:
+Module
+View
+Create
+Edit
+Approve
+Delete
+Finance
+✅
+✅
+Limited
+✅
+❌
+Inventory
+✅
+✅
+Limited
+✅
+❌
+Procurement
+✅
+✅
+✅
+✅
+❌
+Billing
+✅
+✅
+Limited
+Limited
+❌
+Reports
+✅
+—
+—
+—
+—
+Delete permission ideally almost kisi ko nahi.
+Instead:
+Cancel → Reverse → Adjustment → Audit Log
+4. 💰 FINANCE CONTROL
+Sir ko Finance ka complete visibility + approval authority mile:
+Cash
+Bank
+UPI
+Receivables
+Payables
+Expenses
+Refunds
+Payments
+Collections
+Reconciliation
+P&L
+Cash Flow
+High-value transactions ke liye:
+Finance creates → Admin/Sir approves
+5. 🛒 PROCUREMENT APPROVAL
+Sir dekh sake:
+Pending Purchase Orders
+PO amount
+Supplier
+Rate
+Quantity
+Credit terms
+Previous purchase rate
+Example:
+Purchase Order: ₹1,25,000Supplier: XYZPrevious rate: ₹28Current rate: ₹31Approve / Reject
+6. 📦 INVENTORY CONTROL
+Admin:
+Inventory overview
+Stock valuation
+Stock movement
+Adjustment requests
+Damaged stock
+Expiry
+Stock transfer approvals
+Inventory mismatch
+Important:
+Inventory Executive bole:
+Physical = 98Software = 100Adjustment request = -2
+Sir/authorized manager approve kare.
+Direct silent adjustment nahi.
+7. 🧾 BILLING CONTROL
+Sir:
+Sales
+Bills
+Discounts
+Returns
+Refunds
+Cancellations
+Credit sales
+dekh sake.
+High-value refund/cancellation:
+Approval required
+8. 🏢 WAREHOUSE / FC MANAGEMENT
+Admin:
+Create warehouse
+Activate/deactivate warehouse
+Warehouse capacity
+Inventory
+Employees
+Sales
+Transfers
+Performance
+Example:
+OCEON HUB
+│
+├── FC-01
+├── FC-02
+├── FC-03
+└── FC-04
+Sir All Locations ya individual FC select kar sake.
+9. 🧑‍💼 EMPLOYEE CONTROL
+Admin देख सके:
+Employee
+Role
+Department
+Attendance
+Activity
+Login
+Tasks
+Performance
+Errors
+Aur employee ko:
+Active / Inactive / Suspended
+kar sake.
+10. 🗂️ MASTER DATA CONTROL
+Admin ke paas master data:
+Product Master
+SKU
+Product
+Category
+Brand
+Unit
+MRP
+Tax configuration
+Active/inactive
+Supplier Master
+Supplier
+Contact
+Address
+Terms
+Credit limit
+Status
+Customer/Retailer Master
+Retailer
+Contact
+Credit limit
+Status
+Payment terms
+Master data ka structure Admin control kare.
+11. 🚨 ALERT CENTER
+Sir ke dashboard par Critical Alerts:
+🔴 Cash mismatch🔴 Bank mismatch🔴 Large outstanding🔴 Overdue supplier payment🔴 Large inventory mismatch🔴 High refund🔴 Unusual discount🔴 PO delay🔴 OOS critical SKU🔴 System failure🔴 User permission change
+12. 🕵️ AUDIT LOG — MUST HAVE
+Bhai, ye Admin dashboard ka heart hai.
+Har important action record ho:
+User: RahulAction: Stock AdjustmentSKU: Tata SaltOld: 100New: 95Reason: Physical shortageApproved by: ManagerDate: 24 SepTime: 11:42 AM
+Same for:
+Price changes
+Purchase changes
+Bill cancellation
+Refund
+Payment
+User permission
+Inventory adjustment
+Supplier changes
+Audit log ko delete/edit koi na kar sake.
+13. ⚙️ SYSTEM SETTINGS
+Admin:
+Company settings
+Warehouse settings
+Invoice settings
+Tax settings
+Payment modes
+Approval limits
+Notification settings
+User roles
+Backup settings
+Integration settings
+control kare.
+14. 💾 BACKUP & DATA CONTROL
+Admin ko:
+Data backup status
+Last backup
+Export data
+Database health
+Recovery information
+Report export
+dikhna chahiye.
+Aur data ownership/export capability clear honi chahiye.
+15. 📊 BUSINESS ANALYTICS
+Sir ke liye higher-level analytics:
+Sales
+Sales → Orders → AOV → Repeat customers
+Inventory
+Inventory → Turnover → OOS → Dead stock
+Procurement
+Purchase → Rate → Supplier → Margin
+Finance
+Cash → Bank → Receivable → Payable → Cash Flow
+Operations
+Order → Pick → Bill → Dispatch → Delivery
+🔥 ADMIN DASHBOARD KA FINAL STRUCTURE
+👑 ADMIN / SIR
+│
+┌────────────────┼────────────────┐
+↓                ↓                ↓
+BUSINESS          USERS           APPROVALS
+OVERVIEW          & ROLES             │
+│                │                 │
+├──────┬─────────┼────────┬────────┤
+↓      ↓         ↓        ↓        ↓
+SALES  INVENTORY PROCUREMENT FINANCE BILLING
+│      │         │        │        │
+└──────┴─────────┴────────┴────────┘
+↓
+🚨 ALERT CENTER
+↓
+🕵️ AUDIT LOG
+↓
+⚙️ SETTINGS
+↓
+💾 BACKUP / DATA
+🧠 Simple difference
+Employee:
+“Mujhe mera kaam karna hai.”
+Inventory:
+“Stock control karna hai.”
+Billing:
+“Sale/bill record karna hai.”
+Procurement:
+“Purchase control karna hai.”
+Finance:
+“Money reconcile karna hai.”
+Manager:
+“Operations control karni hai.”
+👑 Admin/Sir:
+“Pura system control, approve, monitor aur audit karna hai.”
+Aur bhai, Admin/Sir ke liye sabse important 3 cheezein main rakhunga:
+1️⃣ Approval Control
+2️⃣ Audit Trail
+3️⃣ Complete Business Visibility
+Isse Sir ko har employee ke computer par baithne ki zarurat nahi padegi—dashboard se pata chalega ki business mein kya ho raha hai aur kisne kya kiya.
+
+================================================================================
+FILE: OCEON BILLING.docx
+================================================================================
+BILLING / SALES MODULE
+1. 🛒 Order → Bill
+Flow:
+CUSTOMER ORDER
+↓
+INVOICE
+↓
+PAYMENTS
+↓
+ORDER CONFIRM
+↓
+PICKING
+↓
+OUTWARD / DELIVERY
+2. Billing person kya karega?
+Bill Create
+Customer/Retailer select
+Order number
+SKU
+Quantity
+Selling price
+Discount
+Tax/GST where applicable
+Delivery charge
+Total amount
+System automatically:
+Subtotal → Discount → Tax → Delivery → Final Amount
+calculate kare.
+3. 💳 Payment Status
+Billing mein:
+Unpaid
+Partially Paid
+Paid
+Credit
+Refunded
+Cancelled
+status ho.
+Payment mode:
+Cash
+UPI
+Bank
+Credit
+NEFT/RTGS
+Other approved modes
+Lekin: Billing person payment ko Finance reconciliation ke equivalent final authority na banaye.
+4. 🧾 Invoice
+Invoice mein:
+Invoice number
+Order number
+Date/time
+Customer
+Items
+Quantity
+Rate
+Discount
+Tax
+Total
+Payment status
+Billing user
+Delivery/order reference
+hona chahiye.
+Invoice delete nahi hona chahiye.
+Mistake ho to:
+Cancel / Credit Note / Refund / Correction
+5. 🔄 Stock Integration
+Billing ke baad inventory automatically update ho:
+Example:
+Tata Salt stock = 100
+Customer buys 3:
+Billing → 3 units soldInventory → 97 units
+Billing employee ko manually stock quantity edit karne ki permission nahi honi chahiye.
+6. 📊 Sales Dashboard
+Billing/Sales team ko:
+Today's Orders
+Today's Bills
+Today's Sales
+Average Order Value
+Items Sold
+Cancelled Orders
+Returned Orders
+Discounts
+Credit Sales
+Payment-status summary
+Top-selling SKUs
+dikhna chahiye.
+7. 🔐 Billing Permissions
+BILLING CAN:
+✅ Create bill✅ Generate invoice✅ Process approved orders✅ Apply permitted discount✅ Mark billing/payment information according to workflow✅ Print/share invoice✅ Cancel bill with approval✅ View sales reports
+BILLING CANNOT:
+❌ Change purchase price❌ Change inventory quantity manually❌ Make supplier payments❌ Delete invoices❌ Change bank balance❌ Change cash opening/closing❌ Change user permissions❌ Modify financial records directly
+🔥 Discount Control
+Ye bahut important hai bhai.
+Billing employee ko unlimited discount mat do.
+Example:
+0–2% → Billing
+2–5% → Manager approval
+5%+ → Admin/Sir approval
+Threshold configurable hona chahiye.
+Har discount ka:
+Who → Why → How much → Approval
+audit log mein save ho.
+🧠 Ab OCEON ka role structure crystal clear ho raha hai:
+OCEON HUB
+│
+┌───────────┼────────────┐
+↓           ↓            ↓
+PROCUREMENT   INVENTORY     BILLING
+│           │            │
+"Kitne mein    "Kitna       "Kitna
+kharide?"      stock?"       bika?"
+│           │            │
+└───────────┼────────────┘
+↓
+FINANCE
+│
+"Kitna paisa?"
+│
+┌────────────┼────────────┐
+↓            ↓            ↓
+CASH         BANK          UPI
+
+================================================================================
+FILE: OCEON FINANCE DASHBOARD.docx
+================================================================================
+Finance Dashboard
+Sir ko ek screen par:
+💵 Cash Balance
+🏦 Bank Balance
+📱 UPI Receivable / Settlement
+📥 Total Receivables
+📤 Total Payables
+🧾 Today's Collection
+🛒 Today's Purchase
+💰 Today's Expenses
+🔄 Cash Flow
+⚠️ Outstanding Receivables
+⚠️ Supplier Payables
+📊 Profit/Loss summary
+📅 Daily / Weekly / Monthly view
+Cash aur Bank alag-alag rahenge. UPI ko bhi settlement hone tak separately track karo
+DETAILS
+2. 💵 CASH MANAGEMENT
+Finance person:
+Cash In
+Customer cash collection
+Other cash receipts
+Opening cash
+Cash transfer received
+Cash Out
+Expense
+Refund
+Petty cash
+Supplier payment
+Other payment
+Daily Closing
+System calculate kare:
+Opening Cash + Cash In − Cash Out = Expected Cash
+Phir Finance actual physical cash enter kare:
+Expected Cash vs Actual Cash
+Agar difference hai:
+🔴 Short ₹2,000🟢 Excess ₹500
+Aur reason mandatory ho.
+BANK MANAGEMENT
+Separate bank ledger:
+Opening Bank Balance
+Bank receipts
+Bank payments
+Supplier payments
+Customer refunds
+Bank charges
+Transfers
+Closing Bank Balance
+Bank Reconciliation
+Finance ko:
+Software Balance vs Bank Statement Balance
+compare karne ka feature chahiye.
+Status:
+✅ Reconciled
+⚠️ Difference
+🔴 Unmatched transaction
+UPI MANAGEMENT
+Ye bhi bahut important hai.
+Track:
+UPI collection
+UPI provider
+Transaction ID
+Order/Bill number
+Collection date
+Settlement date
+Settlement amount
+Bank credited amount
+Settlement difference
+Example:
+Customer paid ₹1,000 UPISettlement ₹998₹2 = charges
+Ye automatically reconcile ho.
+5. 🧾 RECEIVABLES
+Finance ko dekhna chahiye:
+Customer
+Bill
+Amount
+Paid
+Due
+Due Date
+Retailer A
+₹10,000
+₹10,000
+₹5,000
+₹5,000
+25 Sep
+Features:
+Customer outstanding
+Invoice-wise outstanding
+Ageing
+Due date
+Payment history
+Partial payment
+Payment reminder
+Credit limit
+Overdue alert
+Ageing
+0–7 days
+8–15
+16–30
+31–60
+60+ days
+6. 📤 PAYABLES
+Supplier side:
+Supplier invoice
+Purchase amount
+Paid amount
+Outstanding
+Due date
+Credit period
+Payment history
+Partial payment
+Supplier ageing
+Finance ko immediately pata chale:
+Aaj kisko ₹ kitna dena hai?
+7. 💳 EXPENSE MANAGEMENT
+Categories:
+Rent
+Electricity
+Salary
+Transport
+Packaging
+Marketing
+Software
+Maintenance
+Miscellaneous
+Har expense mein:
+Amount + Category + Date + Payment Mode + Description + Attachment
+Invoice/receipt upload bhi hona chahiye.
+8. 🧾 PAYMENT & RECEIPT VOUCHERS
+Finance generate kare:
+Receipt Voucher
+Customer se paisa aaya.
+Payment Voucher
+Supplier/expense ko paisa gaya.
+Har voucher ka:
+Unique number
+Date
+Party
+Amount
+Payment mode
+Reference
+Created by
+Approved by
+9. 🔐 APPROVAL SYSTEM — SABSE IMPORTANT
+Bhai, Finance user ko unlimited power mat dena.
+Example:
+₹0–₹5,000
+Finance can process.
+₹5,001–₹25,000
+Finance + Manager approval.
+₹25,000+
+Sir/Admin approval mandatory.
+Threshold tum apne business ke according set kar sakte ho.
+10. 🚨 NO DELETE SYSTEM
+Finance mein:
+❌ Transaction delete nahi hona chahiye.
+Agar mistake hai:
+Reverse / Cancel / Adjustment
+hona chahiye.
+Aur system record kare:
+Who changed itWhat changedOld valueNew valueDate & timeReason
+Yahi Audit Trail hai.
+11. 👁️ ROLE-BASED ACCESS
+Main isko 4 levels mein rakhunga:
+👑 Super Admin
+Full access.
+💰 Finance
+Finance module ka full operational access.
+👨‍💼 Manager
+Finance reports view only, unless approved.
+👷 Employee
+Finance module NO ACCESS.
+12. Finance kya NAHI kar sake
+Finance user ko ideally:
+❌ Product price change❌ Purchase price change❌ Inventory adjustment❌ Stock delete❌ Supplier delete❌ User delete❌ Order delete❌ Customer data delete❌ Software settings change
+nahi karna chahiye.
+Finance ka domain:
+Money + Accounting + Reconciliation + Financial Reports
+Finance Reports
+Sirf Finance/Sir:
+Daily Collection Report
+Cash Report
+Bank Report
+UPI Report
+Receivable Report
+Payable Report
+Expense Report
+Purchase Payment Report
+Customer Payment Report
+Supplier Payment Report
+Cash Flow
+Profit & Loss
+Outstanding Ageing
+Bank Reconciliation
+Daily Closing Report
+Financial Summary
+14. 🔔 Alerts
+Finance ko automatic alerts:
+🔴 Cash shortage🔴 Bank reconciliation mismatch🔴 Overdue customer🔴 Supplier payment due🔴 Large transaction🔴 Unusual refund🔴 Duplicate payment🔴 Negative cash balance🔴 Unapproved payment🔴 UPI settlement mismatch
+15. 🔒 Security — ye mandatory rakho
+Finance login:
+Individual username
+Strong password
+Session timeout
+Device/session history
+Login history
+Failed login attempts
+Role-based permissions
+Aur Finance ka password kisi employee ke saath share nahi hona chahiye.
+OCEON FINANCE
+│
+┌────────────────┼────────────────┐
+↓                ↓                ↓
+CASH              BANK             UPI
+│                │                │
+└────────────────┼────────────────┘
+↓
+RECONCILIATION
+│
+┌───────────┴───────────┐
+↓                       ↓
+RECEIVABLES               PAYABLES
+│                       │
+└───────────┬───────────┘
+↓
+EXPENSE
+↓
+CASH FLOW
+↓
+P&L REPORT
+↓
+AUDIT LOG
+🔥 Aur ek golden rule
+Finance person paisa record/control kare, lekin business process ko independently modify na kar sake.
+Matlab:
+
+================================================================================
+FILE: OCEON INVENTORY.docx
+================================================================================
+INVENTORY TEAM MODULE
+1. Stock Dashboard
+Inventory person ko:
+Total SKUs
+Total stock quantity
+Total inventory value
+Low-stock items
+Out-of-stock items
+Fast-moving items
+Slow-moving items
+Dead stock
+Near-expiry stock
+Damaged stock
+Today's inward
+Today's outward
+Stock variance
+2. 📥 Inward / GRN
+Supplier se maal aaya:
+Supplier → Purchase → Inward → Physical Check → GRN → Stock
+Inventory team:
+Quantity received
+Batch
+Expiry
+MRP
+Purchase price view
+Damage/shortage
+Accepted quantity
+Rejected quantity
+Storage location
+record kare.
+Important: Purchase price ko inventory person freely edit na kar sake.
+4. 📤 Outward / Stock Issue
+Stock bahar gaya:
+Customer order
+Damage
+Expiry
+Return
+Adjustment
+Har outward ka reason mandatory.
+6. 🔎 Physical Stock Count
+Inventory team periodic stock counting kare:
+System Stock vs Physical Stock
+Example:
+SKU
+System
+Physical
+Difference
+Tata Salt
+100
+98
+-2
+Fortune Oil
+50
+50
+0
+Difference aaye to:
+Adjustment → Reason → Approval → Audit Log
+Inventory person ko directly quantity change karne ki unlimited permission nahi deni chahiye.
+7. ⚠️ Inventory Alerts
+Automatic:
+🔴 Out of stock🟠 Low stock🟡 Near expiry🔴 Expired🔴 Negative stock⚠️ Stock mismatch⚠️ Unreceived purchase⚠️ Unclosed transfer
+8. 📊 Inventory Reports
+Inventory team:
+Current Stock
+Stock Valuation
+SKU Movement
+Fast Moving
+Slow Moving
+Dead Stock
+Stock Ageing
+Expiry Report
+Damage Report
+Stock Adjustment
+Inward Report
+Outward Report
+Physical Count Report
+🔐 Inventory permissions
+Inventory Team CAN:
+✅ Receive stock✅ Count stock✅ Report damage✅ Perform physical count✅ View stock movement
+Inventory Team CANNOT:
+❌ Change selling price❌ Change purchase price❌ Make supplier payments❌ Edit financial transactions❌ Delete invoices❌ Delete stock history❌ Approve large stock adjustments❌ Change user permissions
+
+================================================================================
+FILE: OCEON MANAGER DASHBOARD.docx
+================================================================================
+OCEON MANAGER DASHBOARD
+🎯 Manager ka main question:
+“Aaj business mein kya ho raha hai, kahan problem hai, aur kis jagah mujhe action lena hai?”
+1. 🏠 MAIN DASHBOARD — TODAY
+Top cards:
+KPI
+Value
+🛒 Orders
+209
+🧾 Bills
+209
+💰 Sales
+₹11,632,215
+📦 Inventory Value
+₹1,51,03,801
+⚠️ Low Stock
+12
+🔴 Out of Stock
+5
+💳 Outstanding
+₹11,57,912
+🏦 Cash/Bank
+View only
+Finance balance Manager ko view-only mile; edit nahi.
+2. 📈 SALES MONITORING
+Manager dekh sake:
+Today's sales
+Yesterday sales
+7-day sales
+30-day sales
+Order count
+Average Order Value
+Cancelled orders
+Returned orders
+Top-selling SKUs
+Slow-selling SKUs
+Sales by category
+Sales by FC/store
+Comparison:
+Today vs Yesterday
+This week vs Last week
+This month vs Last month
+3. 📦 INVENTORY OVERVIEW
+Manager ko stock ka health दिखना चाहिए:
+Total SKU
+In-stock SKU
+Low stock
+Out of stock
+Fast-moving
+Slow-moving
+Dead stock
+Near expiry
+Damaged stock
+Inventory ageing
+लेकिन:
+❌ Manager manually stock quantity change na kare.
+4. 🛒 PROCUREMENT OVERVIEW
+Manager ko Procurement ka status mile:
+Today's purchase
+Pending PO
+Pending supplier delivery
+Overdue PO
+Purchase value
+Top suppliers
+Rate increase alerts
+Major purchase pending approval
+Example:
+🔴 Fortune Oil rate ↑ 8%🟠 Supplier A PO delayed 2 days🟢 15 PO received
+Detailed supplier negotiation/rate editing → Procurement.
+5. 💰 FINANCE OVERVIEW
+Manager ko summary, Finance ko control.
+Manager देख सके:
+Today's collection
+Total receivables
+Total payables
+Today's expenses
+Cash status
+Bank status
+UPI status
+Overdue payments
+Cash/bank reconciliation status
+लेकिन:
+❌ Bank balance edit नहीं❌ Cash adjustment नहीं❌ Payment approval नहीं, अगर threshold के ऊपर है❌ Financial transaction delete नहीं
+6. 👥 EMPLOYEE MANAGEMENT
+Manager:
+Employees present
+ALL RECORD OF EMPLOYEES
+Attendance
+Active/inactive users
+Department
+Tasks
+Productivity
+Errors
+Pending tasks
+Example:
+Inventory
+8 Tasks → 7 Completed → 1 Pending
+Billing
+42 Bills → 42 Completed
+Procurement
+6 PO → 4 Completed → 2 Pending
+7. 🚨 PROBLEM / ALERT CENTER
+यह Manager Dashboard का सबसे valuable हिस्सा होना चाहिए.
+एक जगह:
+🔴 Critical
+Stock mismatch
+Large payment pending approval
+Major PO delay
+System error
+High-value order issue
+🟠 Warning
+Low stock
+Supplier delay
+Employee pending task
+Near expiry
+High cancellation
+🟢 Normal
+Today's operations running normally
+Manager को alerts → action → resolution workflow मिले.
+8. 🔧 TASK MANAGEMENT
+Manager tasks assign कर सके:
+“Inventory count Tata Salt”
+Assigned to: Inventory ExecutiveDeadline: Today 4 PMPriority: High
+Status:
+Pending → In Progress → Completed → Verified
+9. 🏢 MULTI-WAREHOUSE
+अगर OCEON आगे multiple FC करेगा:
+OCEON HUB
+├── FC-01
+├── FC-02
+├── FC-03
+└── FC-04
+Manager select कर सके:
+All Locations
+या
+Individual FC
+और देख सके:
+Sales
+Orders
+Inventory
+OOS
+Employees
+Pending tasks
+Operational issues
+10. 📊 MANAGER REPORTS
+Manager के लिए:
+Sales
+Daily sales
+SKU sales
+Category sales
+Customer/retailer sales
+Inventory
+Stock report
+OOS report
+Ageing
+Movement
+Procurement
+Purchase report
+PO report
+Supplier performance
+Operations
+Order fulfilment
+Picking errors
+Billing errors
+Dispatch delays
+Finance
+Summary reports
+Outstanding
+Collection
+Expense summary
+Detailed financial controls → Finance.
+11. 🔐 MANAGER PERMISSIONS
+Manager CAN:
+✅ View all operational dashboards✅ Monitor sales✅ Monitor inventory✅ Monitor procurement✅ Assign tasks✅ Approve operational activities✅ View employee performance✅ View financial summary✅ Approve defined purchase limits✅ Escalate issues✅ Generate reports
+Manager CANNOT:
+❌ Change bank balance❌ Change cash opening/closing❌ Delete financial transactions❌ Change purchase history❌ Arbitrarily change stock❌ Delete invoices❌ Change system permissions❌ Delete users❌ Modify audit logs
+👑 MANAGER DASHBOARD KA CORE STRUCTURE
+👨‍💼 MANAGER
+│
+┌─────────────┼─────────────┐
+↓             ↓             ↓
+SALES        INVENTORY     PROCUREMENT
+│             │             │
+└─────────────┼─────────────┘
+↓
+OPERATIONS
+│
+┌──────────┴──────────┐
+↓                     ↓
+EMPLOYEES              TASKS
+│                     │
+└──────────┬──────────┘
+↓
+🚨 ALERT CENTER
+│
+↓
+📊 REPORTS
+│
+↓
+FINANCE SUMMARY
+👁️ VIEW ONLY
+
+================================================================================
+FILE: OCEON PROCUREMENT  PURCHASE MODULE.docx
+================================================================================
+PROCUREMENT / PURCHASE MODULE
+1. Supplier Selection
+Procurement person ko supplier compare karne ka option:
+Supplier
+SKU
+Rate
+MOQ
+Credit
+Scheme
+Delivery
+Supplier A
+Tata Salt
+₹28
+50
+15 days
+2%
+Daily
+Supplier B
+Tata Salt
+₹27.5
+100
+7 days
+3%
+2 days
+System landed cost calculated:
+Purchase Rate + Freight + Other Cost − Scheme/Discount
+2. 📋 Purchase Requisition
+Inventory se demand aaye:
+Tata Salt → Required 100 unitsCurrent stock → 25Reorder level → 40
+System:
+Purchase Requisition → Procurement
+generate kare.
+Procurement decide kare:
+Purchase 100 units from Supplier B.
+3. 🧾 Purchase Order — PO
+PO mein:
+Supplier
+SKU
+Quantity
+Purchase rate
+Discount/scheme
+Expected delivery
+Payment terms
+Credit days
+MOQ
+Taxes
+Freight
+Total PO value
+PO status:
+Draft → Approval → Sent → Partially Received → Received → Closed
+4. 💰 Purchase Rate Management
+Ye OCEON ke liye bahut important hai.
+System historical rate dikhaye:
+Tata SaltLast Purchase: ₹29Current Supplier A: ₹28Supplier B: ₹27.50
+Procurement ko pata chale:
+“Kya main better rate par kharid raha hoon?”
+5. 📊 Supplier Comparison
+Ek SKU select karo:
+Fortune Mustard Oil
+System automatically dikhaaye:
+Supplier-wise rate
+Last purchase rate
+Lowest rate
+Average rate
+MOQ
+Credit
+Scheme
+Delivery
+Purchase history
+Yahi tumhari 109 distributors/suppliers strategy mein powerful feature banega.
+6. 📦 Purchase Receiving
+Procurement PO banata hai.
+Phir Inventory team maal receive karti hai.
+PROCUREMENT
+↓
+Purchase Order
+↓
+SUPPLIER
+↓
+INWARD / GRN
+↓
+INVENTORY
+Procurement stock ko manually add nahi karega.
+Inventory physically verify karke GRN karega.
+7. 🔄 PO vs Actual Receipt
+Example:
+PO:
+100 Tata Salt
+Supplier delivered:
+95
+System:
+Ordered: 100Received: 95Short: 5
+Ye automatically record ho.
+8. 💳 Supplier Credit Terms
+Procurement ko supplier terms maintain karne chahiye:
+Cash
+7 days
+15 days
+30 days
+45 days
+Example:
+Purchase ₹50,000Credit: 15 daysDue Date: 8 October
+Ye information Finance ko payable ledger mein flow ho.
+9. 🎁 Scheme / Discount
+Supplier schemes:
+Buy 10 Get 1
+2% discount
+₹X slab scheme
+Cash discount
+Volume discount
+System effective purchase cost calculate kare.
+10. 📈 Procurement Analytics
+Procurement dashboard:
+Supplier
+Total purchase
+Average rate
+Lowest rate
+Rate changes
+Credit utilization
+Supplier performance
+Product
+Purchase quantity
+Purchase value
+Last purchase rate
+Average purchase rate
+Rate trend
+Supplier-wise rate
+11. 🚨 Alerts
+System alert kare:
+🔴 Purchase rate increased🟠 Supplier rate higher than benchmark🟡 PO pending🔴 PO overdue🟠 Supplier delivery delayed🔴 MOQ too high🟡 Credit limit near limit
+12. 🔐 Procurement Permissions
+PROCUREMENT CAN:
+✅ Create purchase requisition✅ Compare suppliers✅ Negotiate/record rates✅ Create PO✅ Manage supplier terms✅ View purchase history✅ Track PO✅ Recommend supplier✅ View procurement analytics
+PROCUREMENT CANNOT:
+❌ Receive physical stock independently❌ Change inventory quantity❌ Make supplier payment❌ Change bank/cash❌ Delete financial transactions❌ Close/reconcile Finance❌ Give unlimited discounts❌ Delete purchase history
+🔥 सबसे important: Approval Matrix
+Example:
+₹0–₹10,000→ Procurement
+₹10,001–₹50,000→ Procurement + Manager
+₹50,000+→ Sir/Admin approval
+Threshold software settings से configurable होना चाहिए.
+🧠 Complete OCEON flow
+DEMAND / LOW STOCK
+↓
+PURCHASE REQUISITION
+↓
+SUPPLIER COMPARISON
+↓
+RATE + MOQ + SCHEME + CREDIT
+↓
+PURCHASE ORDER
+↓
+APPROVAL
+↓
+SUPPLIER
+↓
+INWARD / GRN
+↓
+INVENTORY
+↓
+STOCK AVAILABLE
+↓
+BILLING / SALES
+↓
+FINANCE
+↓
+PAYMENT / RECONCILIATION
+और सबसे important बात bhai::
+Purchase Rate ↓ + Stock Availability ↑ + MOQ Control + Supplier Terms + OOS ↓ + Inventory Turnover ↑
+यही system OCEON की पुरानी सबसे बड़ी problem—महंगे procurement और insufficient margin—को directly control करने में मदद करेगा.

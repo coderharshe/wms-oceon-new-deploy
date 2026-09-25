@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Doraemon: Kiro finished",
+  "description": "Tells the Doraemon mascot that Kiro has finished, so the bubble shows a result you can click to jump back to the IDE.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force .kiro/doraemon | Out-Null; Set-Content -NoNewline -Path .kiro/doraemon/agent-state.json -Value '{\"state\":\"done\",\"message\":\"Kiro finished! Click me to see the result.\"}'\""
+  }
+}

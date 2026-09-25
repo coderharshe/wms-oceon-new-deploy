@@ -1,0 +1,100 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // One Worker serves all five portals (admin/manager/finance/qc/pay) via
+  // the existing host-based middleware routing — see PRD §47 "don't build
+  // five independent systems". Each subdomain is bound as a custom domain
+  // route to this same Worker (added below once the domain is known).
+  // Custom entry (not the raw `.open-next/worker.js`) so RealtimeHub can be
+  // re-exported for the durable_objects binding below — see worker.ts.
+  "main": "worker.ts",
+  "name": "wms",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // Keep the wms.shpstack.workers.dev URL live alongside the custom domain
+  // route below — wrangler defaults this off when routes are set and it's
+  // left unspecified, which silently 404s the workers.dev URL on deploy.
+  "workers_dev": true,
+
+  "routes": [
+    // Single entry point for now (PRD's per-portal subdomain split can be
+    // added later as more `custom_domain: true` entries once needed) —
+    // login redirects to the right role's portal either way, see middleware.ts.
+    { "pattern": "taresh.harshuthecoder.qzz.io", "custom_domain": true }
+  ],
+
+  // The Workers runtime is always UTC and there is no TZ knob for it, so
+  // "what day/time is it" comes from this zone instead — see lib/business-date.ts
+  // (cash sessions, ORD-/INV-/GRN- numbers) and lib/fmt.ts (display, invoices).
+  "vars": {
+    "BUSINESS_TZ": "Asia/Kolkata"
+  },
+
+  // Without this nothing is retained, so a failure is only diagnosable if
+  // someone happens to be running `wrangler tail` at the moment it happens --
+  // which is how the intermittent "Exceeded CPU Limit" on bill creation was
+  // found, by luck. Sampling at 1.0: this is a handful of staff in one
+  // warehouse, not a volume worth sampling away.
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "services": [
+    // Required by OpenNext for its own cache-revalidation self-fetch.
+    { "binding": "WORKER_SELF_REFERENCE", "service": "wms" }
+  ],
+
+  "r2_buckets": [
+    // OpenNext's ISR/data-cache store (its caching docs require this).
+    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "wms-opennext-cache" },
+    // Our own file storage: product images, generated invoice/EOD PDFs,
+    // DB backup exports (PRD's R2 requirement).
+    { "binding": "FILES", "bucket_name": "wms-files" }
+  ],
+
+  "kv_namespaces": [
+    // Read-through cache for hot, rarely-changing reference data (product
+    // search, unit list) — cuts Hyperdrive round-trips on the
+    // highest-QPS endpoints. Not used for anything transactional.
+    { "binding": "CACHE_KV", "id": "0cf87b72426648ed9a300f962c1add74" }
+  ],
+
+  "send_email": [
+    // Outbound-only — worker.ts's scheduled health check emails this
+    // address on a down/recovered state change. destination_address must
+    // be a verified Email Routing destination (dashboard/wrangler, sends a
+    // confirmation link) before sends to it actually deliver.
+    { "name": "EMAIL", "destination_address": "shpstack@gmail.com" }
+  ],
+
+  "hyperdrive": [
+    // Proxies to the external Postgres (Neon). The schema needs real
+    // Postgres: Decimal money/qty columns, SELECT...FOR UPDATE row locks
+    // for concurrency-safe stock deduction (PRD §37), and multi-step
+    // interactive transactions — none of which D1/SQLite supports, so per
+    // the PRD's own fallback this is Hyperdrive+Postgres, not D1.
+    { "binding": "HYPERDRIVE", "id": "cc3d4eff84374fd3957618677195fa92", "localConnectionString": "postgresql://wms:wms@localhost:5432/wms" }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      // Replaces the old in-memory EventEmitter pub/sub (src/lib/realtime.ts)
+      // — a Worker isolate is stateless/ephemeral, so SSE subscriber state
+      // has to live in a Durable Object instead of process memory.
+      { "name": "REALTIME_HUB", "class_name": "RealtimeHub" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RealtimeHub"] }
+  ],
+
+  // Two cron schedules dispatched by cron string in worker.ts's `scheduled`
+  // export: daily DB backup (21:00 UTC = 2:30am IST, off-hours), and a
+  // 5-minute uptime/health check that emails on a down->up or up->down
+  // state change (not every run — see runHealthCheck in worker.ts).
+  "triggers": {
+    "crons": ["0 21 * * *", "*/5 * * * *"]
+  }
+}

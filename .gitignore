@@ -1,0 +1,14 @@
+node_modules
+.next
+# The Windows build can't delete these in place (file locks), so the deploy
+# procedure renames them aside and removes them afterwards. Without these two
+# lines a deploy that is interrupted leaves ~900 build artifacts stageable.
+.next.old*
+.open-next.old*
+.env
+*.log
+dist
+.open-next
+.cfbuild
+.wrangler
+src/generated

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>No connection</title>
+<style>
+  body { margin: 0; padding: 48px 16px; background: #fff; color: #1a1a1a; font: 14px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  p { color: #6b6b6b; line-height: 1.5; }
+  a { display: inline-block; margin: 12px 12px 0 0; padding: 8px 14px; border: 1px solid #d8d8d8; border-radius: 4px; color: #1a1a1a; text-decoration: none; }
+  a.primary { background: #1f5fbf; border-color: #1f5fbf; color: #fff; }
+  a:focus-visible { outline: 3px solid #1f5fbf; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>No connection</h1>
+  <p>This screen wasn't saved on this PC. Bills you made are safe and will sync when the internet is back.</p>
+  <a class="primary" href="/finance/orders/new" autofocus>New Order (F2)</a>
+  <a href="/finance/orders">Orders</a>
+</main>
+<script>
+  addEventListener("keydown", (e) => { if (e.key === "F2") { e.preventDefault(); location.href = "/finance/orders/new"; } });
+</script>
+</body>
+</html>

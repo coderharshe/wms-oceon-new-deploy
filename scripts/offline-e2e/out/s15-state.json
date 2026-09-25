@@ -1,0 +1,59 @@
+{
+ "url": "http://localhost:3000/finance/orders/new",
+ "header": "Synced ✓",
+ "outbox": [],
+ "localBills": [
+  {
+   "requestId": "81fdbca2-8488-40e1-9fbf-5f60ec5c0ce3",
+   "offlineRef": "OFF-FIN1-WFA-0922-002",
+   "billedAt": "2026-09-21T18:56:11.114Z",
+   "payload": {
+    "customer": {
+     "ownerName": "E2E-S15",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ]
+   },
+   "display": {
+    "customerName": "E2E-S15",
+    "customerMobile": null,
+    "sellingMode": "WHOLESALE",
+    "notes": null,
+    "lines": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "name": "0 HELL CAN",
+      "unit": "pc",
+      "quantity": 3,
+      "unitPrice": 9,
+      "discount": 0,
+      "lineTotal": 27
+     }
+    ],
+    "subtotal": 27,
+    "discountTotal": 0,
+    "taxTotal": 0,
+    "total": 27
+   },
+   "state": "synced",
+   "cash": [],
+   "updatedAt": "2026-09-21T18:56:13.718Z",
+   "server": {
+    "orderId": "9cabb95a-3218-47d7-89b1-e15c51c0a578",
+    "orderNumber": "ORD-20260922-0022",
+    "billId": "5bf5d0a8-42bc-4c09-8ca0-c8c2819390db",
+    "billNumber": "INV-20260922-0022"
+   }
+  }
+ ]
+}

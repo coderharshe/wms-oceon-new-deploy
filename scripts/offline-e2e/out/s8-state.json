@@ -1,0 +1,157 @@
+{
+ "url": "http://localhost:3000/finance/orders/new",
+ "header": "Needs attention (1)",
+ "outbox": [
+  {
+   "id": "b69d914e-97dd-4bf3-9732-706374adba82",
+   "kind": "bill",
+   "url": "/api/finance/orders",
+   "body": {
+    "customer": {
+     "ownerName": "E2E-S8-GOOD",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ],
+    "offlineRef": "OFF-FIN1-WZ5-0919-011",
+    "billedAt": "2026-09-19T06:44:36.702Z"
+   },
+   "queuedAt": "2026-09-19T06:44:36.703Z",
+   "attempted": true,
+   "attempts": 2,
+   "lastError": "The server returned 500"
+  },
+  {
+   "id": "f6fe8378-c645-4046-8865-d409fb8f5dd4",
+   "kind": "bill",
+   "url": "/api/finance/orders",
+   "body": {
+    "customer": {
+     "ownerName": "E2E-S8-BAD",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "BOGUS",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ],
+    "offlineRef": "OFF-FIN1-WZ5-0919-010",
+    "billedAt": "2026-09-19T06:44:32.887Z"
+   },
+   "queuedAt": "2026-09-19T06:44:32.888Z",
+   "attempted": false,
+   "attempts": 1,
+   "failedAt": "2026-09-19T06:44:38.583Z",
+   "error": "sellingMode: Invalid enum value. Expected 'WHOLESALE' | 'RETAIL', received 'BOGUS'",
+   "status": 400
+  }
+ ],
+ "localBills": [
+  {
+   "requestId": "b69d914e-97dd-4bf3-9732-706374adba82",
+   "offlineRef": "OFF-FIN1-WZ5-0919-011",
+   "billedAt": "2026-09-19T06:44:36.702Z",
+   "payload": {
+    "customer": {
+     "ownerName": "E2E-S8-GOOD",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ]
+   },
+   "display": {
+    "customerName": "E2E-S8-GOOD",
+    "customerMobile": null,
+    "sellingMode": "WHOLESALE",
+    "notes": null,
+    "lines": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "name": "0 HELL CAN",
+      "unit": "pc",
+      "quantity": 3,
+      "unitPrice": 9,
+      "discount": 0,
+      "lineTotal": 27
+     }
+    ],
+    "subtotal": 27,
+    "discountTotal": 0,
+    "taxTotal": 0,
+    "total": 27
+   },
+   "state": "pending",
+   "cash": [],
+   "updatedAt": "2026-09-19T06:44:36.702Z"
+  },
+  {
+   "requestId": "f6fe8378-c645-4046-8865-d409fb8f5dd4",
+   "offlineRef": "OFF-FIN1-WZ5-0919-010",
+   "billedAt": "2026-09-19T06:44:32.887Z",
+   "payload": {
+    "customer": {
+     "ownerName": "E2E-S8-BAD",
+     "type": "WHOLESALE"
+    },
+    "sellingMode": "WHOLESALE",
+    "items": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "quantity": 3,
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "discount": 0,
+      "unitPrice": 9
+     }
+    ]
+   },
+   "display": {
+    "customerName": "E2E-S8-BAD",
+    "customerMobile": null,
+    "sellingMode": "WHOLESALE",
+    "notes": null,
+    "lines": [
+     {
+      "productId": "786dee6e-b878-4229-ba5d-cfd89c91985a",
+      "unitId": "cmsndelxq00017dawbvwcr7ul",
+      "name": "0 HELL CAN",
+      "unit": "pc",
+      "quantity": 3,
+      "unitPrice": 9,
+      "discount": 0,
+      "lineTotal": 27
+     }
+    ],
+    "subtotal": 27,
+    "discountTotal": 0,
+    "taxTotal": 0,
+    "total": 27
+   },
+   "state": "attention",
+   "cash": [],
+   "updatedAt": "2026-09-19T06:44:38.583Z",
+   "error": "sellingMode: Invalid enum value. Expected 'WHOLESALE' | 'RETAIL', received 'BOGUS'"
+  }
+ ]
+}

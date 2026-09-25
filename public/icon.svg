@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <mask id="gap">
+    <rect width="192" height="192" fill="#fff"/>
+    <polygon points="96,26 162,59 104,88 104,110 96,114 30,81 30,59" fill="#000" stroke="#000" stroke-width="9" stroke-linejoin="round"/>
+  </mask>
+  <polygon points="96,166 30,133 88,104 88,82 96,78 162,111 162,133" fill="#dc2626" mask="url(#gap)"/>
+  <polygon points="96,26 162,59 104,88 104,110 96,114 30,81 30,59" fill="#dc2626"/>
+</svg>

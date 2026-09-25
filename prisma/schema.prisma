@@ -1,0 +1,1205 @@
+// WMS + Wholesale/Retail Billing System — data model
+// See docs/PRD.md section 34-35 for the entity list this implements.
+
+generator client {
+  // The newer "prisma-client" generator (not "prisma-client-js") — required
+  // for Cloudflare Workers. prisma-client-js's WASM query-compiler loader
+  // still does a raw fs.readFileSync() for query_compiler_bg.wasm even with
+  // engineType="client", which fails at runtime on Workers (no real
+  // filesystem). prisma-client emits a proper static WASM import instead —
+  // this is Prisma's own documented Cloudflare deployment path.
+  //
+  // engineType still defaults to "library" (native binary) even on this
+  // generator — must be set explicitly or Prisma tries to load a
+  // debian-openssl binary that doesn't exist in the Workers bundle.
+  provider   = "prisma-client"
+  output     = "../src/generated/prisma"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Identity & access ─────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  FINANCE
+  PROCUREMENT
+  INVENTORY
+  BILLING
+  QC
+}
+
+model User {
+  id           String     @id @default(cuid())
+  staffId      String     @unique // login id, e.g. "FIN-001"
+  name         String
+  passwordHash String
+  plainPassword String?
+  role         Role
+  warehouseId  String? // null for ADMIN (global); required for MANAGER/FINANCE/QC
+  warehouse    Warehouse? @relation(fields: [warehouseId], references: [id])
+  active       Boolean    @default(true)
+  theme        String?    @default("default")
+  accentColor  String?
+  fontFamily   String?    @default("inter")
+  fontSize     String?    @default("standard")
+  createdAt    DateTime   @default(now())
+
+  ordersCreated  Order[]              @relation("OrderFinanceUser")
+  billVersions   BillVersion[]        @relation("BillVersionCreatedBy")
+  paymentTx      PaymentTransaction[]
+  qcSessions     QcSession[]          @relation("QcSessionUser")
+  cashSessions   CashSession[]
+  inventoryMoves InventoryMovement[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+  purchaseBills  PurchaseBill[]       @relation("PurchaseBillReceivedBy")
+  requisitions   PurchaseRequisition[] @relation("RequisitionCreatedBy")
+  poCreated      PurchaseOrder[]       @relation("POCreatedBy")
+  poApproved     PurchaseOrder[]       @relation("POApprovedBy")
+  discountsRequested DiscountApproval[] @relation("DiscountRequestedBy")
+  discountsApproved  DiscountApproval[] @relation("DiscountApprovedBy")
+  adjustmentsRequested StockAdjustmentRequest[] @relation("AdjustmentRequestedBy")
+  adjustmentsApproved  StockAdjustmentRequest[] @relation("AdjustmentApprovedBy")
+  countSessions        StockCountSession[]      @relation("CountConductedBy")
+  expensesCreated      Expense[]                @relation("ExpenseCreatedBy")
+  expensesApproved     Expense[]                @relation("ExpenseApprovedBy")
+  vouchersCreated      Voucher[]                @relation("VoucherCreatedBy")
+  vouchersApproved     Voucher[]                @relation("VoucherApprovedBy")
+  tasksAssigned        Task[]                   @relation("TaskAssignedTo")
+  tasksCreated         Task[]                   @relation("TaskCreatedBy")
+
+  @@index([warehouseId])
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users              User[]
+  orders             Order[]
+  bills              Bill[]
+  inventory          Inventory[]
+  inventoryMovements InventoryMovement[]
+  cashSessions       CashSession[]
+  bankBalances       BankBalance[]
+  qcRestrictionRules QcRestrictionRule[]
+  purchaseBills      PurchaseBill[]
+  purchaseRequisitions PurchaseRequisition[]
+  purchaseOrders     PurchaseOrder[]
+  discountApprovals  DiscountApproval[]
+  stockAdjustmentRequests StockAdjustmentRequest[]
+  stockCountSessions      StockCountSession[]
+  expenses           Expense[]
+  vouchers           Voucher[]
+  upiSettlements     UPISettlement[]
+  tasks              Task[]
+  bankTransactions   BankTransaction[]
+}
+
+// ───────────────────────── Product & unit master ─────────────────────────
+
+enum UnitType {
+  WEIGHT
+  VOLUME
+  COUNT
+  CUSTOM
+}
+
+model Unit {
+  id     String   @id @default(cuid())
+  name   String   @unique // "kilogram"
+  symbol String   @unique // "kg"
+  type   UnitType
+
+  productUnits     ProductUnit[]
+  orderItems       OrderItem[]
+  billItems        BillItem[]
+  baseUnitProducts Product[]          @relation("ProductBaseUnit")
+  purchaseItems    PurchaseBillItem[]
+  poItems          PurchaseOrderItem[]
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  sku            String   @unique
+  barcode        String?  @unique
+  qrCode         String?  @unique
+  name           String
+  category       String?
+  brand          String?
+  baseUnitId     String
+  baseUnit       Unit     @relation("ProductBaseUnit", fields: [baseUnitId], references: [id])
+  wholesalePrice Decimal  @db.Decimal(12, 2)
+  retailPrice    Decimal  @db.Decimal(12, 2)
+  taxPercent     Decimal  @default(0) @db.Decimal(5, 2)
+  minStock       Decimal? @db.Decimal(14, 3)
+  maxStock       Decimal? @db.Decimal(14, 3)
+  batchTracked   Boolean  @default(false)
+  expiryTracked  Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  imageKey       String? // R2 object key, served via /api/files/[...key]
+  // Moving weighted-average purchase cost, per *base* unit, recomputed on
+  // every stock receipt (see api/inventory/purchase-bills). Null until the
+  // first purchase bill for this product. Reporting only — never used to
+  // price a sale, which stays wholesalePrice/retailPrice.
+  avgCost        Decimal? @db.Decimal(12, 4)
+  // Set by the catalogue import when a spreadsheet row could not be read with
+  // confidence (price above the MRP in its own name, a red-flagged row, no
+  // price at all). The product still exists and is searchable; the manager
+  // review screen lists these so the guesswork is visible instead of buried.
+  needsReview    Boolean  @default(false)
+  reviewNotes    String?
+
+  saleUnits        ProductUnit[]
+  inventory        Inventory[]
+  orderItems       OrderItem[]
+  billItems        BillItem[]
+  movements        InventoryMovement[]
+  reservations     StockReservation[]
+  qcAdjustments    QcAdjustment[]
+  restrictionRules QcRestrictionRule[]
+  purchaseItems    PurchaseBillItem[]
+  requisitionItems PurchaseRequisitionItem[]
+  poItems          PurchaseOrderItem[]
+  supplierRates    SupplierSkuRate[]
+  adjustmentRequests StockAdjustmentRequest[]
+  stockCountItems    StockCountItem[]
+
+  @@index([category])
+}
+
+// Units a product can be sold in, each with a conversion factor to the product's base unit.
+// e.g. Product "Sugar" base=kg; ProductUnit(unit=g, factorToBase=0.001), ProductUnit(unit=kg, factorToBase=1)
+model ProductUnit {
+  id                String   @id @default(cuid())
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id])
+  unitId            String
+  unit              Unit     @relation(fields: [unitId], references: [id])
+  factorToBase      Decimal  @db.Decimal(14, 6) // qty(this unit) * factorToBase = qty(base unit)
+  isBaseUnit        Boolean  @default(false)
+  // The unit a billing line opens on. Separate from isBaseUnit because the
+  // base unit is always the smallest one (stock has to be stored in it, and a
+  // fractional factor like 1/9 would leak quantity), while the unit people
+  // actually buy is often the peti or the 30kg bag.
+  isDefaultSaleUnit Boolean  @default(false)
+  // Set only when this unit's price is NOT simply the base price times
+  // factorToBase — a peti rate quoted whole (Rs 680 for 9 bottles) can't be
+  // recovered from a 2-decimal per-bottle price without drifting a few paise.
+  // Null means "derive it", which is the common case.
+  wholesalePrice    Decimal? @db.Decimal(12, 2)
+  retailPrice       Decimal? @db.Decimal(12, 2)
+  // Per-packaging barcode: a "box of 24" carries a different code than a
+  // loose piece of the same product. Product.barcode stays the *product's*
+  // manufacturer code; this is the per-unit one, either scanned off the
+  // carton or software-generated (barcodeGenerated) for unbranded goods.
+  barcode           String?  @unique
+  barcodeGenerated  Boolean  @default(false)
+
+  @@unique([productId, unitId])
+}
+
+// ───────────────────────── Customers ─────────────────────────
+
+enum CustomerType {
+  WHOLESALE
+  RETAIL
+}
+
+model Customer {
+  id                 String       @id @default(cuid())
+  shopName           String
+  ownerName          String?
+  // Optional: a walk-in customer often won't give a number. Postgres treats
+  // NULLs as distinct in a unique index, so any number of customers can have
+  // none — but a customer WITH a number is still unique by it, which is what
+  // lets the billing screen match a repeat customer on mobile alone.
+  mobile             String?      @unique
+  address            String?
+  gstin              String?
+  type               CustomerType
+  creditLimit        Decimal?     @db.Decimal(12, 2)
+  outstandingBalance Decimal      @default(0) @db.Decimal(12, 2)
+  status             String       @default("ACTIVE")
+  notes              String?
+  createdAt          DateTime     @default(now())
+
+  orders Order[]
+}
+
+// ───────────────────────── Orders & bills ─────────────────────────
+
+enum SellingMode {
+  WHOLESALE
+  RETAIL
+}
+
+enum OrderStatus {
+  DRAFT
+  BILLED
+  PAYMENT_PENDING
+  PAID
+  READY_FOR_QC
+  QC_IN_PROGRESS
+  QC_ADJUSTMENT_REQUIRED
+  ADDITIONAL_PAYMENT_REQUIRED
+  REFUND_REQUIRED
+  READY_FOR_HANDOVER
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  warehouseId     String
+  warehouse       Warehouse   @relation(fields: [warehouseId], references: [id])
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  financeUserId   String
+  financeUser     User        @relation("OrderFinanceUser", fields: [financeUserId], references: [id])
+  sellingMode     SellingMode
+  status          OrderStatus @default(DRAFT)
+  notes           String?
+  // Billing never refuses a bill: anything wrong with it (a unit that is not
+  // set up, a product with no price, stock billed below zero, a customer over
+  // their credit limit) is billed anyway and recorded here for the manager to
+  // resolve. Same flag/notes pair Product carries for the catalogue import.
+  needsReview     Boolean     @default(false)
+  reviewNotes     String?
+  // Offline-first billing: the PC's own id for the bill (a re-sent bill finds
+  // the order it already became) and the provisional OFF-… slip number the
+  // customer was handed while the till was offline.
+  clientRequestId String?     @unique
+  offlineRef      String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items        OrderItem[]
+  bill         Bill?
+  reservations StockReservation[]
+  qcSessions   QcSession[]
+  discountApprovals DiscountApproval[]
+
+  @@index([warehouseId, status])
+  @@index([customerId])
+  @@index([needsReview])
+  @@index([offlineRef])
+}
+
+// The original ordered lines, as entered by Finance. Immutable once billed.
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Decimal @db.Decimal(14, 3)
+  unitId    String
+  unit      Unit    @relation(fields: [unitId], references: [id])
+  unitPrice Decimal @db.Decimal(12, 2) // price actually used at sale time (wholesale or retail)
+  discount  Decimal @default(0) @db.Decimal(12, 2)
+  taxAmount Decimal @default(0) @db.Decimal(12, 2)
+  lineTotal Decimal @db.Decimal(12, 2)
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  REFUND_DUE
+  REFUNDED
+  PAYMENT_ADJUSTMENT_REQUIRED
+}
+
+// One Bill per order. Never edited in place — every change appends a BillVersion.
+model Bill {
+  id             String        @id @default(cuid())
+  billNumber     String        @unique
+  orderId        String        @unique
+  order          Order         @relation(fields: [orderId], references: [id])
+  warehouseId    String
+  warehouse      Warehouse     @relation(fields: [warehouseId], references: [id])
+  paymentStatus  PaymentStatus @default(UNPAID)
+  currentVersion Int           @default(1)
+  createdAt      DateTime      @default(now())
+
+  versions    BillVersion[]
+  payment     Payment?
+  adjustments PaymentAdjustment[]
+}
+
+enum BillVersionType {
+  FINANCE
+  QC_ADJUSTMENT
+  FINAL
+}
+
+model BillVersion {
+  id              String          @id @default(cuid())
+  billId          String
+  bill            Bill            @relation(fields: [billId], references: [id])
+  versionNumber   Int
+  versionType     BillVersionType
+  subtotal        Decimal         @db.Decimal(12, 2)
+  discountTotal   Decimal         @default(0) @db.Decimal(12, 2)
+  taxTotal        Decimal         @default(0) @db.Decimal(12, 2)
+  total           Decimal         @db.Decimal(12, 2)
+  reason          String?
+  createdByUserId String
+  createdByUser   User            @relation("BillVersionCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime        @default(now())
+
+  items BillItem[]
+
+  @@unique([billId, versionNumber])
+}
+
+enum LineChangeType {
+  KEPT
+  REDUCED
+  // Only a finance/manager bill revision produces this — QC can shorten a
+  // line but never add to it.
+  INCREASED
+  REMOVED
+  ADDED
+  REPLACED
+  UNAVAILABLE
+}
+
+model BillItem {
+  id               String         @id @default(cuid())
+  billVersionId    String
+  billVersion      BillVersion    @relation(fields: [billVersionId], references: [id])
+  productId        String
+  product          Product        @relation(fields: [productId], references: [id])
+  quantity         Decimal        @db.Decimal(14, 3)
+  unitId           String
+  unit             Unit           @relation(fields: [unitId], references: [id])
+  unitPrice        Decimal        @db.Decimal(12, 2)
+  discount         Decimal        @default(0) @db.Decimal(12, 2)
+  taxAmount        Decimal        @default(0) @db.Decimal(12, 2)
+  lineTotal        Decimal        @db.Decimal(12, 2)
+  changeType       LineChangeType @default(KEPT)
+  previousQuantity Decimal?       @db.Decimal(14, 3)
+  reason           String?
+}
+
+// ───────────────────────── Payments ─────────────────────────
+
+enum PaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  CREDIT
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  billId     String   @unique
+  bill       Bill     @relation(fields: [billId], references: [id])
+  amountDue  Decimal  @db.Decimal(12, 2)
+  amountPaid Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+
+  transactions PaymentTransaction[]
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+  ADJUSTMENT
+}
+
+model PaymentTransaction {
+  id               String          @id @default(cuid())
+  paymentId        String
+  payment          Payment         @relation(fields: [paymentId], references: [id])
+  type             TransactionType
+  method           PaymentMethod
+  amount           Decimal         @db.Decimal(12, 2)
+  amountReceived   Decimal?        @db.Decimal(12, 2) // cash tendered
+  changeGiven      Decimal?        @db.Decimal(12, 2)
+  upiReference     String?
+  bankReference    String?         // UTR number or IMPS reference
+  chequeNumber     String?
+  chequeBank       String?
+  chequeDueDate    DateTime?
+  chequeStatus     String?         // PENDING | CLEARED | BOUNCED
+  notes            String?
+  status           String          @default("CONFIRMED") // CONFIRMED | PENDING | FAILED
+  recordedByUserId String
+  recordedByUser   User            @relation(fields: [recordedByUserId], references: [id])
+  timestamp        DateTime        @default(now()) // server-recorded time (authoritative)
+  clickedAt        DateTime?
+}
+
+enum BankTxType {
+  DIRECT_DEPOSIT      // Cash drawer deposited into bank
+  CUSTOMER_TRANSFER   // Customer NEFT/RTGS/IMPS
+  UPI_COLLECTION      // UPI settlement
+  CHEQUE_CLEARANCE    // Inward cheque cleared
+  SUPPLIER_PAYMENT    // Outward vendor payout
+  EXPENSE_PAYOUT      // Operational payout
+  BANK_CHARGES        // Charges or Interest
+  ADJUSTMENT          // Manual adjustment / reconciliation entry
+}
+
+model BankTransaction {
+  id               String          @id @default(cuid())
+  warehouseId      String
+  warehouse        Warehouse       @relation(fields: [warehouseId], references: [id])
+  businessDate     DateTime        @default(now()) @db.Date
+  type             BankTxType
+  amount           Decimal         @db.Decimal(14, 2)
+  isCredit         Boolean         @default(true) // true = Inflow (+), false = Outflow (-)
+  utrReference     String?         // Optional
+  bankName         String?         // Optional
+  accountNumber    String?         // Optional
+  partyName        String?         // Optional
+  notes            String?         // Optional
+  reconciled       Boolean         @default(true)
+  recordedByUserId String?
+  createdAt        DateTime        @default(now())
+
+  @@index([warehouseId, businessDate])
+}
+
+enum AdjustmentResolution {
+  ADDITIONAL_PAYMENT
+  CASH_REFUND
+  UPI_REFUND
+  CUSTOMER_CREDIT
+  MANAGER_ADJUSTMENT
+}
+
+model PaymentAdjustment {
+  id               String                @id @default(cuid())
+  billId           String
+  bill             Bill                  @relation(fields: [billId], references: [id])
+  previousTotal    Decimal               @db.Decimal(12, 2)
+  newTotal         Decimal               @db.Decimal(12, 2)
+  difference       Decimal               @db.Decimal(12, 2) // newTotal - previousTotal
+  resolutionType   AdjustmentResolution?
+  resolvedByUserId String?
+  notes            String?
+  createdAt        DateTime              @default(now())
+}
+
+// ───────────────────────── Cash sessions (EOD) ─────────────────────────
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+model CashSession {
+  id                String            @id @default(cuid())
+  warehouseId       String
+  warehouse         Warehouse         @relation(fields: [warehouseId], references: [id])
+  financeUserId     String
+  financeUser       User              @relation(fields: [financeUserId], references: [id])
+  businessDate      DateTime          @db.Date
+  openingCash       Decimal           @db.Decimal(12, 2)
+  expectedCash      Decimal?          @db.Decimal(12, 2)
+  actualCash        Decimal?          @db.Decimal(12, 2)
+  difference        Decimal?          @db.Decimal(12, 2)
+  status            CashSessionStatus @default(OPEN)
+  discrepancyReason String?
+  closedAt          DateTime?
+  createdAt         DateTime          @default(now())
+
+  transactions CashTransaction[]
+
+  // A drawer is a chain of sessions, not one per day: counting closes the
+  // session and the next cash movement opens another, carrying the count
+  // forward (src/lib/cash.ts). So several per day is normal; at most one
+  // OPEN per person is kept by an advisory lock, not a constraint.
+  @@index([warehouseId, financeUserId, status])
+}
+
+enum CashTxType {
+  SALE
+  REFUND
+  WITHDRAWAL
+  OTHER_RECEIPT
+  BANK_DEPOSIT
+}
+
+model CashTransaction {
+  id            String      @id @default(cuid())
+  cashSessionId String
+  cashSession   CashSession @relation(fields: [cashSessionId], references: [id])
+  type          CashTxType
+  amount        Decimal     @db.Decimal(12, 2)
+  referenceId   String?
+  note          String?
+  timestamp     DateTime    @default(now())
+
+  @@index([cashSessionId])
+}
+
+// The bank balance as read off the statement at the end of a business day,
+// typed in by a manager. Only the balance is stored — what it should have
+// been is worked out from the drawers on read (src/lib/daybook.ts), so a
+// drawer counted late still lands in the right comparison.
+model BankBalance {
+  id              String    @id @default(cuid())
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+  businessDate    DateTime  @db.Date
+  // Only read for the very first entry; after that the opening is the
+  // previous entry's closing.
+  openingBalance  Decimal?  @db.Decimal(14, 2)
+  closingBalance  Decimal   @db.Decimal(14, 2)
+  // Bank movements that aren't sales: charges, supplier payments, transfers.
+  adjustment      Decimal   @default(0) @db.Decimal(14, 2)
+  note            String?
+  enteredByUserId String
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([warehouseId, businessDate])
+}
+
+// ───────────────────────── Inventory ─────────────────────────
+
+model Inventory {
+  id               String    @id @default(cuid())
+  productId        String
+  product          Product   @relation(fields: [productId], references: [id])
+  warehouseId      String
+  warehouse        Warehouse @relation(fields: [warehouseId], references: [id])
+  quantityOnHand   Decimal   @default(0) @db.Decimal(14, 3) // in product base unit
+  quantityReserved Decimal   @default(0) @db.Decimal(14, 3)
+
+  @@unique([productId, warehouseId])
+}
+
+enum MovementType {
+  GRN
+  PUTAWAY
+  SALE
+  QC_ADJUSTMENT
+  RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGE
+  EXPIRY
+  STOCK_COUNT_ADJUSTMENT
+  MANUAL_ADJUSTMENT
+}
+
+model InventoryMovement {
+  id            String       @id @default(cuid())
+  productId     String
+  product       Product      @relation(fields: [productId], references: [id])
+  warehouseId   String
+  warehouse     Warehouse    @relation(fields: [warehouseId], references: [id])
+  beforeQty     Decimal      @db.Decimal(14, 3)
+  movementQty   Decimal      @db.Decimal(14, 3) // signed: negative = deduction
+  afterQty      Decimal      @db.Decimal(14, 3)
+  movementType  MovementType
+  referenceType String? // "ORDER" | "QC_SESSION" | ...
+  referenceId   String?
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  timestamp     DateTime     @default(now())
+
+  @@index([productId, warehouseId])
+}
+
+enum ReservationStatus {
+  ACTIVE
+  RELEASED
+  CONSUMED
+}
+
+model StockReservation {
+  id          String            @id @default(cuid())
+  orderId     String
+  order       Order             @relation(fields: [orderId], references: [id])
+  productId   String
+  product     Product           @relation(fields: [productId], references: [id])
+  warehouseId String
+  quantity    Decimal           @db.Decimal(14, 3)
+  status      ReservationStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  releasedAt  DateTime?
+}
+
+// ───────────────────────── QC ─────────────────────────
+
+enum QcSessionStatus {
+  IN_PROGRESS
+  CHANGES_REQUIRED
+  COMPLETED
+}
+
+model QcSession {
+  id           String          @id @default(cuid())
+  orderId      String
+  order        Order           @relation(fields: [orderId], references: [id])
+  qcUserId     String
+  qcUser       User            @relation("QcSessionUser", fields: [qcUserId], references: [id])
+  status       QcSessionStatus @default(IN_PROGRESS)
+  startedAt    DateTime        @default(now())
+  completedAt  DateTime?
+  // Bumped on claim and on every client heartbeat while the QC page is open.
+  // A session older than QC_LOCK_TIMEOUT_MS (src/lib/qc-lock.ts) counts as
+  // abandoned and can be claimed by a different QC user — see /api/qc/sessions.
+  lastActiveAt DateTime        @default(now())
+
+  adjustments QcAdjustment[]
+}
+
+enum QcAction {
+  KEEP
+  REDUCE
+  REMOVE
+  ADD
+  REPLACE
+  MARK_UNAVAILABLE
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model QcAdjustment {
+  id               String         @id @default(cuid())
+  qcSessionId      String
+  qcSession        QcSession      @relation(fields: [qcSessionId], references: [id])
+  productId        String
+  product          Product        @relation(fields: [productId], references: [id])
+  originalQty      Decimal        @db.Decimal(14, 3)
+  finalQty         Decimal        @db.Decimal(14, 3)
+  unitId           String
+  action           QcAction
+  reason           String?
+  requiresApproval Boolean        @default(false)
+  approvalStatus   ApprovalStatus @default(NOT_REQUIRED)
+  approvedByUserId String?
+  createdAt        DateTime       @default(now())
+}
+
+// Configurable QC modification limits (admin-managed). Most specific match wins:
+// productId+warehouseId > productId only > warehouseId only > global (both null).
+model QcRestrictionRule {
+  id                      String     @id @default(cuid())
+  productId               String?
+  product                 Product?   @relation(fields: [productId], references: [id])
+  warehouseId             String?
+  warehouse               Warehouse? @relation(fields: [warehouseId], references: [id])
+  maxIncreasePercent      Decimal?   @db.Decimal(6, 2)
+  maxDecreasePercent      Decimal?   @db.Decimal(6, 2)
+  maxAbsoluteQty          Decimal?   @db.Decimal(14, 3)
+  allowAddition           Boolean    @default(true)
+  allowRemoval            Boolean    @default(true)
+  reasonMandatory         Boolean    @default(true)
+  managerApprovalRequired Boolean    @default(false)
+  financeApprovalRequired Boolean    @default(false)
+
+  @@unique([productId, warehouseId])
+}
+
+// ───────────────────────── Audit / notifications / settings ─────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  role        Role?
+  warehouseId String?
+  action      String
+  entityType  String
+  entityId    String
+  oldValue    Json?
+  newValue    Json?
+  reason      String?
+  ipAddress   String?
+  timestamp   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  role        Role?
+  warehouseId String?
+  type        String
+  title       String
+  message     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// Atomic sequence generator for human-readable numbers (ORD-, INV-).
+// A plain row + `UPDATE ... RETURNING` takes a row lock, which is all the
+// concurrency safety this needs (PRD §37) — no need for a bigger sequencer.
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}
+
+// Claimed once per client-generated request id before a queueable offline
+// action (stock-in, cash payment) applies — a retried flush of the same
+// queued item hits the unique constraint and is treated as already-done
+// instead of double-applying. See src/lib/idempotency.ts.
+model IdempotencyKey {
+  key       String   @id
+  createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Purchasing (stock-in) ─────────────────────────
+
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  gstin         String? // optional — many small suppliers are unregistered
+  notes         String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  purchaseBills PurchaseBill[]
+  purchaseOrders PurchaseOrder[]
+  requisitionItems PurchaseRequisitionItem[]
+  skuRates       SupplierSkuRate[]
+}
+
+enum PurchasePaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+// A supplier's invoice as received at the gate. Creating one is the only way
+// purchased stock enters inventory — it writes the GRN movements for every
+// line in the same transaction.
+model PurchaseBill {
+  id               String                @id @default(cuid())
+  grnNumber        String                @unique // system-issued, GRN-YYYYMMDD-NNNN
+  supplierBillNo   String // the number printed on the supplier's own bill
+  billDate         DateTime              @db.Date
+  supplierId       String
+  supplier         Supplier              @relation(fields: [supplierId], references: [id])
+  warehouseId      String
+  warehouse        Warehouse             @relation(fields: [warehouseId], references: [id])
+  subtotal         Decimal               @db.Decimal(12, 2) // sum of line amounts
+  gstAmount        Decimal               @default(0) @db.Decimal(12, 2)
+  otherCharges     Decimal               @default(0) @db.Decimal(12, 2) // freight, loading, etc.
+  total            Decimal               @db.Decimal(12, 2)
+  paymentStatus    PurchasePaymentStatus @default(UNPAID)
+  dueDate          DateTime?             @db.Date
+  notes            String?
+  // R2 object keys of the photographed supplier bill (multi-page bills are
+  // common), served via /api/files/[...key]. Optional — stock can be
+  // received now and the photo attached later.
+  invoiceKeys      String[]              @default([])
+  receivedByUserId String
+  receivedByUser   User                  @relation("PurchaseBillReceivedBy", fields: [receivedByUserId], references: [id])
+  createdAt        DateTime              @default(now())
+
+  items PurchaseBillItem[]
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id])
+
+  // The same supplier can't bill the same number twice — catches the most
+  // common double-entry (two clerks keying the same paper bill).
+  @@unique([supplierId, supplierBillNo])
+  @@index([warehouseId, createdAt])
+}
+
+model PurchaseBillItem {
+  id             String       @id @default(cuid())
+  purchaseBillId String
+  purchaseBill   PurchaseBill @relation(fields: [purchaseBillId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id])
+  quantity       Decimal      @db.Decimal(14, 3)
+  unitId         String
+  unit           Unit         @relation(fields: [unitId], references: [id])
+  rate           Decimal      @db.Decimal(12, 2) // purchase rate per `unit`, as printed on the bill
+  amount         Decimal      @db.Decimal(12, 2) // quantity * rate
+
+  @@index([purchaseBillId])
+  @@index([productId])
+}
+
+// ───────────────────────── Procurement & Purchase Orders ─────────────────────────
+
+enum RequisitionStatus {
+  PENDING
+  PO_CREATED
+  CANCELLED
+}
+
+model PurchaseRequisition {
+  id              String            @id @default(cuid())
+  requisitionNo   String            @unique // REQ-YYYYMMDD-NNNN
+  warehouseId     String
+  warehouse       Warehouse         @relation(fields: [warehouseId], references: [id])
+  requestedByUserId String
+  requestedByUser User              @relation("RequisitionCreatedBy", fields: [requestedByUserId], references: [id])
+  status          RequisitionStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime          @default(now())
+
+  items PurchaseRequisitionItem[]
+
+  @@index([warehouseId, status])
+}
+
+model PurchaseRequisitionItem {
+  id            String              @id @default(cuid())
+  requisitionId String
+  requisition   PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product             @relation(fields: [productId], references: [id])
+  requiredQty   Decimal             @db.Decimal(14, 3)
+  currentStock  Decimal             @db.Decimal(14, 3)
+  reorderLevel  Decimal?            @db.Decimal(14, 3)
+  suggestedSupplierId String?
+  suggestedSupplier   Supplier?     @relation(fields: [suggestedSupplierId], references: [id])
+  notes         String?
+}
+
+enum POStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id                String    @id @default(cuid())
+  poNumber          String    @unique // PO-YYYYMMDD-NNNN
+  supplierId        String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id])
+  warehouseId       String
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id])
+  status            POStatus  @default(DRAFT)
+  subtotal          Decimal   @db.Decimal(12, 2)
+  gstAmount         Decimal   @default(0) @db.Decimal(12, 2)
+  freightCharges    Decimal   @default(0) @db.Decimal(12, 2)
+  otherCharges      Decimal   @default(0) @db.Decimal(12, 2)
+  schemeDiscount    Decimal   @default(0) @db.Decimal(12, 2)
+  total             Decimal   @db.Decimal(12, 2)
+  creditDays        Int       @default(0)
+  expectedDelivery  DateTime? @db.Date
+  notes             String?
+  createdByUserId   String
+  createdByUser     User      @relation("POCreatedBy", fields: [createdByUserId], references: [id])
+  approvedByUserId  String?
+  approvedByUser    User?     @relation("POApprovedBy", fields: [approvedByUserId], references: [id])
+  approvalNotes     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  items         PurchaseOrderItem[]
+  purchaseBills PurchaseBill[]
+
+  @@index([warehouseId, status])
+  @@index([supplierId])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Decimal       @db.Decimal(14, 3)
+  unitId          String
+  unit            Unit          @relation(fields: [unitId], references: [id])
+  purchaseRate    Decimal       @db.Decimal(12, 2)
+  schemeDiscount  Decimal       @default(0) @db.Decimal(12, 2)
+  taxPercent      Decimal       @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal       @db.Decimal(12, 2)
+  receivedQty     Decimal       @default(0) @db.Decimal(14, 3)
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+// Supplier-specific rates, terms & schemes per SKU
+model SupplierSkuRate {
+  id           String    @id @default(cuid())
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rate         Decimal   @db.Decimal(12, 2)
+  moq          Decimal   @default(1) @db.Decimal(14, 3)
+  creditDays   Int       @default(0)
+  schemeText   String?   // e.g. "Buy 10 get 1 free" or "3% cash discount"
+  deliveryDays Int       @default(1)
+  active       Boolean   @default(true)
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+}
+
+// ───────────────────────── Billing & Discount Approvals ─────────────────────────
+
+enum DiscountApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DiscountApproval {
+  id                String                 @id @default(cuid())
+  orderId           String?
+  order             Order?                 @relation(fields: [orderId], references: [id])
+  warehouseId       String
+  warehouse         Warehouse              @relation(fields: [warehouseId], references: [id])
+  discountPercent   Decimal                @db.Decimal(5, 2)
+  discountAmount    Decimal                @db.Decimal(12, 2)
+  billAmount        Decimal                @db.Decimal(12, 2)
+  reason            String
+  status            DiscountApprovalStatus @default(PENDING)
+  requestedByUserId String
+  requestedByUser   User                   @relation("DiscountRequestedBy", fields: [requestedByUserId], references: [id])
+  approvedByUserId  String?
+  approvedByUser    User?                  @relation("DiscountApprovedBy", fields: [approvedByUserId], references: [id])
+  approvalNotes     String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([warehouseId, status])
+}
+
+// ───────────────────────── Inventory Team Audit & Count Sessions ─────────────────────────
+
+enum StockAdjustmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model StockAdjustmentRequest {
+  id                String                @id @default(cuid())
+  warehouseId       String
+  warehouse         Warehouse             @relation(fields: [warehouseId], references: [id])
+  productId         String
+  product           Product               @relation(fields: [productId], references: [id])
+  systemQty         Decimal               @db.Decimal(14, 3)
+  physicalQty       Decimal               @db.Decimal(14, 3)
+  varianceQty       Decimal               @db.Decimal(14, 3) // physical - system
+  reason            String
+  status            StockAdjustmentStatus @default(PENDING)
+  requestedByUserId String
+  requestedByUser   User                  @relation("AdjustmentRequestedBy", fields: [requestedByUserId], references: [id])
+  approvedByUserId  String?
+  approvedByUser    User?                 @relation("AdjustmentApprovedBy", fields: [approvedByUserId], references: [id])
+  approvalNotes     String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([warehouseId, status])
+  @@index([productId])
+}
+
+model StockCountSession {
+  id                 String           @id @default(cuid())
+  sessionNo          String           @unique // COUNT-YYYYMMDD-NNNN
+  warehouseId        String
+  warehouse          Warehouse        @relation(fields: [warehouseId], references: [id])
+  conductedByUserId  String
+  conductedByUser    User             @relation("CountConductedBy", fields: [conductedByUserId], references: [id])
+  notes              String?
+  totalSkusCounted   Int              @default(0)
+  totalVarianceCount Int              @default(0)
+  createdAt          DateTime         @default(now())
+
+  items StockCountItem[]
+
+  @@index([warehouseId])
+}
+
+model StockCountItem {
+  id                  String            @id @default(cuid())
+  stockCountSessionId String
+  stockCountSession   StockCountSession @relation(fields: [stockCountSessionId], references: [id], onDelete: Cascade)
+  productId           String
+  product             Product           @relation(fields: [productId], references: [id])
+  systemQty           Decimal           @db.Decimal(14, 3)
+  physicalQty         Decimal           @db.Decimal(14, 3)
+  varianceQty         Decimal           @db.Decimal(14, 3)
+  notes               String?
+
+  @@index([stockCountSessionId])
+  @@index([productId])
+}
+
+// ───────────────────────── Finance Ledgers, Expenses & Vouchers ─────────────────────────
+
+enum ExpenseCategory {
+  RENT
+  ELECTRICITY
+  SALARY
+  TRANSPORT
+  PACKAGING
+  MARKETING
+  SOFTWARE
+  MAINTENANCE
+  MISCELLANEOUS
+}
+
+model Expense {
+  id                String          @id @default(cuid())
+  warehouseId       String
+  warehouse         Warehouse       @relation(fields: [warehouseId], references: [id])
+  amount            Decimal         @db.Decimal(12, 2)
+  category          ExpenseCategory
+  date              DateTime        @db.Date
+  paymentMode       PaymentMethod   @default(CASH)
+  description       String
+  attachmentKey     String?         // R2 key for uploaded bill/receipt image
+  createdByUserId   String
+  createdByUser     User            @relation("ExpenseCreatedBy", fields: [createdByUserId], references: [id])
+  approvedByUserId  String?
+  approvedByUser    User?           @relation("ExpenseApprovedBy", fields: [approvedByUserId], references: [id])
+  createdAt         DateTime        @default(now())
+
+  @@index([warehouseId, category])
+  @@index([date])
+}
+
+enum VoucherType {
+  RECEIPT_VOUCHER
+  PAYMENT_VOUCHER
+}
+
+enum VoucherStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model Voucher {
+  id                String        @id @default(cuid())
+  voucherNo         String        @unique // VOU-YYYYMMDD-NNNN
+  warehouseId       String
+  warehouse         Warehouse     @relation(fields: [warehouseId], references: [id])
+  type              VoucherType
+  date              DateTime      @db.Date
+  partyName         String
+  partyType         String        @default("CUSTOMER") // "CUSTOMER" | "SUPPLIER" | "OTHER"
+  amount            Decimal       @db.Decimal(12, 2)
+  paymentMode       PaymentMethod @default(CASH)
+  referenceNo       String?       // Cheque no, UTR, Bill reference
+  notes             String?
+  status            VoucherStatus @default(APPROVED)
+  createdByUserId   String
+  createdByUser     User          @relation("VoucherCreatedBy", fields: [createdByUserId], references: [id])
+  approvedByUserId  String?
+  approvedByUser    User?         @relation("VoucherApprovedBy", fields: [approvedByUserId], references: [id])
+  createdAt         DateTime      @default(now())
+
+  @@index([warehouseId, type])
+  @@index([date])
+}
+
+enum UPISettlementStatus {
+  PENDING
+  SETTLED
+  DISCREPANCY
+}
+
+model UPISettlement {
+  id                String              @id @default(cuid())
+  warehouseId       String
+  warehouse         Warehouse           @relation(fields: [warehouseId], references: [id])
+  transactionId     String              @unique
+  orderNumber       String?
+  collectionDate    DateTime            @default(now())
+  settlementDate    DateTime?
+  collectedAmount   Decimal             @db.Decimal(12, 2)
+  settlementAmount  Decimal?            @db.Decimal(12, 2)
+  chargesAmount     Decimal?            @default(0) @db.Decimal(12, 2)
+  status            UPISettlementStatus @default(PENDING)
+  notes             String?
+  createdAt         DateTime            @default(now())
+
+  @@index([warehouseId, status])
+}
+
+// ───────────────────────── Manager Task Management & Operations ─────────────────────────
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CANCELLED
+}
+
+model Task {
+  id              String       @id @default(cuid())
+  taskNo          String       @unique // TSK-YYYYMMDD-NNNN
+  title           String
+  description     String
+  department      Role?
+  priority        TaskPriority @default(MEDIUM)
+  status          TaskStatus   @default(PENDING)
+  warehouseId     String
+  warehouse       Warehouse    @relation(fields: [warehouseId], references: [id])
+  assignedToId    String?
+  assignedTo      User?        @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdById     String
+  createdBy       User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  dueDate         DateTime?    @db.Date
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([warehouseId, status])
+  @@index([assignedToId])
+}
+

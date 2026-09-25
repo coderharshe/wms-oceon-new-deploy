@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Theme defaults. A portal overrides these on its PortalShell root
+     (src/lib/themes.ts); anything outside a portal — login, the customer
+     payment screen — paints from here. */
+  :root {
+    --c-paper: 255 255 255;
+    --c-surface: 249 250 251;
+    --c-surface-hi: 243 244 246;
+    --c-ink: 26 26 26;
+    --c-line: 216 216 216;
+    --c-muted: 107 107 107;
+    --c-accent: 31 95 191;
+  }
+
+  html,
+  body {
+    @apply bg-paper text-ink;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * {
+    @apply border-line;
+  }
+  table {
+    @apply w-full border-collapse text-sm;
+  }
+  th {
+    @apply border-b border-line bg-surface px-2 py-1 text-left font-semibold text-ink;
+  }
+  td {
+    @apply border-b border-line px-2 py-1;
+  }
+  input,
+  select,
+  textarea {
+    @apply rounded border border-line bg-paper px-2 py-1 text-sm focus:border-accent;
+  }
+  button {
+    @apply rounded;
+  }
+
+  /* Keyboard-only billing needs the cursor to be findable across the room.
+     This used to be `outline-none` plus a 1px border tint, which is invisible
+     on a bright counter screen — the whole reason staff reached for the mouse.
+     :focus-visible (not :focus) means a mouse click doesn't paint a ring. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline outline-2 outline-offset-1 outline-accent;
+  }
+
+  /* A bill row is seven boxes wide — knowing which *line* you're on matters as
+     much as which box, so the whole row lifts while focus is anywhere in it.
+     A tint of the accent would all but vanish on a dark theme; surface-hi is
+     defined per theme to stay visible against that theme's paper. */
+  tbody tr:focus-within {
+    @apply bg-surface-hi;
+  }
+}
+
+@layer components {
+  /* One shared action-button style: no per-page one-off button CSS. */
+  .btn {
+    @apply rounded border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-surface-hi active:bg-line disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn border-accent bg-accent text-white hover:bg-accent/90;
+  }
+  .btn-danger {
+    @apply btn border-bad bg-bad text-white hover:bg-bad/90;
+  }
+  .card {
+    @apply rounded border border-line bg-paper p-3;
+  }
+  .badge {
+    @apply inline-block rounded px-1.5 py-0.5 text-xs font-medium;
+  }
+}
+
+/* Barcode label printing (src/components/BarcodeLabel.tsx). window.print()
+   from the label sheet should emit just the stickers — not the surrounding
+   portal chrome, nav, or the modal's own buttons. */
+@media print {
+  body:has(#barcode-print-area) * {
+    visibility: hidden;
+  }
+  #barcode-print-area,
+  #barcode-print-area * {
+    visibility: visible;
+  }
+  #barcode-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .barcode-label {
+    page-break-inside: avoid;
+  }
+}
+
+/* Counter screens get read standing up, at arm's length, so everything is
+   uppercase and a size up — finance most of all, since that's the till.
+   text-transform only repaints; the values typed and sent are untouched, but
+   inputs keep their real casing so an email or password reads back correctly. */
+@layer base {
+  html {
+    font-size: 17px;
+  }
+  body {
+    text-transform: uppercase;
+  }
+  input,
+  textarea {
+    text-transform: none;
+  }
+  /* Tailwind's text-sm/text-xs are rem off the root, so finance has to move
+     the root itself — a font-size on the wrapper would leave every one of
+     them behind, and zoom would stretch min-h-screen into a scrollbar. */
+  html:has(.finance-ui) {
+    font-size: 19px;
+  }
+  html:has(.font-size-sm) {
+    font-size: 15px;
+  }
+  html:has(.finance-ui:has(.font-size-sm)),
+  html:has(.finance-ui.font-size-sm) {
+    font-size: 17px;
+  }
+  html:has(.font-size-lg) {
+    font-size: 19px;
+  }
+  html:has(.finance-ui:has(.font-size-lg)),
+  html:has(.finance-ui.font-size-lg) {
+    font-size: 21px;
+  }
+  html:has(.font-size-xl) {
+    font-size: 21px;
+  }
+  html:has(.finance-ui:has(.font-size-xl)),
+  html:has(.finance-ui.font-size-xl) {
+    font-size: 23px;
+  }
+}
