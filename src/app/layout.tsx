@@ -4,8 +4,8 @@ import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import { ThemeApplier } from "@/components/ThemeApplier";
 
 export const metadata: Metadata = {
-  title: "Taresh",
-  description: "Taresh — Wholesale/Retail Warehouse Management System",
+  title: "OCEON-WMS",
+  description: "OCEON-WMS — Wholesale/Retail Warehouse Management System",
   manifest: "/manifest.json",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };

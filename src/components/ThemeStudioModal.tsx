@@ -177,7 +177,7 @@ export function ThemeStudioModal({
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
                     <div className="flex items-center gap-2">
                       <span className="h-3 w-3 rounded-full bg-accent" />
-                      <span className="font-bold text-sm text-ink">Taresh Warehouse Management</span>
+                      <span className="font-bold text-sm text-ink">OCEON-WMS Warehouse Management</span>
                       <span className="badge bg-surface-hi text-muted text-[11px] border border-line">v2.4</span>
                     </div>
                     <span className="badge bg-good/15 text-good font-semibold text-xs">● Active Session</span>

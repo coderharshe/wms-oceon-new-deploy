@@ -77,7 +77,7 @@ export default function PaymentDisplayPage() {
         </>
       )}
 
-      <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs opacity-50">Taresh · © {new Date().getFullYear()} SHP Stacks</p>
+      <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs opacity-50">OCEON-WMS · © {new Date().getFullYear()} SHP Stacks</p>
     </div>
   );
 }

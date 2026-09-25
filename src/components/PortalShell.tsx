@@ -44,10 +44,10 @@ export default function PortalShell({
         <div className="flex flex-wrap items-center gap-3.5">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-surface font-black text-xs shadow-xs">
-              T
+              O
             </span>
             <span className="text-sm font-bold tracking-tight text-ink">
-              Taresh <span className="font-normal text-muted">· {title}</span>
+              OCEON-WMS <span className="font-normal text-muted">· {title}</span>
             </span>
           </div>
 

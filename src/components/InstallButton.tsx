@@ -67,7 +67,7 @@ export default function InstallButton() {
           await e.prompt();
         }}
         className="rounded border border-line px-2 py-1 text-sm hover:bg-surface-hi"
-        title="Install Taresh as an app on this device"
+        title="Install OCEON-WMS as an app on this device"
       >
         Install app
       </button>

@@ -1,7 +1,7 @@
 {
-  "name": "Taresh",
-  "short_name": "Taresh",
-  "description": "Taresh — Wholesale/Retail Warehouse Management System",
+  "name": "OCEON-WMS",
+  "short_name": "OCEON-WMS",
+  "description": "OCEON-WMS — Wholesale/Retail Warehouse Management System",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -6,6 +6,7 @@ import { getActiveSid, loginLockoutSeconds, recordLoginFailure, clearLoginFailur
 const schema = z.object({
   staffId: z.string().min(1),
   password: z.string().min(1),
+  force: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -35,11 +36,9 @@ export async function POST(req: NextRequest) {
   await clearLoginFailures(keys).catch(() => {});
 
   // One active device per account: if a session is already registered for
-  // this user, this plain login is refused — the client shows a "sign out
-  // the other device?" prompt and, if confirmed, calls the takeover flow
-  // instead (see /api/auth/login/takeover*).
+  // this user, this plain login is refused unless force instant sign-in is requested.
   const existingSid = await getActiveSid(user.id).catch(() => undefined);
-  if (existingSid) {
+  if (existingSid && !body.data.force) {
     return NextResponse.json({ error: "ALREADY_LOGGED_IN" }, { status: 409 });
   }
 
