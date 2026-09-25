@@ -11,4 +11,11 @@ dist
 .open-next
 .cfbuild
 .wrangler
-src/generated
+src/generated/prisma
+.claude
+.kiro
+docs_content.txt
+extract_docs.py
+vikas.pdf
+hsncodemaster.xls
+*.tsbuildinfo

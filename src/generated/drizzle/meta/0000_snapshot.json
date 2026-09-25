@@ -1,0 +1,3085 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "prevId": "",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public._prisma_migrations": {
+      "name": "_prisma_migrations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "checksum": {
+          "name": "checksum",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "migration_name": {
+          "name": "migration_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "logs": {
+          "name": "logs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rolled_back_at": {
+          "name": "rolled_back_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "applied_steps_count": {
+          "name": "applied_steps_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.SystemSetting": {
+      "name": "SystemSetting",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Counter": {
+      "name": "Counter",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Warehouse": {
+      "name": "Warehouse",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "Warehouse_code_key": {
+          "name": "Warehouse_code_key",
+          "columns": [
+            {
+              "expression": "code",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.User": {
+      "name": "User",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "staffId": {
+          "name": "staffId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "passwordHash": {
+          "name": "passwordHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "Role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "User_staffId_key": {
+          "name": "User_staffId_key",
+          "columns": [
+            {
+              "expression": "staffId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "User_warehouseId_idx": {
+          "name": "User_warehouseId_idx",
+          "columns": [
+            {
+              "expression": "warehouseId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "User_warehouseId_fkey": {
+          "name": "User_warehouseId_fkey",
+          "tableFrom": "User",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Unit": {
+      "name": "Unit",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "UnitType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "Unit_name_key": {
+          "name": "Unit_name_key",
+          "columns": [
+            {
+              "expression": "name",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Unit_symbol_key": {
+          "name": "Unit_symbol_key",
+          "columns": [
+            {
+              "expression": "symbol",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.ProductUnit": {
+      "name": "ProductUnit",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unitId": {
+          "name": "unitId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "factorToBase": {
+          "name": "factorToBase",
+          "type": "numeric(14, 6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isBaseUnit": {
+          "name": "isBaseUnit",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "ProductUnit_productId_unitId_key": {
+          "name": "ProductUnit_productId_unitId_key",
+          "columns": [
+            {
+              "expression": "productId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "unitId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ProductUnit_productId_fkey": {
+          "name": "ProductUnit_productId_fkey",
+          "tableFrom": "ProductUnit",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "ProductUnit_unitId_fkey": {
+          "name": "ProductUnit_unitId_fkey",
+          "tableFrom": "ProductUnit",
+          "tableTo": "Unit",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "unitId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Order": {
+      "name": "Order",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orderNumber": {
+          "name": "orderNumber",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customerId": {
+          "name": "customerId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "financeUserId": {
+          "name": "financeUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sellingMode": {
+          "name": "sellingMode",
+          "type": "SellingMode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "OrderStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DRAFT'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "Order_customerId_idx": {
+          "name": "Order_customerId_idx",
+          "columns": [
+            {
+              "expression": "customerId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Order_orderNumber_key": {
+          "name": "Order_orderNumber_key",
+          "columns": [
+            {
+              "expression": "orderNumber",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Order_warehouseId_status_idx": {
+          "name": "Order_warehouseId_status_idx",
+          "columns": [
+            {
+              "expression": "warehouseId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "enum_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "status",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Order_warehouseId_fkey": {
+          "name": "Order_warehouseId_fkey",
+          "tableFrom": "Order",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "Order_customerId_fkey": {
+          "name": "Order_customerId_fkey",
+          "tableFrom": "Order",
+          "tableTo": "Customer",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "customerId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "Order_financeUserId_fkey": {
+          "name": "Order_financeUserId_fkey",
+          "tableFrom": "Order",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "financeUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Customer": {
+      "name": "Customer",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "shopName": {
+          "name": "shopName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ownerName": {
+          "name": "ownerName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mobile": {
+          "name": "mobile",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gstin": {
+          "name": "gstin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "CustomerType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creditLimit": {
+          "name": "creditLimit",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outstandingBalance": {
+          "name": "outstandingBalance",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "Customer_mobile_key": {
+          "name": "Customer_mobile_key",
+          "columns": [
+            {
+              "expression": "mobile",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.OrderItem": {
+      "name": "OrderItem",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orderId": {
+          "name": "orderId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unitId": {
+          "name": "unitId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unitPrice": {
+          "name": "unitPrice",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discount": {
+          "name": "discount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "taxAmount": {
+          "name": "taxAmount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "lineTotal": {
+          "name": "lineTotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "OrderItem_orderId_fkey": {
+          "name": "OrderItem_orderId_fkey",
+          "tableFrom": "OrderItem",
+          "tableTo": "Order",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "orderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "OrderItem_productId_fkey": {
+          "name": "OrderItem_productId_fkey",
+          "tableFrom": "OrderItem",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "OrderItem_unitId_fkey": {
+          "name": "OrderItem_unitId_fkey",
+          "tableFrom": "OrderItem",
+          "tableTo": "Unit",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "unitId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Bill": {
+      "name": "Bill",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "billNumber": {
+          "name": "billNumber",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "orderId": {
+          "name": "orderId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paymentStatus": {
+          "name": "paymentStatus",
+          "type": "PaymentStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'UNPAID'"
+        },
+        "currentVersion": {
+          "name": "currentVersion",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "Bill_billNumber_key": {
+          "name": "Bill_billNumber_key",
+          "columns": [
+            {
+              "expression": "billNumber",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Bill_orderId_key": {
+          "name": "Bill_orderId_key",
+          "columns": [
+            {
+              "expression": "orderId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Bill_orderId_fkey": {
+          "name": "Bill_orderId_fkey",
+          "tableFrom": "Bill",
+          "tableTo": "Order",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "orderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "Bill_warehouseId_fkey": {
+          "name": "Bill_warehouseId_fkey",
+          "tableFrom": "Bill",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.BillVersion": {
+      "name": "BillVersion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "billId": {
+          "name": "billId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "versionNumber": {
+          "name": "versionNumber",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "versionType": {
+          "name": "versionType",
+          "type": "BillVersionType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subtotal": {
+          "name": "subtotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discountTotal": {
+          "name": "discountTotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "taxTotal": {
+          "name": "taxTotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "total": {
+          "name": "total",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdByUserId": {
+          "name": "createdByUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "BillVersion_billId_versionNumber_key": {
+          "name": "BillVersion_billId_versionNumber_key",
+          "columns": [
+            {
+              "expression": "billId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "versionNumber",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "BillVersion_billId_fkey": {
+          "name": "BillVersion_billId_fkey",
+          "tableFrom": "BillVersion",
+          "tableTo": "Bill",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "billId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "BillVersion_createdByUserId_fkey": {
+          "name": "BillVersion_createdByUserId_fkey",
+          "tableFrom": "BillVersion",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "createdByUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.BillItem": {
+      "name": "BillItem",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "billVersionId": {
+          "name": "billVersionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unitId": {
+          "name": "unitId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unitPrice": {
+          "name": "unitPrice",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discount": {
+          "name": "discount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "taxAmount": {
+          "name": "taxAmount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "lineTotal": {
+          "name": "lineTotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changeType": {
+          "name": "changeType",
+          "type": "LineChangeType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'KEPT'"
+        },
+        "previousQuantity": {
+          "name": "previousQuantity",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "BillItem_billVersionId_fkey": {
+          "name": "BillItem_billVersionId_fkey",
+          "tableFrom": "BillItem",
+          "tableTo": "BillVersion",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "billVersionId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "BillItem_productId_fkey": {
+          "name": "BillItem_productId_fkey",
+          "tableFrom": "BillItem",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "BillItem_unitId_fkey": {
+          "name": "BillItem_unitId_fkey",
+          "tableFrom": "BillItem",
+          "tableTo": "Unit",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "unitId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Payment": {
+      "name": "Payment",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "billId": {
+          "name": "billId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amountDue": {
+          "name": "amountDue",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amountPaid": {
+          "name": "amountPaid",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "Payment_billId_key": {
+          "name": "Payment_billId_key",
+          "columns": [
+            {
+              "expression": "billId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Payment_billId_fkey": {
+          "name": "Payment_billId_fkey",
+          "tableFrom": "Payment",
+          "tableTo": "Bill",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "billId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.PaymentTransaction": {
+      "name": "PaymentTransaction",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "paymentId": {
+          "name": "paymentId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "TransactionType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "name": "method",
+          "type": "PaymentMethod",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amountReceived": {
+          "name": "amountReceived",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changeGiven": {
+          "name": "changeGiven",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upiReference": {
+          "name": "upiReference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CONFIRMED'"
+        },
+        "recordedByUserId": {
+          "name": "recordedByUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "PaymentTransaction_paymentId_fkey": {
+          "name": "PaymentTransaction_paymentId_fkey",
+          "tableFrom": "PaymentTransaction",
+          "tableTo": "Payment",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "paymentId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "PaymentTransaction_recordedByUserId_fkey": {
+          "name": "PaymentTransaction_recordedByUserId_fkey",
+          "tableFrom": "PaymentTransaction",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "recordedByUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.PaymentAdjustment": {
+      "name": "PaymentAdjustment",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "billId": {
+          "name": "billId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "previousTotal": {
+          "name": "previousTotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "newTotal": {
+          "name": "newTotal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "difference": {
+          "name": "difference",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resolutionType": {
+          "name": "resolutionType",
+          "type": "AdjustmentResolution",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolvedByUserId": {
+          "name": "resolvedByUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "PaymentAdjustment_billId_fkey": {
+          "name": "PaymentAdjustment_billId_fkey",
+          "tableFrom": "PaymentAdjustment",
+          "tableTo": "Bill",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "billId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.CashSession": {
+      "name": "CashSession",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "financeUserId": {
+          "name": "financeUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "businessDate": {
+          "name": "businessDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "openingCash": {
+          "name": "openingCash",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expectedCash": {
+          "name": "expectedCash",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actualCash": {
+          "name": "actualCash",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "difference": {
+          "name": "difference",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "CashSessionStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OPEN'"
+        },
+        "discrepancyReason": {
+          "name": "discrepancyReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closedAt": {
+          "name": "closedAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "CashSession_warehouseId_financeUserId_businessDate_key": {
+          "name": "CashSession_warehouseId_financeUserId_businessDate_key",
+          "columns": [
+            {
+              "expression": "warehouseId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "financeUserId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "businessDate",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "CashSession_warehouseId_fkey": {
+          "name": "CashSession_warehouseId_fkey",
+          "tableFrom": "CashSession",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "CashSession_financeUserId_fkey": {
+          "name": "CashSession_financeUserId_fkey",
+          "tableFrom": "CashSession",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "financeUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.CashTransaction": {
+      "name": "CashTransaction",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "cashSessionId": {
+          "name": "cashSessionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "CashTxType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referenceId": {
+          "name": "referenceId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "CashTransaction_cashSessionId_fkey": {
+          "name": "CashTransaction_cashSessionId_fkey",
+          "tableFrom": "CashTransaction",
+          "tableTo": "CashSession",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "cashSessionId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Inventory": {
+      "name": "Inventory",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantityOnHand": {
+          "name": "quantityOnHand",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "quantityReserved": {
+          "name": "quantityReserved",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        }
+      },
+      "indexes": {
+        "Inventory_productId_warehouseId_key": {
+          "name": "Inventory_productId_warehouseId_key",
+          "columns": [
+            {
+              "expression": "productId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "warehouseId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Inventory_productId_fkey": {
+          "name": "Inventory_productId_fkey",
+          "tableFrom": "Inventory",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "Inventory_warehouseId_fkey": {
+          "name": "Inventory_warehouseId_fkey",
+          "tableFrom": "Inventory",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.InventoryMovement": {
+      "name": "InventoryMovement",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "beforeQty": {
+          "name": "beforeQty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "movementQty": {
+          "name": "movementQty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "afterQty": {
+          "name": "afterQty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "movementType": {
+          "name": "movementType",
+          "type": "MovementType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referenceType": {
+          "name": "referenceType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "referenceId": {
+          "name": "referenceId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "InventoryMovement_productId_warehouseId_idx": {
+          "name": "InventoryMovement_productId_warehouseId_idx",
+          "columns": [
+            {
+              "expression": "productId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "warehouseId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "InventoryMovement_productId_fkey": {
+          "name": "InventoryMovement_productId_fkey",
+          "tableFrom": "InventoryMovement",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "InventoryMovement_warehouseId_fkey": {
+          "name": "InventoryMovement_warehouseId_fkey",
+          "tableFrom": "InventoryMovement",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "InventoryMovement_userId_fkey": {
+          "name": "InventoryMovement_userId_fkey",
+          "tableFrom": "InventoryMovement",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.StockReservation": {
+      "name": "StockReservation",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orderId": {
+          "name": "orderId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "ReservationStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "releasedAt": {
+          "name": "releasedAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "StockReservation_orderId_fkey": {
+          "name": "StockReservation_orderId_fkey",
+          "tableFrom": "StockReservation",
+          "tableTo": "Order",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "orderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "StockReservation_productId_fkey": {
+          "name": "StockReservation_productId_fkey",
+          "tableFrom": "StockReservation",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.QcSession": {
+      "name": "QcSession",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orderId": {
+          "name": "orderId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qcUserId": {
+          "name": "qcUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "QcSessionStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'IN_PROGRESS'"
+        },
+        "startedAt": {
+          "name": "startedAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "completedAt": {
+          "name": "completedAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "QcSession_orderId_fkey": {
+          "name": "QcSession_orderId_fkey",
+          "tableFrom": "QcSession",
+          "tableTo": "Order",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "orderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "QcSession_qcUserId_fkey": {
+          "name": "QcSession_qcUserId_fkey",
+          "tableFrom": "QcSession",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "qcUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.QcAdjustment": {
+      "name": "QcAdjustment",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "qcSessionId": {
+          "name": "qcSessionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "originalQty": {
+          "name": "originalQty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finalQty": {
+          "name": "finalQty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unitId": {
+          "name": "unitId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "QcAction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requiresApproval": {
+          "name": "requiresApproval",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "approvalStatus": {
+          "name": "approvalStatus",
+          "type": "ApprovalStatus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NOT_REQUIRED'"
+        },
+        "approvedByUserId": {
+          "name": "approvedByUserId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "QcAdjustment_qcSessionId_fkey": {
+          "name": "QcAdjustment_qcSessionId_fkey",
+          "tableFrom": "QcAdjustment",
+          "tableTo": "QcSession",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "qcSessionId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "QcAdjustment_productId_fkey": {
+          "name": "QcAdjustment_productId_fkey",
+          "tableFrom": "QcAdjustment",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.QcRestrictionRule": {
+      "name": "QcRestrictionRule",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maxIncreasePercent": {
+          "name": "maxIncreasePercent",
+          "type": "numeric(6, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maxDecreasePercent": {
+          "name": "maxDecreasePercent",
+          "type": "numeric(6, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maxAbsoluteQty": {
+          "name": "maxAbsoluteQty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allowAddition": {
+          "name": "allowAddition",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "allowRemoval": {
+          "name": "allowRemoval",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "reasonMandatory": {
+          "name": "reasonMandatory",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "managerApprovalRequired": {
+          "name": "managerApprovalRequired",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "financeApprovalRequired": {
+          "name": "financeApprovalRequired",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "QcRestrictionRule_productId_warehouseId_key": {
+          "name": "QcRestrictionRule_productId_warehouseId_key",
+          "columns": [
+            {
+              "expression": "productId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "warehouseId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "QcRestrictionRule_productId_fkey": {
+          "name": "QcRestrictionRule_productId_fkey",
+          "tableFrom": "QcRestrictionRule",
+          "tableTo": "Product",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        },
+        "QcRestrictionRule_warehouseId_fkey": {
+          "name": "QcRestrictionRule_warehouseId_fkey",
+          "tableFrom": "QcRestrictionRule",
+          "tableTo": "Warehouse",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.AuditLog": {
+      "name": "AuditLog",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "Role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entityType": {
+          "name": "entityType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entityId": {
+          "name": "entityId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "oldValue": {
+          "name": "oldValue",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "newValue": {
+          "name": "newValue",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ipAddress": {
+          "name": "ipAddress",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "AuditLog_entityType_entityId_idx": {
+          "name": "AuditLog_entityType_entityId_idx",
+          "columns": [
+            {
+              "expression": "entityType",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "entityId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "AuditLog_timestamp_idx": {
+          "name": "AuditLog_timestamp_idx",
+          "columns": [
+            {
+              "expression": "timestamp",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "timestamp_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "AuditLog_userId_fkey": {
+          "name": "AuditLog_userId_fkey",
+          "tableFrom": "AuditLog",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Notification": {
+      "name": "Notification",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "Role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read": {
+          "name": "read",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "Notification_userId_read_idx": {
+          "name": "Notification_userId_read_idx",
+          "columns": [
+            {
+              "expression": "userId",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "read",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Notification_userId_fkey": {
+          "name": "Notification_userId_fkey",
+          "tableFrom": "Notification",
+          "tableTo": "User",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.Product": {
+      "name": "Product",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barcode": {
+          "name": "barcode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qrCode": {
+          "name": "qrCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brand": {
+          "name": "brand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "baseUnitId": {
+          "name": "baseUnitId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wholesalePrice": {
+          "name": "wholesalePrice",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "retailPrice": {
+          "name": "retailPrice",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "taxPercent": {
+          "name": "taxPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "minStock": {
+          "name": "minStock",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maxStock": {
+          "name": "maxStock",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batchTracked": {
+          "name": "batchTracked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "expiryTracked": {
+          "name": "expiryTracked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "imageKey": {
+          "name": "imageKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "Product_barcode_key": {
+          "name": "Product_barcode_key",
+          "columns": [
+            {
+              "expression": "barcode",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Product_category_idx": {
+          "name": "Product_category_idx",
+          "columns": [
+            {
+              "expression": "category",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Product_qrCode_key": {
+          "name": "Product_qrCode_key",
+          "columns": [
+            {
+              "expression": "qrCode",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "Product_sku_key": {
+          "name": "Product_sku_key",
+          "columns": [
+            {
+              "expression": "sku",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "Product_baseUnitId_fkey": {
+          "name": "Product_baseUnitId_fkey",
+          "tableFrom": "Product",
+          "tableTo": "Unit",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "baseUnitId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.AdjustmentResolution": {
+      "name": "AdjustmentResolution",
+      "values": [
+        "ADDITIONAL_PAYMENT",
+        "CASH_REFUND",
+        "UPI_REFUND",
+        "CUSTOMER_CREDIT",
+        "MANAGER_ADJUSTMENT"
+      ],
+      "schema": "public"
+    },
+    "public.ApprovalStatus": {
+      "name": "ApprovalStatus",
+      "values": [
+        "NOT_REQUIRED",
+        "PENDING",
+        "APPROVED",
+        "REJECTED"
+      ],
+      "schema": "public"
+    },
+    "public.BillVersionType": {
+      "name": "BillVersionType",
+      "values": [
+        "FINANCE",
+        "QC_ADJUSTMENT",
+        "FINAL"
+      ],
+      "schema": "public"
+    },
+    "public.CashSessionStatus": {
+      "name": "CashSessionStatus",
+      "values": [
+        "OPEN",
+        "CLOSED"
+      ],
+      "schema": "public"
+    },
+    "public.CashTxType": {
+      "name": "CashTxType",
+      "values": [
+        "SALE",
+        "REFUND",
+        "WITHDRAWAL",
+        "OTHER_RECEIPT"
+      ],
+      "schema": "public"
+    },
+    "public.CustomerType": {
+      "name": "CustomerType",
+      "values": [
+        "WHOLESALE",
+        "RETAIL"
+      ],
+      "schema": "public"
+    },
+    "public.LineChangeType": {
+      "name": "LineChangeType",
+      "values": [
+        "KEPT",
+        "REDUCED",
+        "REMOVED",
+        "ADDED",
+        "REPLACED",
+        "UNAVAILABLE"
+      ],
+      "schema": "public"
+    },
+    "public.MovementType": {
+      "name": "MovementType",
+      "values": [
+        "GRN",
+        "PUTAWAY",
+        "SALE",
+        "QC_ADJUSTMENT",
+        "RETURN",
+        "TRANSFER_IN",
+        "TRANSFER_OUT",
+        "DAMAGE",
+        "EXPIRY",
+        "STOCK_COUNT_ADJUSTMENT",
+        "MANUAL_ADJUSTMENT"
+      ],
+      "schema": "public"
+    },
+    "public.OrderStatus": {
+      "name": "OrderStatus",
+      "values": [
+        "DRAFT",
+        "BILLED",
+        "PAYMENT_PENDING",
+        "PAID",
+        "READY_FOR_QC",
+        "QC_IN_PROGRESS",
+        "QC_ADJUSTMENT_REQUIRED",
+        "ADDITIONAL_PAYMENT_REQUIRED",
+        "REFUND_REQUIRED",
+        "READY_FOR_HANDOVER",
+        "COMPLETED",
+        "CANCELLED"
+      ],
+      "schema": "public"
+    },
+    "public.PaymentMethod": {
+      "name": "PaymentMethod",
+      "values": [
+        "CASH",
+        "UPI"
+      ],
+      "schema": "public"
+    },
+    "public.PaymentStatus": {
+      "name": "PaymentStatus",
+      "values": [
+        "UNPAID",
+        "PENDING",
+        "PARTIALLY_PAID",
+        "PAID",
+        "REFUND_DUE",
+        "REFUNDED",
+        "PAYMENT_ADJUSTMENT_REQUIRED"
+      ],
+      "schema": "public"
+    },
+    "public.QcAction": {
+      "name": "QcAction",
+      "values": [
+        "KEEP",
+        "REDUCE",
+        "REMOVE",
+        "ADD",
+        "REPLACE",
+        "MARK_UNAVAILABLE"
+      ],
+      "schema": "public"
+    },
+    "public.QcSessionStatus": {
+      "name": "QcSessionStatus",
+      "values": [
+        "IN_PROGRESS",
+        "CHANGES_REQUIRED",
+        "COMPLETED"
+      ],
+      "schema": "public"
+    },
+    "public.ReservationStatus": {
+      "name": "ReservationStatus",
+      "values": [
+        "ACTIVE",
+        "RELEASED",
+        "CONSUMED"
+      ],
+      "schema": "public"
+    },
+    "public.Role": {
+      "name": "Role",
+      "values": [
+        "ADMIN",
+        "MANAGER",
+        "FINANCE",
+        "QC"
+      ],
+      "schema": "public"
+    },
+    "public.SellingMode": {
+      "name": "SellingMode",
+      "values": [
+        "WHOLESALE",
+        "RETAIL"
+      ],
+      "schema": "public"
+    },
+    "public.TransactionType": {
+      "name": "TransactionType",
+      "values": [
+        "PAYMENT",
+        "REFUND",
+        "ADJUSTMENT"
+      ],
+      "schema": "public"
+    },
+    "public.UnitType": {
+      "name": "UnitType",
+      "values": [
+        "WEIGHT",
+        "VOLUME",
+        "COUNT",
+        "CUSTOM"
+      ],
+      "schema": "public"
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {}
+  }
+}
