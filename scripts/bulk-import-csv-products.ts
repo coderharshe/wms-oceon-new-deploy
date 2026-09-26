@@ -1023,7 +1023,7 @@ async function main() {
     seenNames.add(lowerKey);
 
     const sku = generateSku(cleanName, idx++, seenSkus);
-    const unitId = unitMap[row.unit] || unitMap.pc || dbUnits[0].id;
+    const unitId = unitMap[row.unit] || unitMap.pc || dbUnits[0]?.id || "";
     const wp = parseFloat(row.wp) || 0;
     const rp = parseFloat(row.rp) || wp;
 

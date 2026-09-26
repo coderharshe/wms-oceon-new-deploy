@@ -44,6 +44,17 @@ model User {
   warehouseId  String? // null for ADMIN (global); required for MANAGER/FINANCE/QC
   warehouse    Warehouse? @relation(fields: [warehouseId], references: [id])
   active       Boolean    @default(true)
+  contact      String?
+  designation  String?
+  city         String?
+  town         String?
+  employmentType String?   @default("Full-time")
+  shift        String?    @default("General")
+  joiningDate  String?
+  endingDate   String?
+  salary       String?
+  bankUpi      String?
+  reportingManager String?
   theme        String?    @default("default")
   accentColor  String?
   fontFamily   String?    @default("inter")
@@ -73,6 +84,8 @@ model User {
   vouchersApproved     Voucher[]                @relation("VoucherApprovedBy")
   tasksAssigned        Task[]                   @relation("TaskAssignedTo")
   tasksCreated         Task[]                   @relation("TaskCreatedBy")
+  attendances          StaffAttendance[]        @relation("StaffAttendanceUser")
+  markedAttendances    StaffAttendance[]        @relation("AttendanceMarkedBy")
 
   @@index([warehouseId])
 }
@@ -104,6 +117,37 @@ model Warehouse {
   upiSettlements     UPISettlement[]
   tasks              Task[]
   bankTransactions   BankTransaction[]
+  attendances        StaffAttendance[]        @relation("StaffAttendanceWarehouse")
+  stockBatches       StockBatch[]
+}
+
+enum AttendanceStatus {
+  PRESENT
+  HALF_DAY
+  PAID_LEAVE
+  ABSENT
+  OVERTIME
+}
+
+model StaffAttendance {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation("StaffAttendanceUser", fields: [userId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse        @relation("StaffAttendanceWarehouse", fields: [warehouseId], references: [id], onDelete: Cascade)
+  date        String           // YYYY-MM-DD
+  status      AttendanceStatus @default(PRESENT)
+  occasion    String?          // e.g. "Diwali Festival", "National Holiday", "Sick Leave", "Casual Leave", "Paid Occasion"
+  overtimeHrs Decimal?         @default(0)
+  notes       String?
+  markedById  String?
+  markedBy    User?            @relation("AttendanceMarkedBy", fields: [markedById], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([userId, date])
+  @@index([warehouseId, date])
+  @@index([date])
 }
 
 // ───────────────────────── Product & unit master ─────────────────────────
@@ -175,6 +219,7 @@ model Product {
   supplierRates    SupplierSkuRate[]
   adjustmentRequests StockAdjustmentRequest[]
   stockCountItems    StockCountItem[]
+  stockBatches     StockBatch[]
 
   @@index([category])
 }
@@ -780,16 +825,26 @@ model IdempotencyKey {
 // ───────────────────────── Purchasing (stock-in) ─────────────────────────
 
 model Supplier {
-  id            String   @id @default(cuid())
-  name          String   @unique
+  id            String    @id @default(cuid())
+  name          String    @unique
+  category      String?
   contactPerson String?
   phone         String?
   email         String?
   address       String?
-  gstin         String? // optional — many small suppliers are unregistered
+  city          String?
+  state         String?
+  gstin         String?
+  paymentTerms  String?
+  bankDetails   String?
+  contractStart DateTime? @db.Date
+  contractEnd   DateTime? @db.Date
+  supplyType    String?   @default("INWARD")
+  creditDays    Int       @default(0)
+  creditLimit   Decimal?  @db.Decimal(12, 2)
   notes         String?
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
 
   purchaseBills PurchaseBill[]
   purchaseOrders PurchaseOrder[]
@@ -851,6 +906,9 @@ model PurchaseBillItem {
   unit           Unit         @relation(fields: [unitId], references: [id])
   rate           Decimal      @db.Decimal(12, 2) // purchase rate per `unit`, as printed on the bill
   amount         Decimal      @db.Decimal(12, 2) // quantity * rate
+  batchNumber    String?
+  mfgDate        DateTime?    @db.Date
+  expiryDate     DateTime?    @db.Date
 
   @@index([purchaseBillId])
   @@index([productId])
@@ -1202,4 +1260,27 @@ model Task {
   @@index([warehouseId, status])
   @@index([assignedToId])
 }
+
+// ───────────────────────── Stock Batch & Expiry Tracking ─────────────────────────
+
+model StockBatch {
+  id             String    @id @default(cuid())
+  batchNumber    String    // e.g. "BAT-2026-0901"
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId    String
+  warehouse      Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantityOnHand Decimal   @default(0) @db.Decimal(14, 3)
+  costRate       Decimal?  @db.Decimal(12, 2)
+  mfgDate        DateTime? @db.Date
+  expiryDate     DateTime  @db.Date
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([productId, warehouseId, batchNumber])
+  @@index([warehouseId, expiryDate])
+  @@index([expiryDate])
+}
+
 

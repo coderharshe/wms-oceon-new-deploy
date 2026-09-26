@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ["*.trycloudflare.com"],
   eslint: { ignoreDuringBuilds: true },
   // Barcode scanning (src/components/BarcodeScanButton.tsx) calls
   // getUserMedia. Without an explicit Permissions-Policy some browsers deny

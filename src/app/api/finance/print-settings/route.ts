@@ -7,5 +7,5 @@ import { getSetting } from "@/lib/settings";
 export async function GET() {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
   if (isErrorResponse(session)) return session;
-  return NextResponse.json({ businessName: (await getSetting("BUSINESS_NAME")) || "Store" });
+  return NextResponse.json({ businessName: (await getSetting("BUSINESS_NAME")) || "Hub" });
 }

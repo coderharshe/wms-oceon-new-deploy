@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "QC"]);
   if (isErrorResponse(session)) return session;
 
-  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId!;
+  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
 
   if (isWorkersRuntime()) {
     const { getDrizzleDb } = await import("@/lib/drizzle-db");

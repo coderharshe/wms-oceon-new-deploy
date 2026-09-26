@@ -6,7 +6,7 @@ import { invalidateJson } from "@/lib/kv-cache";
 import { isWorkersRuntime } from "@/lib/cf-env";
 
 // Same roles that may create a unit (see the collection route's POST).
-const ROLES = ["ADMIN", "MANAGER"] as const;
+const ROLES = ["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT"] as const;
 
 const schema = z.object({
   name: z.string().trim().min(1).optional(),

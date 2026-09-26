@@ -14,7 +14,7 @@ const LINKS = [
   { href: "/manager/cash", label: "Cash & Bank" },
   { href: "/manager/customers", label: "Customers" },
   { href: "/manager/suppliers", label: "Suppliers" },
-  { href: "/manager/staff", label: "Staff" },
+  { href: "/manager/staff", label: "Staff & Users" },
   { href: "/manager/reports", label: "Reports" },
   { href: "/manager/transactions", label: "Transactions" },
   { href: "/manager/warehouse", label: "Warehouse" },

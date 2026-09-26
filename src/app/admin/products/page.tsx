@@ -10,6 +10,7 @@ import { Highlight, matchesQuery } from "@/components/Highlight";
 import { useDebounced } from "@/lib/useDebounced";
 import { BarcodeLabelSheet, type LabelSpec } from "@/components/BarcodeLabel";
 import { readError } from "@/lib/read-error";
+import { InventoryLedgerView } from "@/components/InventoryLedgerView";
 
 type Unit = { id: string; symbol: string; name: string };
 type SaleUnit = { unitId: string; unit: Unit; factorToBase: string; isBaseUnit: boolean; barcode: string | null; wholesalePrice: string | null; retailPrice: string | null };
@@ -61,6 +62,8 @@ function labelsForProduct(p: Product): LabelSpec[] {
 }
 
 export default function ProductsPage() {
+  const [sectionTab, setSectionTab] = useState<"ledger" | "catalog">("ledger");
+
   // The search has to reach the server: /api/admin/products returns 200 rows
   // and the catalogue is several times that, so filtering only what was
   // loaded made most of it unreachable. The client filter stays as a second
@@ -73,7 +76,10 @@ export default function ProductsPage() {
   // for one optional flag — same reasoning as Inventory's #low.
   useEffect(() => {
     const from = new URLSearchParams(window.location.search).get("q");
-    if (from) setQ(from);
+    if (from) {
+      setQ(from);
+      setSectionTab("catalog");
+    }
   }, []);
   const debouncedQ = useDebounced(q.trim());
   const { data: productsData, error: loadError, loading, reload: load } = useApiGet<Product[]>(`/api/admin/products?q=${encodeURIComponent(debouncedQ)}`);
@@ -155,10 +161,44 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="space-y-3">
-      <h1 className="text-lg font-semibold">Products</h1>
-      {loadError && <ErrorRetry message={loadError} onRetry={load} />}
-      <div className="card space-y-2">
+    <div className="space-y-4">
+      {/* Top Header & Tab Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-ink">Inventory</h1>
+        </div>
+
+        {/* Section Tabs */}
+        <div className="flex items-center gap-1.5 bg-surface-2 p-1 rounded-lg border border-line">
+          <button
+            onClick={() => setSectionTab("ledger")}
+            className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+              sectionTab === "ledger" ? "bg-accent text-white shadow-xs" : "text-muted hover:text-ink"
+            }`}
+          >
+            📑 Inventory Ledger & Health
+          </button>
+          <button
+            onClick={() => setSectionTab("catalog")}
+            className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+              sectionTab === "catalog" ? "bg-accent text-white shadow-xs" : "text-muted hover:text-ink"
+            }`}
+          >
+            📦 Product Catalog & Master
+          </button>
+        </div>
+      </div>
+
+      {/* Tab 1: Comprehensive Inventory Ledger */}
+      {sectionTab === "ledger" && (
+        <InventoryLedgerView portalRole="ADMIN" />
+      )}
+
+      {/* Tab 2: Catalog & Product Creation */}
+      {sectionTab === "catalog" && (
+        <div className="space-y-3">
+          {loadError && <ErrorRetry message={loadError} onRetry={load} />}
+          <div className="card space-y-2">
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <label className="mb-1 block text-xs text-muted">SKU</label>
@@ -347,6 +387,8 @@ export default function ProductsPage() {
 
       {editing && <EditProductModal product={editing} onClose={() => setEditing(null)} onSaved={load} />}
       {printing && <BarcodeLabelSheet labels={printing} onClose={() => setPrinting(null)} />}
+        </div>
+      )}
     </div>
   );
 }

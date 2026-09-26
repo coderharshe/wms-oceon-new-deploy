@@ -10,7 +10,7 @@ export async function buildUpiLink(args: { amount: string; orderNumber: string; 
   // No placeholder fallback: an unconfigured VPA still renders a perfectly
   // scannable QR, so the customer's money would go to whoever owns it.
   if (!vpa) throw new UpiNotConfiguredError("UPI VPA is not configured");
-  const name = (await getSetting("BUSINESS_NAME")) || "Store";
+  const name = (await getSetting("BUSINESS_NAME")) || "Hub";
   const params = new URLSearchParams({
     pa: vpa,
     pn: name,

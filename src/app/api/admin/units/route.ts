@@ -7,7 +7,7 @@ import { isWorkersRuntime } from "@/lib/cf-env";
 // Units change only via deliberate admin action — a generous TTL is safe,
 // and every product/order/QC screen loads this list on mount.
 export async function GET() {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "QC"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "QC", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
   if (isWorkersRuntime()) {
@@ -26,7 +26,7 @@ export async function GET() {
 const schema = z.object({ name: z.string().min(1), symbol: z.string().min(1), type: z.enum(["WEIGHT", "VOLUME", "COUNT", "CUSTOM"]) });
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

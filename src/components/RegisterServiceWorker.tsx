@@ -32,7 +32,22 @@ export default function RegisterServiceWorker() {
   const pathname = usePathname();
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      if (process.env.NODE_ENV === "development") {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        }).catch(() => {});
+        if ("caches" in window) {
+          caches.keys().then((keys) => {
+            for (const key of keys) {
+              caches.delete(key);
+            }
+          }).catch(() => {});
+        }
+      } else {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
     }
     startQueueFlusher();
   }, []);

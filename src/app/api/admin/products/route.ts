@@ -6,7 +6,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { fail } from "@/lib/api-error";
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT", "FINANCE", "BILLING", "QC"]);
   if (isErrorResponse(session)) return session;
   const q = req.nextUrl.searchParams.get("q")?.trim();
 
@@ -70,7 +70,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
   // Finance creating a product mid-bill is a manager-controlled privilege, and

@@ -298,7 +298,7 @@ export default function SettingsPage() {
                 <div className="flex gap-2">
                   <input
                     className="input flex-1 text-xs font-mono"
-                    placeholder="e.g. store@upi or merchant@icici"
+                    placeholder="e.g. hub@upi or merchant@icici"
                     value={values.UPI_VPA ?? ""}
                     onChange={(e) => setValues({ ...values, UPI_VPA: e.target.value })}
                   />
@@ -355,7 +355,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-ink">
-                  Physical Store Address <span className="text-muted font-normal">(Printed on Tax Invoices)</span>
+                  Physical Hub / Business Address <span className="text-muted font-normal">(Printed on Tax Invoices)</span>
                 </label>
                 <textarea
                   className="input w-full text-xs"

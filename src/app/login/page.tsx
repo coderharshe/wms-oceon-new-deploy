@@ -24,7 +24,8 @@ function LoginForm() {
   const [passwordVal, setPasswordVal] = useState("");
   const [alreadyIn, setAlreadyIn] = useState<{ staffId: string; password: string } | null>(null);
   const [takeover, setTakeover] = useState<Takeover | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  // FIX: Initialize to null, set via useEffect after mount (avoids hydration mismatch)
+  const [now, setNow] = useState<number | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const alreadyInRef = useRef<{ staffId: string; password: string } | null>(null);
 
@@ -111,6 +112,13 @@ function LoginForm() {
     setTakeover({ takeoverId: body.takeoverId, secret: body.secret, expiresAt: body.expiresAt });
   }
 
+  // Set the initial "now" timestamp after client mount (prevents hydration mismatch)
+  useEffect(() => {
+    if (takeover) {
+      setNow(Date.now());
+    }
+  }, [takeover]);
+
   // Poll while a takeover is pending; this same poll is what finalizes it once grace period elapses
   useEffect(() => {
     if (!takeover) return;
@@ -150,7 +158,7 @@ function LoginForm() {
     executeLogin(id, "password123", true);
   }
 
-  if (takeover) {
+  if (takeover && now !== null) {
     const secondsLeft = Math.max(0, Math.round((takeover.expiresAt - now) / 1000));
     return (
       <div className="card w-80 space-y-4 text-center p-6 shadow-xl border border-line">
@@ -303,7 +311,7 @@ function LoginForm() {
       {/* 1-Click Quick Demo Sign In */}
       <div className="pt-2 border-t border-line">
         <p className="text-[11px] text-muted text-center mb-2 font-medium">⚡ Quick 1-Click Instant Sign In:</p>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={() => quickLogin("ADMIN-1")}
@@ -320,6 +328,13 @@ function LoginForm() {
           </button>
           <button
             type="button"
+            onClick={() => quickLogin("BILL-1")}
+            className="px-2 py-1.5 text-xs font-semibold rounded bg-surface hover:bg-accent hover:text-white border border-line text-ink transition-colors text-center"
+          >
+            🧾 Billing
+          </button>
+          <button
+            type="button"
             onClick={() => quickLogin("FIN-1")}
             className="px-2 py-1.5 text-xs font-semibold rounded bg-surface hover:bg-accent hover:text-white border border-line text-ink transition-colors text-center"
           >
@@ -327,10 +342,26 @@ function LoginForm() {
           </button>
           <button
             type="button"
-            onClick={() => quickLogin("QC-1")}
+            onClick={() => quickLogin("INV-1")}
             className="px-2 py-1.5 text-xs font-semibold rounded bg-surface hover:bg-accent hover:text-white border border-line text-ink transition-colors text-center"
           >
-            🔬 QC
+            📊 Inventory
+          </button>
+          <button
+            type="button"
+            onClick={() => quickLogin("PROC-1")}
+            className="px-2 py-1.5 text-xs font-semibold rounded bg-surface hover:bg-accent hover:text-white border border-line text-ink transition-colors text-center"
+          >
+            🚚 Procure
+          </button>
+        </div>
+        <div className="mt-1.5">
+          <button
+            type="button"
+            onClick={() => quickLogin("QC-1")}
+            className="w-full px-2 py-1.5 text-xs font-semibold rounded bg-surface hover:bg-accent hover:text-white border border-line text-ink transition-colors text-center"
+          >
+            🔬 QC / Verification
           </button>
         </div>
       </div>

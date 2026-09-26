@@ -51,7 +51,7 @@ export default function ReceivablesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold">Customer Receivables & Ageing Analysis</h1>
+          <h1 className="text-lg font-bold">Receivables</h1>
           <p className="text-xs text-muted">Outstanding invoices, credit limits, and collection ageing buckets</p>
         </div>
         <div className="w-72">
@@ -123,9 +123,8 @@ export default function ReceivablesPage() {
                 <td className="py-2 text-good">₹{r.amountPaid.toFixed(2)}</td>
                 <td className="py-2 font-bold text-bad">₹{r.balanceDue.toFixed(2)}</td>
                 <td className="py-2">
-                  <span className={`badge text-xs font-semibold ${
-                    r.ageDays > 30 ? "bg-bad text-white" : r.ageDays > 15 ? "bg-warn text-white" : "bg-surface-hi text-ink"
-                  }`}>
+                  <span className={`badge text-xs font-semibold ${r.ageDays > 30 ? "bg-bad text-white" : r.ageDays > 15 ? "bg-warn text-white" : "bg-surface-hi text-ink"
+                    }`}>
                     {r.ageDays} Days
                   </span>
                 </td>

@@ -30,15 +30,18 @@ async function main() {
   const passwordHash = await bcrypt.hash("password123", 10);
   const plainPassword = "password123";
   const users = [
-    { staffId: "ADMIN-1", name: "Asha Admin", role: "ADMIN" as const, warehouseId: null },
-    { staffId: "MGR-1", name: "Manoj Manager", role: "MANAGER" as const, warehouseId: warehouse.id },
-    { staffId: "FIN-1", name: "Farah Finance", role: "FINANCE" as const, warehouseId: warehouse.id },
-    { staffId: "QC-1", name: "Qasim QC", role: "QC" as const, warehouseId: warehouse.id },
+    { staffId: "ADMIN-1", name: "Asha Admin", role: "ADMIN" as const, warehouseId: null, contact: "9811000001", designation: "General Administrator", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "General", joiningDate: "2024-01-15", salary: "65,000", bankUpi: "UPI:asha@hdfc", reportingManager: "Managing Director" },
+    { staffId: "MGR-1", name: "Manoj Manager", role: "MANAGER" as const, warehouseId: warehouse.id, contact: "9811000002", designation: "Warehouse Manager", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "8AM–5PM", joiningDate: "2024-03-01", salary: "45,000", bankUpi: "UPI:manoj@icici", reportingManager: "Asha Admin" },
+    { staffId: "BILL-1", name: "Bikram Billing", role: "BILLING" as const, warehouseId: warehouse.id, contact: "9811000003", designation: "Head Cashier / Billing", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "9AM–6PM", joiningDate: "2024-05-10", salary: "22,000", bankUpi: "UPI:bikram@paytm", reportingManager: "Manoj Manager" },
+    { staffId: "FIN-1", name: "Farah Finance", role: "FINANCE" as const, warehouseId: warehouse.id, contact: "9811000004", designation: "Accounts Executive", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "9AM–6PM", joiningDate: "2024-04-12", salary: "32,000", bankUpi: "UPI:farah@axis", reportingManager: "Manoj Manager" },
+    { staffId: "INV-1", name: "Irfan Inventory", role: "INVENTORY" as const, warehouseId: warehouse.id, contact: "9811000005", designation: "Senior Picker / Stock Clerk", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "6AM–2PM", joiningDate: "2024-06-01", salary: "18,000", bankUpi: "UPI:irfan@upi", reportingManager: "Manoj Manager" },
+    { staffId: "PROC-1", name: "Pooja Procurement", role: "PROCUREMENT" as const, warehouseId: warehouse.id, contact: "9811000006", designation: "Procurement Officer", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "9AM–6PM", joiningDate: "2024-05-20", salary: "28,000", bankUpi: "UPI:pooja@sbi", reportingManager: "Manoj Manager" },
+    { staffId: "QC-1", name: "Qasim QC", role: "QC" as const, warehouseId: warehouse.id, contact: "9811000007", designation: "Quality Checker", city: "Gurugram", town: "Haryana", employmentType: "Full-time", shift: "7AM–3PM", joiningDate: "2024-06-15", salary: "20,000", bankUpi: "UPI:qasim@okaxis", reportingManager: "Manoj Manager" },
   ];
   for (const u of users) {
     await db.user.upsert({
       where: { staffId: u.staffId },
-      update: { plainPassword },
+      update: { ...u, plainPassword },
       create: { ...u, passwordHash, plainPassword },
     });
   }

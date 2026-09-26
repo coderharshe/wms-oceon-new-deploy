@@ -82,16 +82,21 @@ export function movingAverageCost(args: {
 
 export const supplierSchema = z.object({
   name: z.string().min(1),
-  contactPerson: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  address: z.string().optional(),
-  // Optional by design — plenty of small suppliers are unregistered. Format
-  // is still checked when one is given, so a typo doesn't reach the books.
-  gstin: z
-    .string()
-    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z][Z][0-9A-Z]$/, "Not a valid 15-character GSTIN")
-    .optional()
-    .or(z.literal("")),
-  notes: z.string().optional(),
+  category: z.string().optional().nullable(),
+  contactPerson: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  state: z.string().optional().nullable(),
+  gstin: z.string().optional().nullable(),
+  paymentTerms: z.string().optional().nullable(),
+  bankDetails: z.string().optional().nullable(),
+  contractStart: z.string().optional().nullable(),
+  contractEnd: z.string().optional().nullable(),
+  supplyType: z.string().optional().default("INWARD"),
+  creditDays: z.number().int().nonnegative().optional().default(0),
+  creditLimit: z.number().nonnegative().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  active: z.boolean().optional().default(true),
 });

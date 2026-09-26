@@ -16,7 +16,7 @@ import { isWorkersRuntime } from "@/lib/cf-env";
 // is why the labels print as Code128: it encodes arbitrary text, unlike
 // EAN-13 which demands exactly 13 digits with a checksum.
 export async function POST() {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT", "FINANCE"]);
   if (isErrorResponse(session)) return session;
 
   if (isWorkersRuntime()) {

@@ -60,123 +60,114 @@ export default function ManagerDashboard() {
   if (!d) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">Operations Manager Dashboard (MGR-01 / MGR-02)</h1>
-          <p className="text-xs text-muted">
-            Daily floor operations, sales velocity, picking throughput, inventory alerts & task progress.
-          </p>
-        </div>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-tight text-ink">Manager Dashboard</h1>
         <button onClick={reload} className="btn-secondary text-xs">
           Refresh
         </button>
       </div>
 
-      {/* Quick Action & Alert Banners */}
+      {/* Quick Action & Alert Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Link
           href="/manager/tasks"
-          className="card bg-gradient-to-r from-blue-50 to-blue-100/50 border-blue-300 p-4 flex items-center justify-between hover:shadow transition"
+          className="card border-blue-200 bg-blue-50/40 p-3.5 flex items-center justify-between hover:border-blue-300 transition"
         >
           <div>
-            <div className="text-xs font-bold text-blue-900 uppercase">📋 Task Delegation Hub</div>
-            <div className="text-base font-bold text-blue-950 mt-0.5">
-              {d.pendingTasksCount} Active Operational Tasks
+            <div className="text-xs font-bold text-blue-900 uppercase tracking-wider">Tasks</div>
+            <div className="text-lg font-bold text-blue-950 mt-0.5">
+              {d.pendingTasksCount} Active Tasks
             </div>
-            <p className="text-xs text-blue-800">Assign, monitor & verify floor tasks across staff</p>
           </div>
           <span className="btn-primary text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-            Manage Tasks →
+            View Tasks →
           </span>
         </Link>
 
         <Link
           href="/manager/alerts"
-          className="card bg-gradient-to-r from-amber-50 to-amber-100/50 border-amber-300 p-4 flex items-center justify-between hover:shadow transition"
+          className="card border-amber-200 bg-amber-50/40 p-3.5 flex items-center justify-between hover:border-amber-300 transition"
         >
           <div>
-            <div className="text-xs font-bold text-amber-900 uppercase">⚠️ Operational Alert Radar</div>
-            <div className="text-base font-bold text-amber-950 mt-0.5">
+            <div className="text-xs font-bold text-amber-900 uppercase tracking-wider">Alerts</div>
+            <div className="text-lg font-bold text-amber-950 mt-0.5">
               {d.oosCount} OOS · {d.lowStockCount} Low Stock · {d.pendingQc} Pending QC
             </div>
-            <p className="text-xs text-amber-800">Review flagged orders, stock warnings & bottlenecks</p>
           </div>
           <span className="btn-secondary text-xs border-amber-300 text-amber-900 font-semibold">
-            Open Alerts →
+            View Alerts →
           </span>
         </Link>
       </div>
 
       {/* QC Stage Control */}
       {qc && (
-        <section className="card flex items-center justify-between gap-3 bg-muted/10">
+        <div className="card flex items-center justify-between gap-3 p-3 bg-surface-2 border border-line">
           <div>
-            <div className="text-sm font-semibold">Quality Check & Picking Stage</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-ink">QC Verification Stage</div>
             <div className="text-xs text-muted">
-              {qc.enabled
-                ? "Active: Orders require physical QC checking before customer handover."
-                : "Bypassed: QC is off — Finance bills and completes orders directly."}
+              Status: {qc.enabled ? "Active" : "Disabled (Bypassed)"}
             </div>
           </div>
-          <button className="btn text-xs" disabled={savingQc} onClick={() => toggleQc(!qc.enabled)}>
+          <button className="btn text-xs py-1 px-3" disabled={savingQc} onClick={() => toggleQc(!qc.enabled)}>
             {savingQc ? "Saving…" : qc.enabled ? "Turn QC Off" : "Turn QC On"}
           </button>
-        </section>
+        </div>
       )}
 
-      {/* Sales Velocity & Comparison (MGR-02) */}
+      {/* Sales Velocity */}
       <div className="space-y-2">
-        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Sales Velocity & Daily Comparison</h2>
+        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Sales</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="card">
             <div className="text-xs text-muted">Today&apos;s Sales</div>
             <div className="text-xl font-bold text-primary">₹{d.salesToday.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">{d.todaysOrders} Orders placed</div>
+            <div className="text-xs text-muted mt-0.5">{d.todaysOrders} Orders</div>
           </div>
           <div className="card">
             <div className="text-xs text-muted">Yesterday&apos;s Sales</div>
             <div className="text-xl font-bold">₹{d.salesYesterday.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">{d.yesterdaysOrders} Orders</div>
+            <div className="text-xs text-muted mt-0.5">{d.yesterdaysOrders} Orders</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Daily Sales Trend</div>
+            <div className="text-xs text-muted">Growth</div>
             <div className={`text-xl font-bold ${d.salesGrowthPercent >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
               {d.salesGrowthPercent >= 0 ? `+${d.salesGrowthPercent.toFixed(1)}%` : `${d.salesGrowthPercent.toFixed(1)}%`}
             </div>
-            <div className="text-xs text-muted mt-1">vs yesterday same time</div>
+            <div className="text-xs text-muted mt-0.5">vs yesterday</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Warehouse Stock Value</div>
+            <div className="text-xs text-muted">Stock Value</div>
             <div className="text-xl font-bold">₹{d.inventoryValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">Wholesale valuation</div>
+            <div className="text-xs text-muted mt-0.5">Wholesale value</div>
           </div>
         </div>
       </div>
 
-      {/* Floor Operations KPIs */}
+      {/* Operations KPIs */}
       <div className="space-y-2">
-        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Floor Operations & Staff Throughput</h2>
+        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Operations</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="card">
-            <div className="text-xs text-muted">Pending QC Picking</div>
+            <div className="text-xs text-muted">Pending QC</div>
             <div className={`text-xl font-bold ${d.pendingQc > 0 ? "text-amber-600" : ""}`}>{d.pendingQc}</div>
-            <div className="text-xs text-muted mt-1">Awaiting floor check</div>
+            <div className="text-xs text-muted mt-0.5">Orders in queue</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Completed & Dispatched</div>
+            <div className="text-xs text-muted">Dispatched Today</div>
             <div className="text-xl font-bold text-emerald-600">{d.completedToday}</div>
-            <div className="text-xs text-muted mt-1">Orders today</div>
+            <div className="text-xs text-muted mt-0.5">Orders completed</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Active Staff On Duty</div>
+            <div className="text-xs text-muted">Active Staff</div>
             <div className="text-xl font-bold">{d.staffCount}</div>
-            <div className="text-xs text-muted mt-1">Assigned to warehouse</div>
+            <div className="text-xs text-muted mt-0.5">Hub personnel</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Pending Purchase Orders</div>
+            <div className="text-xs text-muted">Pending POs</div>
             <div className="text-xl font-bold text-blue-600">{d.pendingPOsCount}</div>
-            <div className="text-xs text-muted mt-1">In procurement queue</div>
+            <div className="text-xs text-muted mt-0.5">Purchase orders</div>
           </div>
         </div>
       </div>
@@ -184,13 +175,13 @@ export default function ManagerDashboard() {
       {/* Active QC Locks */}
       {d.activeQcLocks.length > 0 && (
         <section className="card space-y-3">
-          <h2 className="text-sm font-bold">Orders Currently Being Picked / QC Checked</h2>
+          <h2 className="text-sm font-bold">Active QC & Picking Sessions</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted">
                   <th className="py-2">Order No</th>
-                  <th>Checked By Staff</th>
+                  <th>Staff Member</th>
                   <th>Locked Since</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -207,7 +198,7 @@ export default function ManagerDashboard() {
                         disabled={releasing === l.qcSessionId}
                         onClick={() => release(l.qcSessionId)}
                       >
-                        {releasing === l.qcSessionId ? "Releasing…" : "Force Release Lock"}
+                        {releasing === l.qcSessionId ? "Releasing…" : "Release Lock"}
                       </button>
                     </td>
                   </tr>
@@ -222,7 +213,7 @@ export default function ManagerDashboard() {
       {d.lowStockItems.length > 0 && (
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold">Stock Replenishment Warnings</h2>
+            <h2 className="text-sm font-bold">Low Stock Warnings</h2>
             <Link href="/manager/inventory" className="text-xs text-primary font-semibold hover:underline">
               View All Stock →
             </Link>

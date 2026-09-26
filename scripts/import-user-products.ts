@@ -998,8 +998,9 @@ async function run() {
   let inserted = 0;
   for (let i = 0; i < rawData.length; i++) {
     const item = rawData[i];
+    if (!item) continue;
     const sku = generateCleanSku(item.name, i, seenSkus);
-    const unitId = unitMap[item.unit] || unitMap.pc || dbUnits[0].id;
+    const unitId = unitMap[item.unit] || unitMap.pc || dbUnits[0]?.id || "";
 
     await db.product.upsert({
       where: { sku },

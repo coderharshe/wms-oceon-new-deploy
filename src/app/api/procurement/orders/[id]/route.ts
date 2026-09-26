@@ -41,7 +41,7 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER", "PROCUREMENT"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "PROCUREMENT", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
 
   const { id } = await params;

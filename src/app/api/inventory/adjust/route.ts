@@ -29,7 +29,7 @@ const schema = z.object({
 class StaleCountError extends Error {}
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
 
   const parsed = schema.safeParse(await req.json().catch(() => null));

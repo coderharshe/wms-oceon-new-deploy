@@ -7,7 +7,7 @@ import { isWorkersRuntime } from "@/lib/cf-env";
 export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
   if (isErrorResponse(session)) return session;
-  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId ?? undefined;
+  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
 
   try {
     const db = getDb();

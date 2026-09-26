@@ -5,15 +5,16 @@ import { getSetting } from "@/lib/settings";
 
 const LINKS = [
   { href: "/admin", label: "Dashboard" },
-  { href: "/admin/approvals", label: "Approvals Hub" },
-  { href: "/admin/alerts", label: "Alert Center" },
+  { href: "/admin/approvals", label: "Approvals" },
+  { href: "/admin/alerts", label: "Alerts" },
+  { href: "/admin/damaged", label: "Damaged Goods" },
   { href: "/admin/warehouses", label: "Warehouses" },
-  { href: "/admin/users", label: "Users & Roles" },
-  { href: "/admin/products", label: "Products" },
+  { href: "/admin/users", label: "Users" },
+  { href: "/admin/products", label: "Inventory" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/suppliers", label: "Suppliers" },
   { href: "/admin/cash", label: "Cash & Bank" },
-  { href: "/admin/reports", label: "BI Reports" },
+  { href: "/admin/reports", label: "Reports" },
   { href: "/admin/audit", label: "Audit Log" },
   { href: "/admin/settings", label: "Settings" },
 ];

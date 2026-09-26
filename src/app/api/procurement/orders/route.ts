@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "PROCUREMENT", "INVENTORY", "FINANCE"]);
   if (isErrorResponse(session)) return session;
 
-  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId!;
+  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
 
   try {
@@ -63,7 +63,7 @@ const createPoSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "PROCUREMENT"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "PROCUREMENT", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
 
   const parsed = createPoSchema.safeParse(await req.json().catch(() => null));

@@ -17,17 +17,33 @@ import { supplierSchema } from "@/lib/purchase";
 const patchSchema = supplierSchema.partial().extend({ active: z.boolean().optional() });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const data = {
-    ...parsed.data,
-    ...(parsed.data.name ? { name: parsed.data.name.trim() } : {}),
-    ...(parsed.data.gstin !== undefined ? { gstin: parsed.data.gstin ? parsed.data.gstin.toUpperCase() : null } : {}),
-    ...(parsed.data.email !== undefined ? { email: parsed.data.email || null } : {}),
+  const raw = parsed.data;
+  const data: Record<string, any> = {
+    ...raw,
+    ...(raw.name ? { name: raw.name.trim() } : {}),
+    ...(raw.gstin !== undefined ? { gstin: raw.gstin ? raw.gstin.trim().toUpperCase() : null } : {}),
+    ...(raw.email !== undefined ? { email: raw.email?.trim() || null } : {}),
+    ...(raw.category !== undefined ? { category: raw.category?.trim() || null } : {}),
+    ...(raw.contactPerson !== undefined ? { contactPerson: raw.contactPerson?.trim() || null } : {}),
+    ...(raw.phone !== undefined ? { phone: raw.phone?.trim() || null } : {}),
+    ...(raw.address !== undefined ? { address: raw.address?.trim() || null } : {}),
+    ...(raw.city !== undefined ? { city: raw.city?.trim() || null } : {}),
+    ...(raw.state !== undefined ? { state: raw.state?.trim() || null } : {}),
+    ...(raw.paymentTerms !== undefined ? { paymentTerms: raw.paymentTerms?.trim() || null } : {}),
+    ...(raw.bankDetails !== undefined ? { bankDetails: raw.bankDetails?.trim() || null } : {}),
+    ...(raw.contractStart !== undefined ? { contractStart: raw.contractStart ? new Date(raw.contractStart) : null } : {}),
+    ...(raw.contractEnd !== undefined ? { contractEnd: raw.contractEnd ? new Date(raw.contractEnd) : null } : {}),
+    ...(raw.supplyType !== undefined ? { supplyType: raw.supplyType || "INWARD" } : {}),
+    ...(raw.creditDays !== undefined ? { creditDays: Number(raw.creditDays || 0) } : {}),
+    ...(raw.creditLimit !== undefined ? { creditLimit: raw.creditLimit != null ? Number(raw.creditLimit) : null } : {}),
+    ...(raw.notes !== undefined ? { notes: raw.notes?.trim() || null } : {}),
+    ...(raw.active !== undefined ? { active: raw.active } : {}),
   };
 
   try {

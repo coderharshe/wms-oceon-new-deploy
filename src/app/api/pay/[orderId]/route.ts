@@ -61,7 +61,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ orderId
   }
 
   return NextResponse.json({
-    businessName: (await getSetting("BUSINESS_NAME")) || "Store",
+    businessName: (await getSetting("BUSINESS_NAME")) || "Hub",
     orderNumber,
     billNumber,
     amountPayable: balance,

@@ -37,13 +37,10 @@ export default function AdminAlertCenterPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold">Executive Alert Center (ADM-11)</h1>
-          <p className="text-xs text-muted">
-            Real-time critical business alerts: Cash/Bank discrepancies, OOS SKUs, overdue payables/receivables & pending approvals.
-          </p>
+          <h1 className="text-xl font-bold tracking-tight">Alerts</h1>
         </div>
         <button onClick={reload} className="btn-secondary text-xs">
-          Refresh Alerts
+          Refresh
         </button>
       </div>
 

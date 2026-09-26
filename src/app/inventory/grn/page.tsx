@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonTable } from "@/components/Skeleton";
@@ -47,13 +47,29 @@ type OpenPO = {
 };
 
 type Supplier = { id: string; name: string };
-type Product = { id: string; name: string; sku: string; baseUnitId: string; baseUnit: { symbol: string }; avgCost: number | null; wholesalePrice: number };
+type Product = {
+  id: string;
+  name: string;
+  sku: string;
+  taxPercent?: string | number;
+  wholesalePrice?: string | number;
+  baseUnit: { id: string; symbol: string; name: string };
+  saleUnits?: Array<{
+    unitId: string;
+    unit: { id: string; symbol: string; name: string };
+    factorToBase: string | number;
+  }>;
+};
 
 export default function GrnInwardPage() {
   const { data: grns, loading, error, reload } = useApiGet<GRN[]>("/api/inventory/grn");
-  const { data: openPOs } = useApiGet<OpenPO[]>("/api/procurement/orders?status=SENT");
+  const { data: allPOs } = useApiGet<OpenPO[]>("/api/procurement/orders");
+  const openPOs = (allPOs || []).filter(
+    (po) => po && (po as any).status !== "CLOSED" && (po as any).status !== "CANCELLED" && (po as any).status !== "DRAFT"
+  );
   const { data: suppliers } = useApiGet<Supplier[]>("/api/suppliers");
-  const { data: products } = useApiGet<Product[]>("/api/products");
+  const { data: productsData, loading: productsLoading } = useApiGet<Product[]>("/api/admin/products");
+  const products = productsData || [];
 
   const [showNewGrn, setShowNewGrn] = useState(false);
   const [selectedPoId, setSelectedPoId] = useState("");
@@ -62,86 +78,163 @@ export default function GrnInwardPage() {
   const [billDate, setBillDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
 
-  const [items, setItems] = useState<{ productId: string; name: string; sku: string; unitId: string; unitSymbol: string; quantity: number; rate: number }[]>([]);
+  type GrnDraftItem = {
+    productId: string;
+    unitId: string;
+    quantity: number;
+    rate: number;
+  };
+
+  const [items, setItems] = useState<GrnDraftItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  function addProductRow() {
+    if (!products || products.length === 0) return;
+    const firstP = products[0];
+    if (!firstP) return;
+    setItems((prev) => [
+      ...prev,
+      {
+        productId: firstP.id,
+        unitId: firstP.baseUnit?.id || firstP.saleUnits?.[0]?.unitId || "",
+        quantity: 1,
+        rate: Number(firstP.wholesalePrice || 0),
+      },
+    ]);
+  }
+
+  function updateDraftItem(index: number, patch: Partial<GrnDraftItem>) {
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== index) return it;
+        const updated = { ...it, ...patch };
+
+        // If product changed, update available units and default rate
+        if (patch.productId && patch.productId !== it.productId) {
+          const p = products.find((x) => x.id === patch.productId);
+          if (p) {
+            updated.unitId = p.baseUnit?.id || p.saleUnits?.[0]?.unitId || "";
+            updated.rate = Number(p.wholesalePrice || 0);
+          }
+        }
+        return updated;
+      })
+    );
+  }
+
+  function removeDraftItem(index: number) {
+    setItems((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
   function handleSelectPO(poId: string) {
     setSelectedPoId(poId);
-    if (!poId || !openPOs) return;
-    const po = openPOs.find((p) => p.id === poId);
+    if (!poId || !allPOs) {
+      if (items.length === 0 && products.length > 0) {
+        addProductRow();
+      }
+      return;
+    }
+    const po = allPOs.find((p) => p.id === poId);
     if (po) {
       setSupplierId(po.supplierId);
-      setItems(
-        po.items.map((i) => {
-          const remaining = Number(i.quantity) - Number(i.receivedQty);
-          return {
-            productId: i.productId,
-            name: i.product.name,
-            sku: i.product.sku,
-            unitId: i.unitId,
-            unitSymbol: i.unit.symbol,
-            quantity: remaining > 0 ? remaining : Number(i.quantity),
-            rate: Number(i.purchaseRate),
-          };
-        })
-      );
+      if (po.items && po.items.length > 0) {
+        setItems(
+          po.items.map((i) => {
+            const remaining = Number(i.quantity) - Number(i.receivedQty || 0);
+            return {
+              productId: i.productId,
+              unitId: i.unitId,
+              quantity: remaining > 0 ? remaining : Number(i.quantity),
+              rate: Number(i.purchaseRate || 0),
+            };
+          })
+        );
+      }
     }
   }
 
+  const grandTotal = useMemo(() => {
+    return items.reduce((acc, it) => acc + Number(it.quantity || 0) * Number(it.rate || 0), 0);
+  }, [items]);
+
   async function handleCreateGrn(e: React.FormEvent) {
     e.preventDefault();
-    if (!supplierId || !supplierBillNo || items.length === 0) {
-      return setFormError("Please fill supplier invoice number and add line items");
+    if (!supplierId) {
+      return setFormError("Please select a supplier");
+    }
+    if (!supplierBillNo.trim()) {
+      return setFormError("Please enter the supplier invoice / bill number");
+    }
+    if (items.length === 0) {
+      return setFormError("Please add at least one product item to receive");
+    }
+    for (const it of items) {
+      if (!it.productId || it.quantity <= 0 || it.rate < 0) {
+        return setFormError("All items must have valid quantity and rate");
+      }
     }
 
     setSaving(true);
     setFormError(null);
 
-    const res = await fetch("/api/inventory/grn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        purchaseOrderId: selectedPoId || undefined,
-        supplierId,
-        supplierBillNo,
-        billDate,
-        notes: notes || undefined,
-        items: items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          unitId: i.unitId,
-          rate: i.rate,
-        })),
-      }),
-    });
+    try {
+      const res = await fetch("/api/inventory/grn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purchaseOrderId: selectedPoId || undefined,
+          supplierId,
+          supplierBillNo: supplierBillNo.trim(),
+          billDate,
+          notes: notes.trim() || undefined,
+          items: items.map((i) => ({
+            productId: i.productId,
+            quantity: Number(i.quantity),
+            unitId: i.unitId,
+            rate: Number(i.rate),
+          })),
+        }),
+      });
 
-    setSaving(false);
-    if (!res.ok) {
-      const b = await res.json().catch(() => ({}));
-      return setFormError(b.error || "Failed to process GRN");
+      setSaving(false);
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        return setFormError(b.error || "Failed to process GRN");
+      }
+
+      setShowNewGrn(false);
+      setSelectedPoId("");
+      setSupplierBillNo("");
+      setSupplierId("");
+      setNotes("");
+      setItems([]);
+      reload();
+    } catch (err: any) {
+      setSaving(false);
+      setFormError(err.message || "Network error while saving GRN");
     }
-
-    setShowNewGrn(false);
-    setSelectedPoId("");
-    setSupplierBillNo("");
-    setItems([]);
-    reload();
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold">Inward / Goods Receipt Note (GRN)</h1>
+          <h1 className="text-lg font-bold text-ink">Inward / Goods Receipt Note (GRN)</h1>
           <p className="text-xs text-muted">Physical stock verification, inward inspection, and purchase bill recording</p>
         </div>
         <div className="flex gap-2">
           <button
-            className="btn btn-primary font-semibold text-xs"
-            onClick={() => setShowNewGrn(true)}
+            className="btn btn-primary font-semibold text-xs flex items-center gap-1.5"
+            onClick={() => {
+              setShowNewGrn(true);
+              setFormError(null);
+              if (items.length === 0 && products.length > 0) {
+                addProductRow();
+              }
+            }}
           >
-            + New Inward / GRN Entry
+            <span>+</span> New Inward / GRN Entry
           </button>
         </div>
       </div>
@@ -150,21 +243,24 @@ export default function GrnInwardPage() {
       {error && !grns && <ErrorRetry message={error} onRetry={reload} />}
 
       {showNewGrn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-line pb-2">
-              <h2 className="text-sm font-bold">Receive Inward Stock (GRN)</h2>
-              <button className="text-muted hover:text-ink text-sm" onClick={() => setShowNewGrn(false)}>✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="card w-full max-w-3xl max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl border border-line">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-ink">Receive Inward Stock (GRN)</h2>
+                <p className="text-[11px] text-muted">Record inward delivery, update inventory stock, and verify supplier invoices.</p>
+              </div>
+              <button className="text-muted hover:text-ink text-sm p-1" onClick={() => setShowNewGrn(false)}>✕</button>
             </div>
 
-            {formError && <div className="p-2 rounded bg-bad/10 text-bad border border-bad/20 text-xs">{formError}</div>}
+            {formError && <div className="p-2.5 rounded bg-bad/10 text-bad border border-bad/20 text-xs font-medium">{formError}</div>}
 
-            <form onSubmit={handleCreateGrn} className="space-y-3 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleCreateGrn} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-surface-2 p-3 rounded-lg border border-line">
                 <div>
-                  <label className="mb-1 block font-semibold">Load from Purchase Order (Optional)</label>
+                  <label className="mb-1 block font-semibold text-ink">Load from Purchase Order (Optional)</label>
                   <select
-                    className="w-full"
+                    className="w-full py-1.5 px-2 rounded border border-line bg-surface text-ink"
                     value={selectedPoId}
                     onChange={(e) => handleSelectPO(e.target.value)}
                   >
@@ -178,9 +274,9 @@ export default function GrnInwardPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block font-semibold">Supplier / Distributor *</label>
+                  <label className="mb-1 block font-semibold text-ink">Supplier / Distributor *</label>
                   <select
-                    className="w-full"
+                    className="w-full py-1.5 px-2 rounded border border-line bg-surface text-ink font-medium"
                     value={supplierId}
                     onChange={(e) => setSupplierId(e.target.value)}
                     required
@@ -191,15 +287,13 @@ export default function GrnInwardPage() {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block font-semibold">Supplier Invoice / Bill No. *</label>
+                  <label className="mb-1 block font-semibold text-ink">Supplier Invoice / Bill No. *</label>
                   <input
                     type="text"
                     placeholder="e.g. INV-9842"
-                    className="w-full"
+                    className="w-full py-1.5 px-2 rounded border border-line bg-surface text-ink font-mono"
                     value={supplierBillNo}
                     onChange={(e) => setSupplierBillNo(e.target.value)}
                     required
@@ -207,10 +301,10 @@ export default function GrnInwardPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block font-semibold">Supplier Bill Date *</label>
+                  <label className="mb-1 block font-semibold text-ink">Supplier Bill Date *</label>
                   <input
                     type="date"
-                    className="w-full"
+                    className="w-full py-1.5 px-2 rounded border border-line bg-surface text-ink font-mono"
                     value={billDate}
                     onChange={(e) => setBillDate(e.target.value)}
                     required
@@ -218,65 +312,165 @@ export default function GrnInwardPage() {
                 </div>
               </div>
 
-              <div className="border-t border-line pt-2 space-y-2">
-                <h3 className="font-semibold text-ink">Physical Stock Verification Lines</h3>
-                {items.length === 0 ? (
-                  <div className="text-muted italic py-2">Select a PO above or add products to receive.</div>
-                ) : (
-                  <table className="w-full text-left text-xs">
+              {/* Physical Stock Verification Lines Table */}
+              <div className="space-y-2 border-t border-line pt-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-ink uppercase tracking-wider">Physical Stock Verification Lines</h3>
+                    <p className="text-[11px] text-muted">Add or inspect each product being physically received into the warehouse.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addProductRow}
+                    className="btn text-xs py-1 px-2.5 bg-surface-2 hover:bg-surface-hi border border-line font-semibold flex items-center gap-1"
+                  >
+                    <span>+</span> Add Product Row
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-line rounded">
+                  <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-line text-muted">
-                        <th className="py-1">Product SKU</th>
-                        <th className="py-1">Accepted Qty</th>
-                        <th className="py-1">Purchase Rate (₹)</th>
-                        <th className="py-1">Line Amount</th>
+                      <tr className="bg-surface-2 border-b border-line text-[10px] text-muted uppercase">
+                        <th className="py-2 px-2.5">Product SKU / Name</th>
+                        <th className="py-2 px-2.5 w-28">Unit</th>
+                        <th className="py-2 px-2.5 text-right w-24">Accepted Qty</th>
+                        <th className="py-2 px-2.5 text-right w-28">Purchase Rate (₹)</th>
+                        <th className="py-2 px-2.5 text-right w-28">Line Total (₹)</th>
+                        <th className="py-2 px-2 text-center w-10"></th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {items.map((item, idx) => (
-                        <tr key={idx} className="border-b border-line/50">
-                          <td className="py-1.5 font-medium">{item.name} ({item.sku})</td>
-                          <td className="py-1.5">
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-24 text-xs font-bold"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                const updated = items.map((it, i) => i === idx ? { ...it, quantity: val } : it);
-                                setItems(updated);
-                              }}
-                            />{" "}
-                            {item.unitSymbol}
-                          </td>
-                          <td className="py-1.5 text-muted">
-                            ₹{item.rate.toFixed(2)}
-                          </td>
-                          <td className="py-1.5 font-bold text-ink">
-                            ₹{(item.quantity * item.rate).toFixed(2)}
+                    <tbody className="divide-y divide-line">
+                      {items.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-muted text-xs">
+                            {productsLoading ? (
+                              <span className="flex items-center justify-center gap-2">
+                                <span className="animate-spin">⏳</span> Loading products catalog…
+                              </span>
+                            ) : products.length === 0 ? (
+                              <span>No products found in catalog.</span>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <div>No products added to this inward receipt yet.</div>
+                                <button
+                                  type="button"
+                                  onClick={addProductRow}
+                                  className="text-accent underline font-semibold hover:text-accent-hi"
+                                >
+                                  + Add first product to receive
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        items.map((item, idx) => {
+                          const currentProduct = products.find((p) => p.id === item.productId);
+                          const availableUnits = currentProduct
+                            ? [
+                                ...(currentProduct.baseUnit ? [currentProduct.baseUnit] : []),
+                                ...(currentProduct.saleUnits || []).map((su) => su.unit).filter(Boolean),
+                              ]
+                            : [];
+
+                          const lineTotal = Number(item.quantity || 0) * Number(item.rate || 0);
+
+                          return (
+                            <tr key={idx} className="hover:bg-surface-2/40 transition-colors">
+                              <td className="p-1.5">
+                                <select
+                                  value={item.productId}
+                                  onChange={(e) => updateDraftItem(idx, { productId: e.target.value })}
+                                  className="w-full py-1 px-1.5 rounded border border-line bg-surface text-ink text-xs font-medium"
+                                >
+                                  {products.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} ({p.sku})
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-1.5">
+                                <select
+                                  value={item.unitId}
+                                  onChange={(e) => updateDraftItem(idx, { unitId: e.target.value })}
+                                  className="w-full py-1 px-1.5 rounded border border-line bg-surface text-ink text-xs"
+                                >
+                                  {availableUnits.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.symbol} {u.name ? `(${u.name})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-1.5">
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="any"
+                                  value={item.quantity}
+                                  onChange={(e) => updateDraftItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                                  className="w-full text-right py-1 px-1.5 rounded border border-line bg-surface text-ink font-mono font-bold"
+                                  required
+                                />
+                              </td>
+                              <td className="p-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={item.rate}
+                                  onChange={(e) => updateDraftItem(idx, { rate: parseFloat(e.target.value) || 0 })}
+                                  className="w-full text-right py-1 px-1.5 rounded border border-line bg-surface text-ink font-mono"
+                                  required
+                                />
+                              </td>
+                              <td className="p-1.5 text-right font-mono font-bold text-ink">
+                                ₹{lineTotal.toFixed(2)}
+                              </td>
+                              <td className="p-1.5 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => removeDraftItem(idx)}
+                                  className="text-bad hover:text-red-700 font-bold p-1 transition-colors"
+                                  title="Remove row"
+                                >
+                                  ✕
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
+                </div>
+
+                {items.length > 0 && (
+                  <div className="flex justify-end pt-1">
+                    <div className="text-right text-xs bg-surface-2 px-3 py-1.5 rounded border border-line font-mono">
+                      <span className="text-muted mr-2">Total Inward Value:</span>
+                      <span className="font-bold text-sm text-accent">₹{grandTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="mb-1 block font-semibold">Receiving Notes / Gate Remarks</label>
+                <label className="mb-1 block font-semibold text-ink">Receiving Notes / Gate Remarks</label>
                 <input
                   type="text"
-                  placeholder="e.g. 5 boxes verified intact, gate check clear"
-                  className="w-full"
+                  placeholder="e.g. 5 boxes verified intact, gate check clear, batch stamps checked"
+                  className="w-full py-1.5 px-2 rounded border border-line bg-surface text-ink"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-line">
-                <button type="button" className="btn" onClick={() => setShowNewGrn(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving || items.length === 0}>
+              <div className="flex justify-end gap-2 pt-3 border-t border-line">
+                <button type="button" className="btn text-xs py-1.5 px-3" onClick={() => setShowNewGrn(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary text-xs py-1.5 px-4 font-semibold shadow-xs" disabled={saving || items.length === 0}>
                   {saving ? "Recording GRN…" : "✓ Confirm Physical Inward & Update Stock"}
                 </button>
               </div>

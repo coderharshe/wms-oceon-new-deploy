@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "BILLING", "FINANCE"]);
   if (isErrorResponse(session)) return session;
 
-  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId!;
+  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
 
   try {

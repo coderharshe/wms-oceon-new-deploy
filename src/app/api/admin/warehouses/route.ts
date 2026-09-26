@@ -6,19 +6,24 @@ import { isWorkersRuntime } from "@/lib/cf-env";
 const schema = z.object({ name: z.string().min(1), code: z.string().min(1), address: z.string().optional() });
 
 export async function GET() {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT", "FINANCE", "BILLING", "QC"]);
   if (isErrorResponse(session)) return session;
 
   if (isWorkersRuntime()) {
     const { getDrizzleDb } = await import("@/lib/drizzle-db");
     const { warehouse } = await import("@/generated/drizzle/schema");
-    const { asc } = await import("drizzle-orm");
-    const warehouses = await getDrizzleDb().select().from(warehouse).orderBy(asc(warehouse.name));
+    const { asc, eq } = await import("drizzle-orm");
+    const db = getDrizzleDb();
+    const query = session.role === "ADMIN"
+      ? db.select().from(warehouse).orderBy(asc(warehouse.name))
+      : db.select().from(warehouse).where(eq(warehouse.id, session.warehouseId!)).orderBy(asc(warehouse.name));
+    const warehouses = await query;
     return NextResponse.json(warehouses);
   }
 
   const db = (await import("@/lib/db")).getDb();
-  const warehouses = await db.warehouse.findMany({ orderBy: { name: "asc" } });
+  const where = session.role === "ADMIN" ? {} : { id: session.warehouseId || "none" };
+  const warehouses = await db.warehouse.findMany({ where, orderBy: { name: "asc" } });
   return NextResponse.json(warehouses);
 }
 

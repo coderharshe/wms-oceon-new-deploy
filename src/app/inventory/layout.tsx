@@ -4,9 +4,12 @@ import PortalShell from "@/components/PortalShell";
 import { getSetting } from "@/lib/settings";
 
 const LINKS = [
-  { href: "/inventory", label: "Stock Dashboard" },
+  { href: "/inventory", label: "Inventory Dashboard" },
+  { href: "/inventory/ledger", label: "Inventory Ledger" },
+  { href: "/inventory/purchase-orders", label: "Purchase Orders" },
+  { href: "/inventory/suppliers", label: "Suppliers" },
   { href: "/inventory/grn", label: "Inward (GRN)" },
-  { href: "/inventory/outward", label: "Stock Issue / Outward" },
+  { href: "/inventory/outward", label: "Inventory Issue / Outward" },
   { href: "/inventory/count", label: "Physical Count" },
   { href: "/inventory/reports", label: "Reports & Alerts" },
 ];
@@ -21,7 +24,7 @@ export default async function InventoryLayout({ children }: { children: React.Re
   return (
     <div className="inventory-ui">
       <PortalShell
-        title="Inventory Team"
+        title="Inventory"
         userName={session.name}
         links={LINKS}
         shortcuts

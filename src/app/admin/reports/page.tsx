@@ -68,8 +68,7 @@ export default function ReportsPage() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-line pb-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Reports & Analytics</h1>
-          <p className="text-xs text-muted">Comprehensive performance, inventory health, QC audits, and financial summaries</p>
+          <h1 className="text-xl font-bold tracking-tight">Reports</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {warehouses && warehouses.length > 0 && (

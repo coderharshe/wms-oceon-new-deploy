@@ -20,18 +20,11 @@ function mergeCredit<T extends { id: string }>(rows: T[], credit: Map<string, Cr
 }
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
   const q = req.nextUrl.searchParams.get("q")?.trim();
-  // Receiving staff only ever pick from active suppliers; the supplier
-  // management screen passes includeInactive=1 to manage the rest.
-  const canManage = session.role === "ADMIN" || session.role === "MANAGER";
-  const includeInactive = req.nextUrl.searchParams.get("includeInactive") === "1" && canManage;
-  // Credit history: how many bills this supplier has sent, how much of it is
-  // still unpaid, and when we last received from them. Skipped for the
-  // receive form's picker (`withCredit` unset) — that just needs the names.
-  const withCredit = req.nextUrl.searchParams.get("withCredit") === "1" && canManage;
-  // ADMIN sees every branch's dues; everyone else only their own.
+  const includeInactive = req.nextUrl.searchParams.get("includeInactive") === "1";
+  const withCredit = req.nextUrl.searchParams.get("withCredit") === "1";
   const scopeWarehouseId = session.role === "ADMIN" ? null : session.warehouseId!;
 
   if (isWorkersRuntime()) {
@@ -41,20 +34,24 @@ export async function GET(req: NextRequest) {
     const db = getDrizzleDb();
     const filters = [
       includeInactive ? undefined : eq(supplier.active, true),
-      q ? or(ilike(supplier.name, `%${q}%`), ilike(supplier.phone, `%${q}%`), ilike(supplier.gstin, `%${q}%`)) : undefined,
+      q ? or(
+        ilike(supplier.name, `%${q}%`),
+        ilike(supplier.phone, `%${q}%`),
+        ilike(supplier.gstin, `%${q}%`),
+        ilike(supplier.contactPerson, `%${q}%`),
+        ilike((supplier as any).category, `%${q}%`),
+        ilike((supplier as any).city, `%${q}%`),
+      ) : undefined,
     ].filter(Boolean);
     const rows = await db
       .select()
       .from(supplier)
       .where(filters.length ? and(...(filters as any[])) : undefined)
       .orderBy(asc(supplier.name))
-      .limit(100);
+      .limit(150);
     if (!withCredit) return NextResponse.json(rows);
     const { purchaseBill } = await import("@/generated/drizzle/schema");
     const { sql, count, max } = await import("drizzle-orm");
-    // One grouped pass over the branch's bills: total count, the unpaid part
-    // of it, and the last receipt date. Cheap enough not to bother caching —
-    // PurchaseBill is a few rows per supplier per month.
     const agg = await db
       .select({
         supplierId: purchaseBill.supplierId,
@@ -81,16 +78,19 @@ export async function GET(req: NextRequest) {
               { name: { contains: q, mode: "insensitive" as const } },
               { phone: { contains: q } },
               { gstin: { contains: q, mode: "insensitive" as const } },
+              { contactPerson: { contains: q, mode: "insensitive" as const } },
+              { category: { contains: q, mode: "insensitive" as const } },
+              { city: { contains: q, mode: "insensitive" as const } },
+              { state: { contains: q, mode: "insensitive" as const } },
             ],
           }
         : {}),
     },
     orderBy: { name: "asc" },
-    take: 100,
+    take: 150,
   });
   if (!withCredit) return NextResponse.json(rows);
-  // Two groupBys rather than one: Prisma can't express a conditional SUM, and
-  // this path only ever runs under `next dev`.
+
   const where = scopeWarehouseId ? { warehouseId: scopeWarehouseId } : {};
   const [counts, unpaid] = await Promise.all([
     db.purchaseBill.groupBy({ by: ["supplierId"], _count: { _all: true }, _max: { billDate: true }, where }),
@@ -110,20 +110,33 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(mergeCredit(rows, credit));
 }
 
-
-// Anyone who can receive stock can add a supplier — a new supplier's truck at
-// the gate must not wait on an admin. Admin cleans up/deactivates later.
 export async function POST(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
   const parsed = supplierSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const raw = parsed.data;
   const data = {
-    ...parsed.data,
-    name: parsed.data.name.trim(),
-    email: parsed.data.email || undefined,
-    gstin: parsed.data.gstin ? parsed.data.gstin.toUpperCase() : undefined,
+    ...raw,
+    name: raw.name.trim(),
+    category: raw.category?.trim() || null,
+    contactPerson: raw.contactPerson?.trim() || null,
+    phone: raw.phone?.trim() || null,
+    email: raw.email?.trim() || null,
+    address: raw.address?.trim() || null,
+    city: raw.city?.trim() || null,
+    state: raw.state?.trim() || null,
+    gstin: raw.gstin ? raw.gstin.trim().toUpperCase() : null,
+    paymentTerms: raw.paymentTerms?.trim() || null,
+    bankDetails: raw.bankDetails?.trim() || null,
+    contractStart: raw.contractStart ? new Date(raw.contractStart) : null,
+    contractEnd: raw.contractEnd ? new Date(raw.contractEnd) : null,
+    supplyType: raw.supplyType || "INWARD",
+    creditDays: Number(raw.creditDays || 0),
+    creditLimit: raw.creditLimit != null ? Number(raw.creditLimit) : null,
+    notes: raw.notes?.trim() || null,
+    active: raw.active ?? true,
   };
 
   try {
@@ -132,7 +145,7 @@ export async function POST(req: NextRequest) {
       const { supplier } = await import("@/generated/drizzle/schema");
       const { writeAuditDrizzle } = await import("@/lib/drizzle-audit");
       const db = getDrizzleDb();
-      const [created] = await db.insert(supplier).values({ id: crypto.randomUUID(), ...data }).returning();
+      const [created] = await db.insert(supplier).values({ id: crypto.randomUUID(), ...data } as any).returning();
       await writeAuditDrizzle({
         userId: session.sub,
         role: session.role,

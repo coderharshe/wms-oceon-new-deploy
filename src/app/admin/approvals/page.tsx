@@ -102,14 +102,11 @@ export default function AdminApprovalsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold">Central Approvals Hub (ADM-05 / ADM-07 / FIN-09)</h1>
-          <p className="text-xs text-muted">
-            Admin executive approval gate for high-value Purchase Orders, Discounts, Stock Variances & Vouchers.
-          </p>
+          <h1 className="text-xl font-bold tracking-tight">Approvals</h1>
         </div>
         <div className="flex items-center gap-2">
           <span className="badge bg-amber-100 text-amber-900 border border-amber-300 font-semibold px-2 py-1">
-            {totalPending} Total Pending Approval
+            {totalPending} Pending
           </span>
           <button onClick={reload} className="btn-secondary text-xs">
             Refresh

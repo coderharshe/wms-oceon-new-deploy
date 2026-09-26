@@ -24,7 +24,7 @@ import { wordStartPattern } from "@/lib/word-search";
 const SEARCH_LIMIT = 50;
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "QC"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "QC", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   // it must NOT ride the 60s name/price cache above, or Finance would see
   // stale "in stock" numbers. ADMIN has no home warehouse, so it must pass
   // one explicitly to get stock back; everyone else's is fixed by session.
-  const warehouseId = req.nextUrl.searchParams.get("warehouseId") ?? session.warehouseId ?? undefined;
+  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId ?? undefined;
 
   if (isWorkersRuntime()) {
     const { getDrizzleDb } = await import("@/lib/drizzle-db");

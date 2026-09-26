@@ -29,7 +29,7 @@ const schema = z
 // product's saleUnits), not the ProductUnit row id — the [productId, unitId]
 // pair is unique, so it identifies the row on its own.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; unitId: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
   const { id, unitId } = await params;
   const parsed = schema.safeParse(await req.json().catch(() => null));
@@ -130,7 +130,7 @@ const LIVE_ORDER_STATUSES = ["DRAFT", "BILLED", "PAYMENT_PENDING", "PAID", "READ
  * (nothing left to transact it in at all).
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string; unitId: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
   const { id, unitId } = await params;
 

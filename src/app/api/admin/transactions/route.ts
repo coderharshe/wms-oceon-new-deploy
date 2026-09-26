@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const until = req.nextUrl.searchParams.get("until") ? new Date(req.nextUrl.searchParams.get("until")!) : null;
   const method = req.nextUrl.searchParams.get("method") || undefined;
   const type = req.nextUrl.searchParams.get("type") || undefined;
-  const warehouseId = req.nextUrl.searchParams.get("warehouseId") || undefined;
+  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") || undefined : session.warehouseId || "none";
 
   if (isWorkersRuntime()) {
     const { getDrizzleDb } = await import("@/lib/drizzle-db");

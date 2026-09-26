@@ -6,12 +6,13 @@ import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonTable } from "@/components/Skeleton";
 import { fmtTime } from "@/lib/fmt";
 
-type ProductWithStock = {
+type ProductWithInventory = {
   id: string;
   name: string;
   sku: string;
-  baseUnit: { symbol: string };
-  inventory: { quantityOnHand: number }[];
+  baseUnit?: { symbol?: string } | null;
+  available?: number | null;
+  inventory?: { quantityOnHand: number }[];
 };
 
 type AdjustmentRequest = {
@@ -28,7 +29,7 @@ type AdjustmentRequest = {
 };
 
 export default function PhysicalCountPage() {
-  const { data: products, loading: pLoading, error: pError, reload: reloadProducts } = useApiGet<ProductWithStock[]>("/api/products");
+  const { data: products, loading: pLoading, error: pError, reload: reloadProducts } = useApiGet<ProductWithInventory[]>("/api/products");
   const { data: adjustments, loading: aLoading, reload: reloadAdjustments } = useApiGet<AdjustmentRequest[]>("/api/inventory/adjustments");
 
   const [countMap, setCountMap] = useState<Record<string, { physical: string; notes: string }>>({});
@@ -63,7 +64,7 @@ export default function PhysicalCountPage() {
       const entry = countMap[p.id];
       if (entry && entry.physical !== "") {
         const physical = parseFloat(entry.physical);
-        const system = p.inventory[0] ? Number(p.inventory[0].quantityOnHand) : 0;
+        const system = Number(p.available ?? p.inventory?.[0]?.quantityOnHand ?? 0);
         countedItems.push({
           productId: p.id,
           systemQty: system,
@@ -91,10 +92,10 @@ export default function PhysicalCountPage() {
     setSubmitting(false);
     if (!res.ok) {
       const b = await res.json().catch(() => ({}));
-      return setMessage(b.error || "Failed to submit stock count");
+      return setMessage(b.error || "Failed to submit inventory count");
     }
 
-    setMessage("Stock count audit submitted! Any variances have been sent for Manager approval.");
+    setMessage("Inventory count audit submitted! Any variances have been sent for Manager approval.");
     setCountMap({});
     reloadProducts();
     reloadAdjustments();
@@ -104,8 +105,8 @@ export default function PhysicalCountPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold">Physical Stock Count & Variance Audit</h1>
-          <p className="text-xs text-muted">Periodic stock audits, physical count verification, and difference approval requests</p>
+          <h1 className="text-lg font-bold">Physical Inventory Count & Variance Audit</h1>
+          <p className="text-xs text-muted">Periodic inventory audits, physical count verification, and difference approval requests</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -126,7 +127,7 @@ export default function PhysicalCountPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
-          <h2 className="text-sm font-semibold border-b border-line pb-1">Shelf Stock Audit Entry</h2>
+          <h2 className="text-sm font-semibold border-b border-line pb-1">Shelf Inventory Audit Entry</h2>
           {pLoading && <SkeletonTable rows={8} cols={5} />}
           {pError && <ErrorRetry message={pError} onRetry={reloadProducts} />}
 
@@ -136,7 +137,7 @@ export default function PhysicalCountPage() {
                 <thead>
                   <tr className="border-b border-line text-muted sticky top-0 bg-paper">
                     <th className="py-2">Product SKU</th>
-                    <th className="py-2">System Stock</th>
+                    <th className="py-2">System Inventory</th>
                     <th className="py-2">Physical Count</th>
                     <th className="py-2">Live Variance</th>
                     <th className="py-2">Variance Remarks</th>
@@ -144,7 +145,8 @@ export default function PhysicalCountPage() {
                 </thead>
                 <tbody>
                   {products.map((p) => {
-                    const system = p.inventory[0] ? Number(p.inventory[0].quantityOnHand) : 0;
+                    const system = Number(p.available ?? p.inventory?.[0]?.quantityOnHand ?? 0);
+                    const unitSym = p.baseUnit?.symbol || "Units";
                     const physicalStr = countMap[p.id]?.physical ?? "";
                     const physical = physicalStr !== "" ? parseFloat(physicalStr) : null;
                     const variance = physical !== null ? physical - system : null;
@@ -156,7 +158,7 @@ export default function PhysicalCountPage() {
                           <div className="text-[10px] text-muted">{p.sku}</div>
                         </td>
                         <td className="py-2 font-semibold">
-                          {system.toFixed(2)} {p.baseUnit.symbol}
+                          {system.toFixed(2)} {unitSym}
                         </td>
                         <td className="py-2">
                           <input
@@ -173,7 +175,7 @@ export default function PhysicalCountPage() {
                             <span className={`badge text-xs font-bold ${
                               variance === 0 ? "bg-good/10 text-good" : variance > 0 ? "bg-accent/10 text-accent" : "bg-bad text-white"
                             }`}>
-                              {variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)} {p.baseUnit.symbol}
+                              {variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)} {unitSym}
                             </span>
                           ) : (
                             <span className="text-muted">—</span>
@@ -201,7 +203,7 @@ export default function PhysicalCountPage() {
           <h2 className="text-sm font-semibold border-b border-line pb-1">Adjustment Requests Status</h2>
           {adjustments && adjustments.length === 0 && (
             <div className="card text-center py-6 text-muted text-xs">
-              No stock adjustment requests logged.
+              No inventory adjustment requests logged.
             </div>
           )}
 

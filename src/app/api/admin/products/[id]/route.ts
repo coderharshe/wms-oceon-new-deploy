@@ -13,6 +13,7 @@ const schema = z.object({
   category: z.string().nullable().optional(),
   brand: z.string().nullable().optional(),
   barcode: z.string().min(1).nullable().optional(),
+  baseUnitId: z.string().optional(),
   wholesalePrice: z.number().nonnegative().optional(),
   retailPrice: z.number().nonnegative().optional(),
   taxPercent: z.number().min(0).max(100).optional(),
@@ -22,7 +23,7 @@ const schema = z.object({
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
   const parsed = schema.safeParse(await req.json().catch(() => null));

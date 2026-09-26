@@ -9,7 +9,7 @@
 // cache. The app therefore asks for its screens to be "warmed" — fetched as
 // HTML and stored — see RegisterServiceWorker.tsx. A power cut that restarts
 // the PC then reloads straight from this cache.
-const CACHE = "taresh-shell-v3";
+const CACHE = "taresh-shell-v4";
 const NAV_TIMEOUT_MS = 8000;
 // "/offline", not "/offline.html": Cloudflare's asset server 307s the .html
 // form to the extension-less one, and the Cache API refuses to store a

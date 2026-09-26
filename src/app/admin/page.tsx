@@ -46,12 +46,11 @@ export default function AdminDashboardPage() {
       {/* Header & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Executive Consolidated Dashboard (ADM-01)</h1>
-          <p className="text-xs text-muted">Complete single-screen view of Sales, Purchases, Cash/Bank, Inventory & Approvals.</p>
+          <h1 className="text-xl font-bold tracking-tight">Executive Dashboard</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Period Selector */}
-          <div className="inline-flex rounded-md shadow-sm border border-border bg-card p-0.5 text-xs">
+          <div className="inline-flex rounded-md shadow-xs border border-border bg-card p-0.5 text-xs">
             <button
               onClick={() => setPeriod("today")}
               className={`px-3 py-1 rounded ${period === "today" ? "bg-primary text-white font-bold" : "text-muted hover:text-foreground"}`}
@@ -102,28 +101,26 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Link
           href="/admin/approvals"
-          className="card bg-gradient-to-r from-amber-50 to-amber-100/50 border-amber-300 p-4 flex items-center justify-between hover:shadow transition"
+          className="card bg-gradient-to-r from-amber-50 to-amber-100/50 border-amber-300 p-4 flex items-center justify-between hover:shadow-xs transition"
         >
           <div>
-            <div className="text-xs font-bold text-amber-900 uppercase">⚡ Approvals Hub</div>
+            <div className="text-xs font-bold text-amber-900 uppercase">⚡ Approvals</div>
             <div className="text-base font-bold text-amber-950 mt-0.5">
-              {d.totalPendingApprovals} Items Requiring Sir / Admin Approval
+              {d.totalPendingApprovals} Pending Approvals
             </div>
-            <p className="text-xs text-amber-800">POs &gt; ₹50k, Discounts &gt; 5%, Variances & Vouchers</p>
           </div>
           <span className="btn-primary text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold">Review →</span>
         </Link>
 
         <Link
           href="/admin/alerts"
-          className="card bg-gradient-to-r from-rose-50 to-rose-100/50 border-rose-300 p-4 flex items-center justify-between hover:shadow transition"
+          className="card bg-gradient-to-r from-rose-50 to-rose-100/50 border-rose-300 p-4 flex items-center justify-between hover:shadow-xs transition"
         >
           <div>
-            <div className="text-xs font-bold text-rose-900 uppercase">🚨 Executive Alert Center</div>
+            <div className="text-xs font-bold text-rose-900 uppercase">🚨 Alerts</div>
             <div className="text-base font-bold text-rose-950 mt-0.5">
-              {d.outOfStockCount} OOS SKUs · {d.lowStockCount} Low Stock SKUs
+              {d.outOfStockCount} Out of Stock · {d.lowStockCount} Low Stock
             </div>
-            <p className="text-xs text-rose-800">Cash mismatches, overdue payables & system notices</p>
           </div>
           <span className="btn-primary text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold">Inspect →</span>
         </Link>
@@ -131,17 +128,17 @@ export default function AdminDashboardPage() {
 
       {/* Sales & Revenue Grid */}
       <div className="space-y-2">
-        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Sales & Revenue Performance</h2>
+        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Sales & Revenue</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="card">
             <div className="text-xs text-muted">Total Sales</div>
             <div className="text-xl font-bold text-primary">₹{d.totalSales.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">{d.totalBills} Bills generated</div>
+            <div className="text-xs text-muted mt-1">{d.totalBills} Bills</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Average Order Value (AOV)</div>
+            <div className="text-xs text-muted">Average Order Value</div>
             <div className="text-xl font-bold">₹{d.aov.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">{d.totalOrders} Total orders</div>
+            <div className="text-xs text-muted mt-1">{d.totalOrders} Orders</div>
           </div>
           <div className="card">
             <div className="text-xs text-muted">Gross Margin</div>
@@ -149,16 +146,16 @@ export default function AdminDashboardPage() {
             <div className="text-xs text-muted mt-1">Purchases: ₹{d.totalPurchases.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">To Collect (Receivables)</div>
+            <div className="text-xs text-muted">Receivables</div>
             <div className="text-xl font-bold text-amber-600">₹{d.outstandingReceivables.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">Unpaid customer balances</div>
+            <div className="text-xs text-muted mt-1">Unpaid balances</div>
           </div>
         </div>
       </div>
 
       {/* Cash, Bank & Collections */}
       <div className="space-y-2">
-        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Collections & Financial Flow</h2>
+        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Collections & Cash</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="card">
             <div className="text-xs text-muted">Cash Collected</div>
@@ -179,40 +176,40 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Inventory & Warehousing */}
+      {/* Inventory */}
       <div className="space-y-2">
-        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Inventory & Operations Health</h2>
+        <h2 className="text-xs font-bold uppercase text-muted tracking-wider">Inventory</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="card">
-            <div className="text-xs text-muted">Total Stock Valuation</div>
+            <div className="text-xs text-muted">Stock Valuation</div>
             <div className="text-xl font-bold">₹{d.inventoryValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div className="text-xs text-muted mt-1">Wholesale cost basis</div>
+            <div className="text-xs text-muted mt-1">Wholesale basis</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Out of Stock (0 Qty)</div>
+            <div className="text-xs text-muted">Out of Stock</div>
             <div className="text-xl font-bold text-rose-600">{d.outOfStockCount} SKUs</div>
-            <div className="text-xs text-muted mt-1">Procurement required</div>
+            <div className="text-xs text-muted mt-1">0 Qty</div>
           </div>
           <div className="card">
-            <div className="text-xs text-muted">Low Stock Warnings</div>
+            <div className="text-xs text-muted">Low Stock</div>
             <div className="text-xl font-bold text-amber-600">{d.lowStockCount} SKUs</div>
-            <div className="text-xs text-muted mt-1">Below min stock level</div>
+            <div className="text-xs text-muted mt-1">Below min level</div>
           </div>
           <div className="card">
             <div className="text-xs text-muted">QC Adjustments</div>
             <div className="text-xl font-bold">{d.qcAdjustments}</div>
-            <div className="text-xs text-muted mt-1">Physical picking audits</div>
+            <div className="text-xs text-muted mt-1">Audit edits</div>
           </div>
         </div>
       </div>
 
-      {/* Critical Low Stock Table */}
+      {/* Low Stock Table */}
       {d.lowStockItems.length > 0 && (
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold">Critical Stock Items Below Reorder Level</h2>
+            <h2 className="text-sm font-bold">Low Stock Items</h2>
             <Link href="/procurement/requisitions" className="text-xs text-primary font-semibold hover:underline">
-              Generate Purchase Requisition →
+              Generate Requisition →
             </Link>
           </div>
           <div className="overflow-x-auto">

@@ -150,7 +150,7 @@ async function render(
   // print yesterday's date on a tax document. invoiceStamp exists for this.
   const { date } = invoiceStamp(new Date());
   const html = buildGstInvoiceHtml({
-    seller: { name: seller.sellerName || "Store", address: seller.sellerAddress, gstin: seller.sellerGstin.trim().toUpperCase(), email: seller.sellerEmail || null },
+    seller: { name: seller.sellerName || "Hub", address: seller.sellerAddress, gstin: seller.sellerGstin.trim().toUpperCase(), email: seller.sellerEmail || null },
     buyer: { name: buyer.name, address: buyer.address, gstin: buyer.gstin, stateCode: buyerState, mobile: buyer.mobile },
     shipTo: input.shipTo,
     invoiceNo,

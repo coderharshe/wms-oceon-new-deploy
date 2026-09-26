@@ -23,22 +23,30 @@ export async function GET() {
 
   const db = (await import("@/lib/db")).getDb();
   const users = await db.user.findMany({
-    where: session.role === "MANAGER" ? { warehouseId: session.warehouseId } : {},
-    include: { warehouse: { select: { name: true } } },
+    where: session.role === "MANAGER" ? { warehouseId: session.warehouseId, role: { not: "ADMIN" } } : {},
+    include: { warehouse: { select: { id: true, name: true, code: true, address: true } } },
     orderBy: { name: "asc" },
   });
   return NextResponse.json(users.map(({ passwordHash: _passwordHash, ...u }) => u));
 }
 
 const schema = z.object({
-  // Trimmed here so a stray space can't create "FIN-01 " as a second account
-  // nobody can log into. 6 is the floor for a new id; older seeded ids
-  // (QC-1, MGR-1) are shorter and stay valid — only renames are re-checked.
   staffId: z.string().trim().min(1),
   name: z.string().trim().min(1),
   password: z.string().min(1),
   role: z.enum(["ADMIN", "MANAGER", "FINANCE", "PROCUREMENT", "INVENTORY", "BILLING", "QC"]),
   warehouseId: z.string().optional(),
+  contact: z.string().optional(),
+  designation: z.string().optional(),
+  city: z.string().optional(),
+  town: z.string().optional(),
+  employmentType: z.string().optional(),
+  shift: z.string().optional(),
+  joiningDate: z.string().optional(),
+  endingDate: z.string().optional(),
+  salary: z.string().optional(),
+  bankUpi: z.string().optional(),
+  reportingManager: z.string().optional(),
 });
 
 /**
@@ -60,7 +68,8 @@ async function createUser(req: NextRequest) {
   if (isErrorResponse(session)) return session;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  if (session.role === "MANAGER" && parsed.data.role !== "ADMIN") {
+  if (session.role === "MANAGER") {
+    if (parsed.data.role === "ADMIN") return NextResponse.json({ error: "Managers cannot create Admin accounts" }, { status: 403 });
     parsed.data.warehouseId = session.warehouseId!; // managers may only staff their own warehouse
   }
   if (parsed.data.role !== "ADMIN" && !parsed.data.warehouseId) {
@@ -98,6 +107,17 @@ async function createUser(req: NextRequest) {
       plainPassword: parsed.data.password,
       role: parsed.data.role,
       warehouseId: parsed.data.role === "ADMIN" ? null : parsed.data.warehouseId,
+      contact: parsed.data.contact || null,
+      designation: parsed.data.designation || null,
+      city: parsed.data.city || null,
+      town: parsed.data.town || null,
+      employmentType: parsed.data.employmentType || "Full-time",
+      shift: parsed.data.shift || "General",
+      joiningDate: parsed.data.joiningDate || null,
+      endingDate: parsed.data.endingDate || null,
+      salary: parsed.data.salary || null,
+      bankUpi: parsed.data.bankUpi || null,
+      reportingManager: parsed.data.reportingManager || null,
     },
   });
   await (await import("@/lib/audit")).writeAudit({ userId: session.sub, role: session.role, action: "USER_CREATED", entityType: "User", entityId: user.id, newValue: { staffId: user.staffId, role: user.role } });

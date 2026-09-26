@@ -12,6 +12,17 @@ export type EditableUser = {
   active: boolean;
   plainPassword?: string | null;
   warehouseId?: string | null;
+  contact?: string | null;
+  designation?: string | null;
+  city?: string | null;
+  town?: string | null;
+  employmentType?: string | null;
+  shift?: string | null;
+  joiningDate?: string | null;
+  endingDate?: string | null;
+  salary?: string | null;
+  bankUpi?: string | null;
+  reportingManager?: string | null;
   theme?: string | null;
   fontFamily?: string | null;
   fontSize?: string | null;
@@ -40,6 +51,17 @@ export function EditUserModal({
     role: user.role,
     active: user.active,
     warehouseId: user.warehouseId ?? "",
+    contact: user.contact ?? "",
+    designation: user.designation ?? "",
+    city: user.city ?? "",
+    town: user.town ?? "",
+    employmentType: user.employmentType ?? "Full-time",
+    shift: user.shift ?? "General",
+    joiningDate: user.joiningDate ?? "",
+    endingDate: user.endingDate ?? "",
+    salary: user.salary ?? "",
+    bankUpi: user.bankUpi ?? "",
+    reportingManager: user.reportingManager ?? "",
     password: "",
     theme: user.theme ?? "default",
     fontFamily: user.fontFamily ?? "inter",
@@ -61,6 +83,17 @@ export function EditUserModal({
     if (form.role !== user.role) body.role = form.role;
     if (form.active !== user.active) body.active = form.active;
     if (warehouses && form.role !== "ADMIN" && form.warehouseId !== (user.warehouseId ?? "")) body.warehouseId = form.warehouseId || null;
+    if (form.contact !== (user.contact ?? "")) body.contact = form.contact.trim() || null;
+    if (form.designation !== (user.designation ?? "")) body.designation = form.designation.trim() || null;
+    if (form.city !== (user.city ?? "")) body.city = form.city.trim() || null;
+    if (form.town !== (user.town ?? "")) body.town = form.town.trim() || null;
+    if (form.employmentType !== (user.employmentType ?? "Full-time")) body.employmentType = form.employmentType;
+    if (form.shift !== (user.shift ?? "General")) body.shift = form.shift.trim() || null;
+    if (form.joiningDate !== (user.joiningDate ?? "")) body.joiningDate = form.joiningDate || null;
+    if (form.endingDate !== (user.endingDate ?? "")) body.endingDate = form.endingDate || null;
+    if (form.salary !== (user.salary ?? "")) body.salary = form.salary.trim() || null;
+    if (form.bankUpi !== (user.bankUpi ?? "")) body.bankUpi = form.bankUpi.trim() || null;
+    if (form.reportingManager !== (user.reportingManager ?? "")) body.reportingManager = form.reportingManager.trim() || null;
     if (form.password) body.password = form.password;
     if (form.theme !== (user.theme ?? "default")) body.theme = form.theme;
     if (form.fontFamily !== (user.fontFamily ?? "inter")) body.fontFamily = form.fontFamily;
@@ -113,9 +146,9 @@ export function EditUserModal({
           </div>
           {warehouses && form.role !== "ADMIN" && (
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-muted">Warehouse</label>
+              <label className="mb-1 block text-xs text-muted">Hub / Warehouse</label>
               <select className="w-full" value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })}>
-                <option value="">Select…</option>
+                <option value="">Select Hub / Warehouse…</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}
@@ -128,6 +161,116 @@ export function EditUserModal({
             <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
             Active
           </label>
+        </div>
+
+        {/* Employee Profile Details */}
+        <div className="border-t border-line pt-2 space-y-2">
+          <label className="text-xs font-semibold text-ink block">👤 Employee & Employment Details</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Contact / Phone</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. 9876543210"
+                value={form.contact}
+                onChange={(e) => setForm({ ...form, contact: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Designation</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. Picker, Cashier"
+                value={form.designation}
+                onChange={(e) => setForm({ ...form, designation: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">City</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. Gurugram"
+                value={form.city}
+                onChange={(e) => setForm({ ...form, city: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Town / State</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. Haryana"
+                value={form.town}
+                onChange={(e) => setForm({ ...form, town: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Employment Type</label>
+              <select
+                className="w-full text-xs"
+                value={form.employmentType}
+                onChange={(e) => setForm({ ...form, employmentType: e.target.value })}
+              >
+                <option value="Full-time">Full-time</option>
+                <option value="Part-time">Part-time</option>
+                <option value="Contract">Contract</option>
+                <option value="Intern">Intern</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Shift</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. 6AM-2PM, General"
+                value={form.shift}
+                onChange={(e) => setForm({ ...form, shift: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Joining Date</label>
+              <input
+                type="date"
+                className="w-full text-xs"
+                value={form.joiningDate}
+                onChange={(e) => setForm({ ...form, joiningDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Ending Date (Discontinued)</label>
+              <input
+                type="date"
+                className="w-full text-xs"
+                value={form.endingDate}
+                onChange={(e) => setForm({ ...form, endingDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Salary / Hourly Rate</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. 15,000"
+                value={form.salary}
+                onChange={(e) => setForm({ ...form, salary: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Bank / UPI Details</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. UPI:ramesh@upi"
+                value={form.bankUpi}
+                onChange={(e) => setForm({ ...form, bankUpi: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[11px] text-muted">Reporting Manager</label>
+              <input
+                className="w-full text-xs"
+                placeholder="e.g. ASM1, MGR-1"
+                value={form.reportingManager}
+                onChange={(e) => setForm({ ...form, reportingManager: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="border-t border-line pt-2">
