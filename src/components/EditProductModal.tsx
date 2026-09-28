@@ -64,6 +64,7 @@ export function EditProductModal({
     "Unit";
 
   const [form, setForm] = useState({
+    sku: product.sku || "",
     name: product.name || "",
     barcode: product.barcode ?? "",
     category: product.category ?? "",
@@ -199,6 +200,15 @@ export function EditProductModal({
   async function save() {
     setError(null);
 
+    if (!form.sku.trim()) {
+      setError({ message: "SKU / Item Code is required" });
+      return;
+    }
+    if (!form.name.trim()) {
+      setError({ message: "Product Name is required" });
+      return;
+    }
+
     const entered = saleUnits.map((su) => unitBarcodes[su.unitId]).filter(Boolean);
     if (new Set(entered).size !== entered.length) {
       setError({ message: "The same barcode is used on more than one unit of this product" });
@@ -210,7 +220,8 @@ export function EditProductModal({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: form.name,
+        sku: form.sku.trim(),
+        name: form.name.trim(),
         barcode: form.barcode || null,
         baseUnitId: baseUnitId || undefined,
         category: form.category.trim() || null,
@@ -282,7 +293,7 @@ export function EditProductModal({
       <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-3 bg-surface border border-line shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line pb-2">
           <h2 className="text-base font-bold text-ink">
-            Edit {product.sku} — {product.name}
+            Edit {form.sku || product.sku} — {form.name || product.name}
           </h2>
           <button onClick={onClose} className="text-muted hover:text-ink font-bold text-sm">
             ✕
@@ -291,9 +302,25 @@ export function EditProductModal({
 
         {/* Product Basic Fields */}
         <div className="space-y-2 text-xs">
-          <div>
-            <label className="mb-1 block font-semibold text-muted">Product Name *</label>
-            <input className="w-full py-1.5 px-2 rounded border border-line bg-surface-2 text-ink font-medium" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="sm:col-span-1">
+              <label className="mb-1 block font-semibold text-muted">SKU / Item Code *</label>
+              <input
+                className="w-full py-1.5 px-2 rounded border border-line bg-surface-2 text-ink font-mono font-bold"
+                value={form.sku}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                placeholder="e.g. SKU-1001"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block font-semibold text-muted">Product Name *</label>
+              <input
+                className="w-full py-1.5 px-2 rounded border border-line bg-surface-2 text-ink font-medium"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Product name"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -560,7 +587,7 @@ export function EditProductModal({
           <button
             type="button"
             className="btn-primary text-xs py-1.5 px-4 font-semibold shadow-xs"
-            disabled={saving || !form.name}
+            disabled={saving || !form.name.trim() || !form.sku.trim()}
             onClick={save}
           >
             {saving ? "Saving Changes…" : "Save Product & Units"}

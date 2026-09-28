@@ -83,7 +83,7 @@ type Line = {
   unitPrice?: number;
 };
 
-export type PaymentTenderMode = "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
+export type PaymentTenderMode = "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT" | "SPLIT";
 
 const scrollToActive = (active: boolean) => (el: HTMLElement | null) => {
   if (active) el?.scrollIntoView({ block: "nearest" });
@@ -162,6 +162,13 @@ function zoneOf(el: EventTarget): string {
 
 const WALK_IN = "CASH";
 
+export type PaymentRowItem = {
+  id: string;
+  method: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
+  amount: string;
+  reference?: string;
+};
+
 type SavedBasket = {
   details: { shopName: string; mobile: string; ownerName: string; address: string; gstin: string };
   customer: Customer | null;
@@ -169,14 +176,7 @@ type SavedBasket = {
   sellingMode: "WHOLESALE" | "RETAIL";
   lines: Line[];
   notes: string;
-  paymentMethod: PaymentTenderMode;
-  amountTendered?: string;
-  upiReference?: string;
-  bankReference?: string;
-  bankName?: string;
-  chequeNumber?: string;
-  chequeBank?: string;
-  chequeDueDate?: string;
+  paymentRows?: PaymentRowItem[];
   requestId: string | null;
 };
 
@@ -226,16 +226,10 @@ export default function BillingNewOrderPage() {
   const [focusQtyIdx, setFocusQtyIdx] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
-  // Payment Tender State
-  const [paymentMethod, setPaymentMethod] = useState<PaymentTenderMode>("CASH");
-  const [amountTendered, setAmountTendered] = useState<string>("");
-  const [upiReference, setUpiReference] = useState<string>("");
-  const [bankReference, setBankReference] = useState<string>("");
-  const [bankName, setBankName] = useState<string>("HDFC Bank");
-  const [chequeNumber, setChequeNumber] = useState<string>("");
-  const [chequeBank, setChequeBank] = useState<string>("");
-  const [chequeDueDate, setChequeDueDate] = useState<string>("");
-  const [showUpiQr, setShowUpiQr] = useState(false);
+  // Simple Payment Rows State
+  const [paymentRows, setPaymentRows] = useState<PaymentRowItem[]>([
+    { id: "1", method: "CASH", amount: "" },
+  ]);
 
   // Form submission & offline queue
   const [error, setError] = useState<string | null>(null);
@@ -293,7 +287,7 @@ export default function BillingNewOrderPage() {
     if (!recovered.current) return;
     if (lines.length === 0) clearEntry(ENTRY_KEYS.newOrder);
     else saveEntry(ENTRY_KEYS.newOrder, snapshot());
-  }, [details, customer, customerQuery, sellingMode, lines, notes, paymentMethod, amountTendered, upiReference, bankReference, bankName, chequeNumber, chequeBank, chequeDueDate]);
+  }, [details, customer, customerQuery, sellingMode, lines, notes, paymentRows]);
 
   const [held, setHeld] = useState<SavedBasket[]>([]);
   useEffect(() => {
@@ -310,14 +304,7 @@ export default function BillingNewOrderPage() {
       sellingMode,
       lines,
       notes,
-      paymentMethod,
-      amountTendered,
-      upiReference,
-      bankReference,
-      bankName,
-      chequeNumber,
-      chequeBank,
-      chequeDueDate,
+      paymentRows,
       requestId: requestIdRef.current,
     };
   }
@@ -329,18 +316,33 @@ export default function BillingNewOrderPage() {
     setSellingMode(b?.sellingMode ?? "WHOLESALE");
     setLines(b?.lines ?? []);
     setNotes(b?.notes ?? "");
-    setPaymentMethod(b?.paymentMethod ?? "CASH");
-    setAmountTendered(b?.amountTendered ?? "");
-    setUpiReference(b?.upiReference ?? "");
-    setBankReference(b?.bankReference ?? "");
-    setBankName(b?.bankName ?? "HDFC Bank");
-    setChequeNumber(b?.chequeNumber ?? "");
-    setChequeBank(b?.chequeBank ?? "");
-    setChequeDueDate(b?.chequeDueDate ?? "");
+    setPaymentRows(b?.paymentRows && b.paymentRows.length > 0 ? b.paymentRows : [{ id: "1", method: "CASH", amount: "" }]);
     requestIdRef.current = b?.requestId ?? null;
     setProductQuery("");
     setRestoredAt(null);
     setError(null);
+  }
+
+  function addPaymentRow() {
+    const currentPaid = paymentRows.reduce((sum, r) => (r.method === "CREDIT" ? sum : sum + (Number(r.amount) || 0)), 0);
+    const rem = round2(Math.max(0, total - currentPaid));
+    setPaymentRows((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        method: prev.some((r) => r.method === "CASH") ? "UPI" : "CASH",
+        amount: rem > 0 ? String(rem) : "",
+        reference: "",
+      },
+    ]);
+  }
+
+  function updatePaymentRow(id: string, patch: Partial<PaymentRowItem>) {
+    setPaymentRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function removePaymentRow(id: string) {
+    setPaymentRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
   }
 
   const isBlank = () => lines.length === 0 && !customer;
@@ -371,7 +373,7 @@ export default function BillingNewOrderPage() {
     fetch(`/api/customers/${customer.id}/billing-context`, { signal: ac.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && typeof d === "object" && Array.isArray(d.lastRates) && setCtx(d))
-      .catch(() => {});
+      .catch(() => { });
     return () => ac.abort();
   }, [customer?.id]);
 
@@ -385,10 +387,10 @@ export default function BillingNewOrderPage() {
     let live = true;
     const read = () => {
       if (!live) return;
-      getCachedProducts().then(setCachedProducts).catch(() => {});
-      getCachedCustomers().then(setCachedCustomers).catch(() => {});
+      getCachedProducts().then(setCachedProducts).catch(() => { });
+      getCachedCustomers().then(setCachedCustomers).catch(() => { });
     };
-    ensureFreshCatalog(read).then(read).catch(() => {});
+    ensureFreshCatalog(read).then(read).catch(() => { });
     return () => {
       live = false;
     };
@@ -426,7 +428,7 @@ export default function BillingNewOrderPage() {
       fetch(`/api/customers?q=${encodeURIComponent(customerQuery)}&limit=${SEARCH_LIMIT}`, { signal: ac.signal })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => Array.isArray(d) && paintCustomers(customerQuery, d as Customer[]))
-        .catch(() => {});
+        .catch(() => { });
     }, 150);
     return () => {
       clearTimeout(t);
@@ -449,7 +451,7 @@ export default function BillingNewOrderPage() {
       fetch(`/api/products?q=${encodeURIComponent(productQuery)}&limit=${SEARCH_LIMIT}`, { signal: ac.signal })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => Array.isArray(d) && paintProducts(productQuery, rankProducts(d as Product[], productQuery)))
-        .catch(() => {});
+        .catch(() => { });
     }, 150);
     return () => {
       clearTimeout(t);
@@ -564,7 +566,7 @@ export default function BillingNewOrderPage() {
       try {
         unitSelect.showPicker();
         return;
-      } catch {}
+      } catch { }
     }
     productInputRef.current?.focus();
   }
@@ -589,7 +591,7 @@ export default function BillingNewOrderPage() {
           fetch("/api/admin/units")
             .then((r) => (r.ok ? r.json() : null))
             .then((d) => Array.isArray(d) && setAllUnits(d))
-            .catch(() => {});
+            .catch(() => { });
         }
         setShowAddProductModal(true);
       } else {
@@ -660,7 +662,7 @@ export default function BillingNewOrderPage() {
       fetch("/api/admin/units")
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => Array.isArray(d) && setAllUnits(d))
-        .catch(() => {});
+        .catch(() => { });
     }
   }
 
@@ -738,10 +740,25 @@ export default function BillingNewOrderPage() {
   const { subtotal, discountTotal, taxTotal, total } = moneyTotals(money);
   const overLimitBy = ctx?.creditLimit != null ? round2(ctx.outstanding + total - ctx.creditLimit) : 0;
 
-  // Cash change computation
-  const tenderedNum = Number(amountTendered) || 0;
-  const changeDue = paymentMethod === "CASH" && tenderedNum >= total ? round2(tenderedNum - total) : 0;
-  const isCreditSale = paymentMethod === "CREDIT";
+  // Payment computation across simple payment rows
+  const totalPaid = round2(
+    paymentRows.reduce((sum, r) => {
+      if (r.method === "CREDIT") return sum;
+      return sum + (Number(r.amount) || 0);
+    }, 0)
+  );
+  const isSingleRow = paymentRows.length === 1;
+  const singleRow = paymentRows[0] || { id: "1", method: "CASH" as const, amount: "" };
+  const effectivePaid =
+    isSingleRow && !singleRow.amount && singleRow.method !== "CREDIT"
+      ? total
+      : totalPaid;
+  const changeDue = effectivePaid > total ? round2(effectivePaid - total) : 0;
+  const remainingCredit = round2(Math.max(0, total - effectivePaid));
+  const isCreditSale =
+    (isSingleRow && singleRow.method === "CREDIT") ||
+    (!isSingleRow && totalPaid <= 0) ||
+    (effectivePaid < total);
 
   function billed() {
     requestIdRef.current = null;
@@ -754,21 +771,44 @@ export default function BillingNewOrderPage() {
       setError("Add at least one product to generate a bill");
       return;
     }
+    if (!isSingleRow && totalPaid <= 0 && !paymentRows.some((r) => r.method === "CREDIT")) {
+      setError("Please enter an amount for at least one payment method or select Credit");
+      return;
+    }
     submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     const cust = customerPayload();
 
+    let paymentMethod: PaymentTenderMode = "CASH";
+    let splitsPayload: Array<{
+      method: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE";
+      amount: number;
+      reference?: string;
+    }> | undefined;
+
+    if (isSingleRow) {
+      paymentMethod = singleRow.method;
+    } else {
+      paymentMethod = "SPLIT";
+      splitsPayload = paymentRows
+        .filter((r) => r.method !== "CREDIT" && Number(r.amount) > 0)
+        .map((r) => ({
+          method: r.method as "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE",
+          amount: Number(r.amount),
+          reference: r.reference?.trim() || undefined,
+        }));
+    }
+
+    const singleRowAmt = Number(singleRow.amount) > 0 ? Number(singleRow.amount) : total;
     const paymentDetails = {
-      amountReceived: paymentMethod === "CASH" ? (tenderedNum > 0 ? tenderedNum : total) : total,
+      amountReceived: isSingleRow ? (singleRow.method === "CREDIT" ? 0 : singleRowAmt) : totalPaid,
       changeGiven: changeDue,
-      upiReference: paymentMethod === "UPI" ? upiReference.trim() || undefined : undefined,
-      bankReference: paymentMethod === "BANK_TRANSFER" ? bankReference.trim() || undefined : undefined,
-      bankName: paymentMethod === "BANK_TRANSFER" ? bankName.trim() || undefined : undefined,
-      chequeNumber: paymentMethod === "CHEQUE" ? chequeNumber.trim() || undefined : undefined,
-      chequeBank: paymentMethod === "CHEQUE" ? chequeBank.trim() || undefined : undefined,
-      chequeDueDate: paymentMethod === "CHEQUE" && chequeDueDate ? chequeDueDate : undefined,
+      upiReference: isSingleRow && singleRow.method === "UPI" ? singleRow.reference?.trim() || undefined : undefined,
+      bankReference: isSingleRow && singleRow.method === "BANK_TRANSFER" ? singleRow.reference?.trim() || undefined : undefined,
+      chequeNumber: isSingleRow && singleRow.method === "CHEQUE" ? singleRow.reference?.trim() || undefined : undefined,
       notes: notes.trim() || undefined,
+      splits: splitsPayload,
     };
 
     const payload = {
@@ -926,13 +966,13 @@ export default function BillingNewOrderPage() {
   useEffect(() => {
     try {
       setGuideHidden(localStorage.getItem(GUIDE_HIDDEN_KEY) === "1");
-    } catch {}
+    } catch { }
   }, []);
   function toggleGuide() {
     setGuideHidden((h) => {
       try {
         localStorage.setItem(GUIDE_HIDDEN_KEY, h ? "0" : "1");
-      } catch {}
+      } catch { }
       return !h;
     });
   }
@@ -966,14 +1006,11 @@ export default function BillingNewOrderPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-ink">New Bill / POS Terminal</h1>
-                  <span className="badge bg-accent/15 text-accent font-semibold text-xs border border-accent/30">
-                    Live Counter
-                  </span>
+                  <h1 className="text-xl font-bold text-ink">New Bills</h1>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted mt-0.5">
                   <span>📅 {clock || "Loading clock..."}</span>
-                  <span>👤 Cashier: <strong className="text-ink">{activeStaff.name}</strong> ({activeStaff.staffId})</span>
+                  <span>👤 Cashier: <strong className="text-ink">{activeStaff.name}</strong></span>
                   <span>🏷️ Mode: <strong className="text-accent">{sellingMode}</strong></span>
                 </div>
               </div>
@@ -1226,9 +1263,8 @@ export default function BillingNewOrderPage() {
                     tabIndex={-1}
                     aria-selected={i === customerIdx}
                     ref={scrollToActive(i === customerIdx)}
-                    className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-surface-hi ${
-                      i === customerIdx ? "bg-accent/15 font-semibold ring-1 ring-inset ring-accent" : ""
-                    }`}
+                    className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-surface-hi ${i === customerIdx ? "bg-accent/15 font-semibold ring-1 ring-inset ring-accent" : ""
+                      }`}
                     onClick={() => selectCustomer(c)}
                   >
                     <div>
@@ -1289,9 +1325,8 @@ export default function BillingNewOrderPage() {
                     tabIndex={-1}
                     aria-selected={i === productIdx}
                     ref={scrollToActive(i === productIdx)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-hi ${
-                      i === productIdx ? "bg-accent/15 font-semibold ring-1 ring-inset ring-accent" : ""
-                    }`}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-hi ${i === productIdx ? "bg-accent/15 font-semibold ring-1 ring-inset ring-accent" : ""
+                      }`}
                     onClick={() => addProduct(p)}
                   >
                     <span>
@@ -1322,15 +1357,14 @@ export default function BillingNewOrderPage() {
                   tabIndex={-1}
                   aria-selected={productIdx === productResults.length}
                   ref={scrollToActive(productIdx === productResults.length)}
-                  className={`flex w-full items-center justify-between border-t border-line px-3 py-2.5 text-left text-sm text-accent hover:bg-surface-hi ${
-                    productIdx === productResults.length ? "bg-accent/15 font-bold ring-1 ring-inset ring-accent" : ""
-                  }`}
+                  className={`flex w-full items-center justify-between border-t border-line px-3 py-2.5 text-left text-sm text-accent hover:bg-surface-hi ${productIdx === productResults.length ? "bg-accent/15 font-bold ring-1 ring-inset ring-accent" : ""
+                    }`}
                   onClick={() => {
                     if (allUnits.length === 0) {
                       fetch("/api/admin/units")
                         .then((r) => (r.ok ? r.json() : null))
                         .then((d) => Array.isArray(d) && setAllUnits(d))
-                        .catch(() => {});
+                        .catch(() => { });
                     }
                     setShowAddProductModal(true);
                   }}
@@ -1527,269 +1561,151 @@ export default function BillingNewOrderPage() {
         )}
 
         {/* 4. Payment Mode & Tender Recording Panel */}
+        {/* 4. Simple Payment Tender Breakdown (Dropdown + Add Rows) */}
         <div className="card p-5 space-y-4 border border-line shadow-sm" data-guide="bill">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">💳</span>
-              <h2 className="text-base font-bold text-ink">Payment Tender Mode</h2>
+            <div>
+              <h2 className="text-base font-bold text-ink flex items-center gap-2">
+                <span>💳</span> Payment Breakdown
+              </h2>
+              <p className="text-xs text-muted">
+                Select payment method and amount. Add rows to split payment across different methods.
+              </p>
             </div>
-            <span className="text-xs text-muted">
-              Select how this bill is paid or recorded on ledger
-            </span>
-          </div>
-
-          {/* Payment Method Selector Pills */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <button
               type="button"
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
-                paymentMethod === "CASH"
-                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
-                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
-              }`}
-              onClick={() => setPaymentMethod("CASH")}
+              className="btn text-xs font-semibold flex items-center gap-1.5 hover:border-accent hover:text-accent"
+              onClick={addPaymentRow}
             >
-              <span className="text-2xl">💵</span>
-              <span className="text-xs">Cash Payment</span>
-            </button>
-
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
-                paymentMethod === "UPI"
-                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
-                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
-              }`}
-              onClick={() => setPaymentMethod("UPI")}
-            >
-              <span className="text-2xl">📱</span>
-              <span className="text-xs">UPI / Dynamic QR</span>
-            </button>
-
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
-                paymentMethod === "BANK_TRANSFER"
-                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
-                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
-              }`}
-              onClick={() => setPaymentMethod("BANK_TRANSFER")}
-            >
-              <span className="text-2xl">🏦</span>
-              <span className="text-xs">NEFT / RTGS / Bank</span>
-            </button>
-
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
-                paymentMethod === "CHEQUE"
-                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
-                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
-              }`}
-              onClick={() => setPaymentMethod("CHEQUE")}
-            >
-              <span className="text-2xl">📑</span>
-              <span className="text-xs">Cheque / DD</span>
-            </button>
-
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
-                paymentMethod === "CREDIT"
-                  ? "border-bad bg-bad/15 text-bad font-bold ring-2 ring-bad shadow-xs"
-                  : "border-line bg-paper text-muted hover:border-bad/40 hover:bg-surface-hi"
-              }`}
-              onClick={() => setPaymentMethod("CREDIT")}
-            >
-              <span className="text-2xl">⏳</span>
-              <span className="text-xs">Credit (Unpaid)</span>
+              <span>+</span>
+              <span>Add Payment Method</span>
             </button>
           </div>
 
-          {/* Contextual Payment Inputs */}
-          {paymentMethod === "CASH" && (
-            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-center">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">
-                    Cash Amount Received from Customer (₹)
-                  </label>
+          {/* Payment Rows List */}
+          <div className="space-y-2.5">
+            {paymentRows.map((row, idx) => (
+              <div
+                key={row.id}
+                className="flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-paper p-3 shadow-2xs"
+              >
+                {/* Method Dropdown */}
+                <div className="w-48 min-w-[150px]">
+                  <label className="mb-0.5 block text-[10px] font-semibold text-muted uppercase">Payment Mode</label>
+                  <select
+                    className="w-full text-xs font-semibold"
+                    value={row.method}
+                    onChange={(e) => updatePaymentRow(row.id, { method: e.target.value as any })}
+                  >
+                    <option value="CASH">💵 Cash Payment</option>
+                    <option value="UPI">📱 UPI / QR Code</option>
+                    <option value="BANK_TRANSFER">🏦 Bank Transfer (NEFT/IMPS)</option>
+                    <option value="CHEQUE">📑 Cheque / DD</option>
+                    <option value="CREDIT">📒 Credit / Khata (Unpaid)</option>
+                  </select>
+                </div>
+
+                {/* Amount */}
+                <div className="w-40 min-w-[120px]">
+                  <label className="mb-0.5 block text-[10px] font-semibold text-muted uppercase">Amount (₹)</label>
                   <input
                     type="number"
                     min="0"
                     step="any"
-                    className="w-full text-lg font-bold"
-                    placeholder={`Exact ₹${total.toFixed(2)}`}
-                    value={amountTendered}
-                    onChange={(e) => setAmountTendered(e.target.value)}
+                    disabled={row.method === "CREDIT"}
+                    className={`w-full text-xs font-bold font-mono ${row.method === "CREDIT" ? "opacity-50" : ""}`}
+                    placeholder={
+                      row.method === "CREDIT"
+                        ? "Credit Ledger"
+                        : paymentRows.length === 1
+                          ? `Exact (₹${total.toFixed(2)})`
+                          : "0.00"
+                    }
+                    value={row.amount}
+                    onChange={(e) => updatePaymentRow(row.id, { amount: e.target.value })}
                   />
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                </div>
+
+                {/* Reference / Notes */}
+                {row.method !== "CREDIT" && row.method !== "CASH" && (
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="mb-0.5 block text-[10px] font-semibold text-muted uppercase">
+                      {row.method === "UPI"
+                        ? "UPI Ref / UTR (Optional)"
+                        : row.method === "CHEQUE"
+                          ? "Cheque Number (Optional)"
+                          : "Bank UTR / Ref (Optional)"}
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full text-xs"
+                      placeholder={
+                        row.method === "UPI"
+                          ? "e.g. 408291839218"
+                          : row.method === "CHEQUE"
+                            ? "e.g. 004921"
+                            : "e.g. HDFC00012398"
+                      }
+                      value={row.reference || ""}
+                      onChange={(e) => updatePaymentRow(row.id, { reference: e.target.value })}
+                    />
+                  </div>
+                )}
+
+                {/* Remove button */}
+                {paymentRows.length > 1 && (
+                  <div className="pt-3.5">
                     <button
                       type="button"
-                      className="btn text-xs font-semibold py-1 px-2 hover:bg-accent/10"
-                      onClick={() => setAmountTendered(String(total))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-muted hover:border-bad hover:bg-bad/10 hover:text-bad"
+                      onClick={() => removePaymentRow(row.id)}
+                      title="Remove row"
                     >
-                      Exact (₹{total.toFixed(2)})
-                    </button>
-                    {[100, 200, 500, 2000].map((denom) => {
-                      const roundedUp = Math.ceil(total / denom) * denom;
-                      if (roundedUp <= total && roundedUp !== total) return null;
-                      return (
-                        <button
-                          key={denom}
-                          type="button"
-                          className="btn text-xs font-semibold py-1 px-2 hover:bg-accent/10"
-                          onClick={() => setAmountTendered(String(roundedUp))}
-                        >
-                          ₹{roundedUp}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex flex-col justify-center rounded-xl bg-paper p-4 border border-line text-center">
-                  <span className="text-xs font-semibold text-muted">Change / Return to Customer</span>
-                  <span className={`text-2xl font-black mt-1 ${changeDue > 0 ? "text-good" : "text-ink"}`}>
-                    ₹{changeDue.toFixed(2)}
-                  </span>
-                  {tenderedNum > 0 && tenderedNum < total && (
-                    <span className="text-xs text-bad font-semibold mt-1">
-                      Short by ₹{(total - tenderedNum).toFixed(2)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {paymentMethod === "UPI" && (
-            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-center">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">
-                    UPI Transaction ID / UTR Reference (12 digits)
-                  </label>
-                  <input
-                    className="w-full text-base font-mono font-semibold uppercase"
-                    placeholder="e.g. 428192837482"
-                    value={upiReference}
-                    onChange={(e) => setUpiReference(e.target.value)}
-                  />
-                  <p className="text-xs text-muted mt-1">
-                    Enter the UTR reference number from the customer&apos;s UPI app screenshot or SMS.
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-center justify-center rounded-xl bg-paper p-4 border border-line text-center">
-                  <div className="flex items-center gap-2 mb-2">
-                    <button
-                      type="button"
-                      className="btn text-xs font-semibold"
-                      onClick={() => setShowUpiQr((v) => !v)}
-                    >
-                      {showUpiQr ? "Hide QR Code" : "📱 Show Counter QR Code"}
+                      ✕
                     </button>
                   </div>
-                  {showUpiQr ? (
-                    <div className="p-2 bg-white rounded-lg border border-line flex flex-col items-center">
-                      <div className="text-xs text-slate-700 font-mono mb-1 font-bold">UPI Amount: ₹{total.toFixed(2)}</div>
-                      {/* Simple dynamic SVG QR representation */}
-                      <div className="w-36 h-36 bg-slate-100 flex items-center justify-center border border-dashed border-slate-300 rounded font-mono text-[10px] text-center p-2 text-slate-600">
-                        Scan with GPay / PhonePe / Paytm / Any UPI App
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-good font-semibold">
-                      ✅ Instant settlement recorded directly in UPI ledger upon billing.
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
 
-          {paymentMethod === "BANK_TRANSFER" && (
-            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">Bank Name</label>
-                  <input
-                    className="w-full text-sm font-medium"
-                    placeholder="e.g. HDFC Bank, ICICI, SBI..."
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">
-                    UTR / IMPS / NEFT Reference Number
-                  </label>
-                  <input
-                    className="w-full text-sm font-mono font-semibold uppercase"
-                    placeholder="e.g. HDFCN240928001"
-                    value={bankReference}
-                    onChange={(e) => setBankReference(e.target.value)}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted">
-                Direct bank transfer automatically logs into Bank Transactions ledger for end-of-day bank reconciliation.
-              </p>
-            </div>
-          )}
+          {/* Totals Summary Footer */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface-hi/40 p-3 text-xs">
+            <button
+              type="button"
+              className="btn text-xs font-semibold flex items-center gap-1.5"
+              onClick={addPaymentRow}
+            >
+              <span>+</span>
+              <span>Add Another Payment Row</span>
+            </button>
 
-          {paymentMethod === "CHEQUE" && (
-            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">Cheque Number (6 digits)</label>
-                  <input
-                    className="w-full text-sm font-mono font-bold"
-                    placeholder="e.g. 000412"
-                    value={chequeNumber}
-                    onChange={(e) => setChequeNumber(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">Issuing Bank</label>
-                  <input
-                    className="w-full text-sm font-medium"
-                    placeholder="e.g. State Bank of India"
-                    value={chequeBank}
-                    onChange={(e) => setChequeBank(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-ink">Cheque Date / Due Date</label>
-                  <input
-                    type="date"
-                    className="w-full text-sm font-medium"
-                    value={chequeDueDate}
-                    onChange={(e) => setChequeDueDate(e.target.value)}
-                  />
-                </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs">
+              <div>
+                <span className="text-muted">Bill Total: </span>
+                <strong className="text-ink font-mono text-sm">₹{total.toFixed(2)}</strong>
               </div>
-            </div>
-          )}
-
-          {paymentMethod === "CREDIT" && (
-            <div className="rounded-xl border border-bad/40 bg-bad/5 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-bad font-bold text-sm">
-                <span>⚠️ Unpaid Credit Sale</span>
+              <div>
+                <span className="text-muted">Total Paid: </span>
+                <strong className="text-good font-mono text-sm">
+                  ₹{effectivePaid.toFixed(2)}
+                </strong>
               </div>
-              <p className="text-xs text-muted">
-                This bill total of <strong className="text-ink">₹{total.toFixed(2)}</strong> will be added to customer{" "}
-                <strong className="text-ink">{customer?.shopName || details.shopName || "Walk-in Retailer"}</strong>&apos;s accounts receivable ledger.
-              </p>
-              {ctx && (
-                <div className="text-xs text-bad font-semibold">
-                  Projected Customer Balance: ₹{(ctx.outstanding + total).toFixed(2)}
-                  {ctx.creditLimit != null && ` (Credit Limit: ₹${ctx.creditLimit.toFixed(2)})`}
+              {changeDue > 0 ? (
+                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30">
+                  Change to Return: ₹{changeDue.toFixed(2)}
+                </div>
+              ) : remainingCredit > 0 && !(isSingleRow && !singleRow.amount && singleRow.method !== "CREDIT") ? (
+                <div className="rounded bg-amber-500/15 px-2.5 py-1 font-bold text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  Remaining on Credit: ₹{remainingCredit.toFixed(2)}
+                </div>
+              ) : (
+                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30">
+                  ✓ Full Settled
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* 5. Financial Summary & Totals Breakdown */}

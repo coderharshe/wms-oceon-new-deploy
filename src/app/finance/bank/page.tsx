@@ -6,6 +6,9 @@ import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonStats } from "@/components/Skeleton";
 
+import { FinanceDateRangePicker } from "@/components/FinanceDateRangePicker";
+import type { DateRangePreset } from "@/lib/date-filter";
+
 type BankAccount = {
   id: string;
   name: string;
@@ -61,15 +64,32 @@ type BankApiResponse = {
   transactions: BankTransaction[];
   drawerDeposits: { id: string; amount: number; note: string | null; at: string }[];
   upiSettlements: { id: string; amount: number; status: string; note: string | null; at: string }[];
+  dateRange?: {
+    preset: DateRangePreset;
+    startDateStr: string;
+    endDateStr: string;
+    label: string;
+  };
 };
 
 const rs = (x: number | string) => `₹${Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function BankManagementPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>("ALL");
-  const queryParam = selectedAccountId !== "ALL" ? `?accountId=${selectedAccountId}` : "";
+  const [datePreset, setDatePreset] = useState<DateRangePreset>("today");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  const { data, error, loading, reload } = useApiGet<BankApiResponse>(`/api/finance/bank${queryParam}`);
+  const queryParams = new URLSearchParams();
+  if (selectedAccountId !== "ALL") queryParams.set("accountId", selectedAccountId);
+  if (datePreset !== "today") queryParams.set("preset", datePreset);
+  if (datePreset === "custom" && startDate && endDate) {
+    queryParams.set("startDate", startDate);
+    queryParams.set("endDate", endDate);
+  }
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  const { data, error, loading, reload } = useApiGet<BankApiResponse>(`/api/finance/bank${queryString}`);
 
   // Modals state
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -217,6 +237,24 @@ export default function BankManagementPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleDeleteAccount(accId: string, accName: string) {
+    if (!confirm(`Are you sure you want to remove account "${accName}"?`)) return;
+    try {
+      const res = await fetch("/api/finance/bank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "DELETE_ACCOUNT",
+          id: accId,
+        }),
+      });
+      if (res.ok) {
+        setSelectedAccountId("ALL");
+        reload();
+      }
+    } catch {}
   }
 
   async function handleInterBankTransfer(e: React.FormEvent) {
@@ -427,35 +465,60 @@ export default function BankManagementPage() {
         </div>
       </div>
 
+      {/* ── Statement Period / Date Range Picker ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface p-2.5 rounded-xl border border-line">
+        <div className="text-xs font-bold text-ink flex items-center gap-1.5">
+          <span>📅 Statement Period:</span>
+          <strong className="text-accent font-mono">{data?.dateRange?.label || "Today"}</strong>
+        </div>
+
+        <FinanceDateRangePicker
+          preset={datePreset}
+          startDate={startDate || data?.dateRange?.startDateStr || ""}
+          endDate={endDate || data?.dateRange?.endDateStr || ""}
+          onChange={(p, s, e) => {
+            setDatePreset(p);
+            setStartDate(s);
+            setEndDate(e);
+          }}
+        />
+      </div>
+
       {/* ── CUSTOM BANK ACCOUNTS SELECTOR BAR ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface p-2 rounded border border-line">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface p-2.5 rounded border border-line">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-bold text-muted uppercase mr-1">Bank Accounts:</span>
-          <button
-            onClick={() => setSelectedAccountId("ALL")}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-              selectedAccountId === "ALL" ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
-            }`}
-          >
-            🏛️ All Consolidated ({rs(data.accounts.reduce((sum, a) => sum + a.currentBalance, 0))})
-          </button>
+          {data.accounts.length === 0 ? (
+            <span className="text-xs text-muted italic">No bank accounts added yet. Click &ldquo;+ Add Bank Account&rdquo; to register your account.</span>
+          ) : (
+            <>
+              <button
+                onClick={() => setSelectedAccountId("ALL")}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
+                  selectedAccountId === "ALL" ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
+                }`}
+              >
+                🏛️ All Consolidated ({rs(data.accounts.reduce((sum, a) => sum + a.currentBalance, 0))})
+              </button>
 
-          {data.accounts.map((acc) => (
-            <button
-              key={acc.id}
-              onClick={() => setSelectedAccountId(acc.id)}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                selectedAccountId === acc.id
-                  ? "bg-accent text-white shadow-sm"
-                  : "bg-paper border border-line text-ink hover:bg-surface-hi"
-              }`}
-            >
-              <span>{acc.name}</span>
-              <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${selectedAccountId === acc.id ? "bg-white/20 text-white" : "bg-surface text-muted"}`}>
-                {rs(acc.currentBalance)}
-              </span>
-            </button>
-          ))}
+              {data.accounts.map((acc) => (
+                <button
+                  key={acc.id}
+                  onClick={() => setSelectedAccountId(acc.id)}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                    selectedAccountId === acc.id
+                      ? "bg-accent text-white shadow-sm"
+                      : "bg-paper border border-line text-ink hover:bg-surface-hi"
+                  }`}
+                >
+                  <span>{acc.name}</span>
+                  <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${selectedAccountId === acc.id ? "bg-white/20 text-white" : "bg-surface text-muted"}`}>
+                    {rs(acc.currentBalance)}
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         <button
@@ -475,7 +538,16 @@ export default function BankManagementPage() {
                 {currentAccount ? `Account Ledger: ${currentAccount.name} (${currentAccount.accountNumber})` : "Consolidated Bank Ledger Formula"}
               </h2>
               {currentAccount && (
-                <span className="badge bg-surface-hi text-[10px]">{currentAccount.bankName} · {currentAccount.accountType}</span>
+                <>
+                  <span className="badge bg-surface-hi text-[10px]">{currentAccount.bankName} · {currentAccount.accountType}</span>
+                  <button
+                    onClick={() => handleDeleteAccount(currentAccount.id, currentAccount.name)}
+                    className="text-[11px] text-bad hover:underline font-bold ml-2"
+                    title="Remove this account"
+                  >
+                    🗑️ Remove Account
+                  </button>
+                </>
               )}
             </div>
             <p className="text-[11px] text-muted">

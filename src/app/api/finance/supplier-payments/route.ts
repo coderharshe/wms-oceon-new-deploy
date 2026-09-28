@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireRole, isErrorResponse } from "@/lib/guard";
 import { getDb } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { parseSupplierBankDetails, serializeSupplierBankDetails } from "@/lib/supplier-bank";
 
 export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
@@ -23,7 +24,19 @@ export async function GET(req: NextRequest) {
       },
       include: {
         supplier: {
-          select: { id: true, name: true, phone: true, contactPerson: true, bankDetails: true, creditDays: true },
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            gstin: true,
+            contactPerson: true,
+            address: true,
+            city: true,
+            state: true,
+            bankDetails: true,
+            creditDays: true,
+          },
         },
         warehouse: { select: { name: true, code: true } },
         purchaseOrder: { select: { poNumber: true, creditDays: true } },
@@ -55,6 +68,29 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { businessDate: "desc" },
       take: 100,
+    });
+
+    // 4. Supplier Directory with structured Banking Info
+    const suppliers = await db.supplier.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        contactPerson: true,
+        phone: true,
+        email: true,
+        address: true,
+        city: true,
+        state: true,
+        gstin: true,
+        paymentTerms: true,
+        bankDetails: true,
+        creditDays: true,
+        creditLimit: true,
+        active: true,
+      },
     });
 
     // Calculate Lifecycle Metrics
@@ -110,7 +146,13 @@ export async function GET(req: NextRequest) {
         supplierName: b.supplier.name,
         contactPerson: b.supplier.contactPerson,
         phone: b.supplier.phone,
+        email: b.supplier.email,
+        gstin: b.supplier.gstin,
+        address: b.supplier.address,
+        city: b.supplier.city,
+        state: b.supplier.state,
         bankDetails: b.supplier.bankDetails,
+        bankInfo: parseSupplierBankDetails(b.supplier.bankDetails),
         supplierBillNo: b.supplierBillNo,
         grnNumber: b.grnNumber,
         poNumber: b.purchaseOrder?.poNumber || null,
@@ -119,6 +161,11 @@ export async function GET(req: NextRequest) {
         total: Number(b.total),
         paymentStatus: b.paymentStatus,
         warehouse: b.warehouse.name,
+      })),
+      suppliers: suppliers.map((s) => ({
+        ...s,
+        creditLimit: s.creditLimit ? Number(s.creditLimit) : null,
+        bankInfo: parseSupplierBankDetails(s.bankDetails),
       })),
       paymentRequests: vouchers.map((v) => ({
         id: v.id,
@@ -153,7 +200,26 @@ export async function GET(req: NextRequest) {
 
 // POST Handler for Complete Supplier Payment Lifecycle Actions
 const requestSchema = z.object({
-  action: z.enum(["CREATE_REQUEST", "APPROVE_REQUEST", "REJECT_REQUEST", "EXECUTE_PAYMENT", "RECONCILE_PAYMENT"]),
+  action: z.enum(["CREATE_REQUEST", "APPROVE_REQUEST", "REJECT_REQUEST", "EXECUTE_PAYMENT", "RECONCILE_PAYMENT", "UPDATE_SUPPLIER"]),
+  // UPDATE_SUPPLIER fields
+  supplierId: z.string().optional(),
+  name: z.string().optional(),
+  contactPerson: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  gstin: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  bankInfo: z.object({
+    accountHolder: z.string().optional(),
+    accountNumber: z.string().optional(),
+    bankName: z.string().optional(),
+    ifsc: z.string().optional(),
+    branch: z.string().optional(),
+    upiId: z.string().optional(),
+  }).optional(),
+  bankDetails: z.string().optional(),
   // CREATE_REQUEST fields
   supplierName: z.string().optional(),
   supplierBillNo: z.string().optional(),
@@ -188,6 +254,60 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
 
   try {
+    // ──────────────────────── 0. UPDATE SUPPLIER (INFO & BANKING) ────────────────────────
+    if (data.action === "UPDATE_SUPPLIER") {
+      if (!data.supplierId) {
+        return NextResponse.json({ error: "supplierId is required to update supplier" }, { status: 400 });
+      }
+
+      const existing = await db.supplier.findUnique({
+        where: { id: data.supplierId },
+      });
+
+      if (!existing) {
+        return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
+      }
+
+      const updateData: Record<string, any> = {};
+      if (data.name !== undefined) updateData.name = data.name.trim();
+      if (data.contactPerson !== undefined) updateData.contactPerson = data.contactPerson?.trim() || null;
+      if (data.phone !== undefined) updateData.phone = data.phone?.trim() || null;
+      if (data.email !== undefined) updateData.email = data.email?.trim() || null;
+      if (data.gstin !== undefined) updateData.gstin = data.gstin ? data.gstin.trim().toUpperCase() : null;
+      if (data.address !== undefined) updateData.address = data.address?.trim() || null;
+      if (data.city !== undefined) updateData.city = data.city?.trim() || null;
+      if (data.state !== undefined) updateData.state = data.state?.trim() || null;
+
+      if (data.bankInfo !== undefined) {
+        updateData.bankDetails = serializeSupplierBankDetails(data.bankInfo);
+      } else if (data.bankDetails !== undefined) {
+        updateData.bankDetails = data.bankDetails?.trim() || null;
+      }
+
+      const updated = await db.supplier.update({
+        where: { id: data.supplierId },
+        data: updateData,
+      });
+
+      await writeAudit({
+        userId: session.sub,
+        role: session.role,
+        warehouseId: session.warehouseId,
+        action: "SUPPLIER_UPDATED_FROM_FINANCE",
+        entityType: "Supplier",
+        entityId: data.supplierId,
+        newValue: updateData,
+      });
+
+      return NextResponse.json({
+        success: true,
+        supplier: {
+          ...updated,
+          bankInfo: parseSupplierBankDetails(updated.bankDetails),
+        },
+      });
+    }
+
     // ──────────────────────── 1. CREATE PAYMENT REQUEST ────────────────────────
     if (data.action === "CREATE_REQUEST") {
       if (!data.supplierName || !data.amount) {

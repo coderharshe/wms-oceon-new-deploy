@@ -32,7 +32,7 @@ export type BillDisplay = {
   discountTotal: number;
   taxTotal: number;
   total: number;
-  paymentMethod?: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
+  paymentMethod?: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT" | "SPLIT";
   paymentDetails?: {
     amountReceived?: number;
     changeGiven?: number;
@@ -43,6 +43,14 @@ export type BillDisplay = {
     chequeBank?: string;
     chequeDueDate?: string;
     notes?: string;
+    splits?: Array<{
+      method: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE";
+      amount: number;
+      reference?: string;
+      bankName?: string;
+      chequeDueDate?: string;
+      notes?: string;
+    }>;
   };
   invoiceNumber?: string;
   employeeName?: string;

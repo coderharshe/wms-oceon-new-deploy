@@ -6,6 +6,7 @@ import { useApiGet } from "@/lib/useApiGet";
 import { SkeletonStats, SkeletonTable } from "@/components/Skeleton";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { fmtDate } from "@/lib/fmt";
+import { parseSupplierBankDetails, serializeSupplierBankDetails, SupplierBankInfo } from "@/lib/supplier-bank";
 
 export type Supplier = {
   id: string;
@@ -20,6 +21,7 @@ export type Supplier = {
   gstin?: string | null;
   paymentTerms?: string | null;
   bankDetails?: string | null;
+  bankInfo?: SupplierBankInfo;
   contractStart?: string | null;
   contractEnd?: string | null;
   supplyType?: "INWARD" | "OUTWARD" | "BOTH" | string | null;
@@ -132,7 +134,12 @@ export default function InventorySuppliersPage() {
     state: "",
     gstin: "",
     paymentTerms: "Regular",
-    bankDetails: "",
+    bankName: "",
+    accountNumber: "",
+    ifsc: "",
+    branch: "",
+    accountHolder: "",
+    upiId: "",
     contractStart: "",
     contractEnd: "",
     supplyType: "INWARD",
@@ -154,6 +161,7 @@ export default function InventorySuppliersPage() {
   }
 
   function openEditModal(s: Supplier) {
+    const bank = parseSupplierBankDetails(s.bankDetails);
     setEditingSupplier(s);
     setFormError(null);
     setForm({
@@ -167,7 +175,12 @@ export default function InventorySuppliersPage() {
       state: s.state || "",
       gstin: s.gstin || "",
       paymentTerms: s.paymentTerms || "Regular",
-      bankDetails: s.bankDetails || "",
+      bankName: bank.bankName || "",
+      accountNumber: bank.accountNumber || "",
+      ifsc: bank.ifsc || "",
+      branch: bank.branch || "",
+      accountHolder: bank.accountHolder || s.name || "",
+      upiId: bank.upiId || "",
       contractStart: s.contractStart ? s.contractStart.slice(0, 10) : "",
       contractEnd: s.contractEnd ? s.contractEnd.slice(0, 10) : "",
       supplyType: s.supplyType || "INWARD",
@@ -191,6 +204,15 @@ export default function InventorySuppliersPage() {
       const url = editingSupplier ? `/api/suppliers/${editingSupplier.id}` : "/api/suppliers";
       const method = editingSupplier ? "PATCH" : "POST";
 
+      const bankInfo = {
+        bankName: form.bankName.trim() || undefined,
+        accountNumber: form.accountNumber.trim() || undefined,
+        ifsc: form.ifsc.trim().toUpperCase() || undefined,
+        branch: form.branch.trim() || undefined,
+        accountHolder: form.accountHolder.trim() || undefined,
+        upiId: form.upiId.trim() || undefined,
+      };
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -205,7 +227,7 @@ export default function InventorySuppliersPage() {
           state: form.state.trim() || undefined,
           gstin: form.gstin.trim() || undefined,
           paymentTerms: form.paymentTerms.trim() || undefined,
-          bankDetails: form.bankDetails.trim() || undefined,
+          bankInfo,
           contractStart: form.contractStart || undefined,
           contractEnd: form.contractEnd || undefined,
           supplyType: form.supplyType || "INWARD",
@@ -689,25 +711,87 @@ export default function InventorySuppliersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-muted mb-1">Payment Terms Description</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Regular / Net 30 / Advance"
-                      value={form.paymentTerms}
-                      onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}
-                      className="w-full py-1.5 px-2.5 rounded border border-line bg-surface-2 text-ink"
-                    />
+                <div>
+                  <label className="block font-semibold text-muted mb-1">Payment Terms Description</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Regular / Net 30 / Advance"
+                    value={form.paymentTerms}
+                    onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}
+                    className="w-full py-1.5 px-2.5 rounded border border-line bg-surface-2 text-ink"
+                  />
+                </div>
+
+                {/* Structured Banking Section */}
+                <div className="p-3 bg-surface-2 rounded-lg border border-line space-y-2.5">
+                  <span className="text-[11px] font-bold text-accent uppercase tracking-wider block">
+                    🏦 Banking & Digital Payout Details
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-semibold text-muted mb-1">Bank Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. HDFC Bank, SBI"
+                        value={form.bankName}
+                        onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                        className="w-full py-1.5 px-2.5 rounded border border-line bg-surface text-ink font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-muted mb-1">Account Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 50200012345678"
+                        value={form.accountNumber}
+                        onChange={(e) => setForm({ ...form, accountNumber: e.target.value.replace(/\s+/g, "") })}
+                        className="w-full py-1.5 px-2.5 rounded border border-line bg-surface text-ink font-mono font-bold"
+                      />
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block font-semibold text-muted mb-1">IFSC Code</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. HDFC0001234"
+                        value={form.ifsc}
+                        onChange={(e) => setForm({ ...form, ifsc: e.target.value.toUpperCase().replace(/\s+/g, "") })}
+                        className="w-full py-1.5 px-2.5 rounded border border-line bg-surface text-ink font-mono uppercase font-bold text-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-muted mb-1">Branch Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Connaught Place"
+                        value={form.branch}
+                        onChange={(e) => setForm({ ...form, branch: e.target.value })}
+                        className="w-full py-1.5 px-2.5 rounded border border-line bg-surface text-ink"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-muted mb-1">UPI ID / VPA</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. vendor@okhdfcbank"
+                        value={form.upiId}
+                        onChange={(e) => setForm({ ...form, upiId: e.target.value.replace(/\s+/g, "") })}
+                        className="w-full py-1.5 px-2.5 rounded border border-line bg-surface text-ink font-mono text-good font-semibold"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block font-semibold text-muted mb-1">Bank / UPI Payout Details</label>
+                    <label className="block font-semibold text-muted mb-1">Account Holder / Beneficiary Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. HDFC - 123456789, IFSC: HDFC0001, UPI: mva@hdfc"
-                      value={form.bankDetails}
-                      onChange={(e) => setForm({ ...form, bankDetails: e.target.value })}
-                      className="w-full py-1.5 px-2.5 rounded border border-line bg-surface-2 text-ink"
+                      placeholder="Name as registered with Bank"
+                      value={form.accountHolder}
+                      onChange={(e) => setForm({ ...form, accountHolder: e.target.value })}
+                      className="w-full py-1.5 px-2.5 rounded border border-line bg-surface text-ink"
                     />
                   </div>
                 </div>
@@ -831,12 +915,66 @@ export default function InventorySuppliersPage() {
                     {[viewingSupplier.address, viewingSupplier.city, viewingSupplier.state].filter(Boolean).join(", ") || "—"}
                   </span>
                 </div>
-                {viewingSupplier.bankDetails && (
-                  <div className="border-t border-line/60 pt-1.5">
-                    <span className="text-muted block text-[10px]">Bank / UPI Account:</span>
-                    <span className="font-mono text-ink font-semibold">{viewingSupplier.bankDetails}</span>
-                  </div>
-                )}
+                {viewingSupplier.bankDetails && (() => {
+                  const b = parseSupplierBankDetails(viewingSupplier.bankDetails);
+                  return (
+                    <div className="border-t border-line/60 pt-2 space-y-1.5">
+                      <span className="text-muted block text-[10px] font-bold uppercase tracking-wider text-accent">
+                        🏦 Bank & Digital Payout Details:
+                      </span>
+                      {b.bankName && (
+                        <div className="font-bold text-ink">
+                          {b.bankName} {b.branch ? `(${b.branch})` : ""}
+                        </div>
+                      )}
+                      {b.accountNumber && (
+                        <div className="flex items-center justify-between bg-surface p-1.5 rounded border border-line">
+                          <span className="text-muted">A/C: <strong className="font-mono text-ink">{b.accountNumber}</strong></span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(b.accountNumber!);
+                              alert(`Copied A/C: ${b.accountNumber}`);
+                            }}
+                            className="px-2 py-0.5 text-[10px] font-bold rounded bg-surface-2 hover:bg-surface-hi border border-line"
+                          >
+                            📋 Copy
+                          </button>
+                        </div>
+                      )}
+                      {b.ifsc && (
+                        <div className="flex items-center justify-between bg-surface p-1.5 rounded border border-line">
+                          <span className="text-muted">IFSC: <strong className="font-mono text-accent uppercase">{b.ifsc}</strong></span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(b.ifsc!);
+                              alert(`Copied IFSC: ${b.ifsc}`);
+                            }}
+                            className="px-2 py-0.5 text-[10px] font-bold rounded bg-surface-2 hover:bg-surface-hi border border-line"
+                          >
+                            📋 Copy
+                          </button>
+                        </div>
+                      )}
+                      {b.upiId && (
+                        <div className="flex items-center justify-between bg-surface p-1.5 rounded border border-line">
+                          <span className="text-muted">UPI: <strong className="font-mono text-good">{b.upiId}</strong></span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(b.upiId!);
+                              alert(`Copied UPI: ${b.upiId}`);
+                            }}
+                            className="px-2 py-0.5 text-[10px] font-bold rounded bg-surface-2 hover:bg-surface-hi border border-line"
+                          >
+                            📋 Copy
+                          </button>
+                        </div>
+                      )}
+                      {!b.accountNumber && !b.ifsc && !b.upiId && (
+                        <div className="font-mono text-ink font-semibold">{viewingSupplier.bankDetails}</div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Contract Validity */}

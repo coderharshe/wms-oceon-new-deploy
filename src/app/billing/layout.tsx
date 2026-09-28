@@ -6,6 +6,7 @@ import { getSetting } from "@/lib/settings";
 const LINKS = [
   { href: "/billing", label: "Dashboard (Alt+D)" },
   { href: "/billing/new", label: "New Bill (F2)" },
+  { href: "/billing/customers", label: "Customers" },
   { href: "/billing/orders", label: "Bills & Orders (Alt+O)" },
   { href: "/billing/gst-bill", label: "GST Invoice" },
   { href: "/billing/discounts", label: "Discount Approvals" },

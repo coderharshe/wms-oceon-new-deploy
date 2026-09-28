@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING"]);
   if (isErrorResponse(session)) return session;
   const q = req.nextUrl.searchParams.get("q")?.trim();
+  const limitParam = Number(req.nextUrl.searchParams.get("limit"));
+  const takeLimit = limitParam > 0 ? Math.min(limitParam, 200) : (q ? 50 : 100);
 
   if (isWorkersRuntime()) {
     const { getDrizzleDb } = await import("@/lib/drizzle-db");
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
     const { or, ilike, asc } = await import("drizzle-orm");
     const db = getDrizzleDb();
     const where = q ? or(ilike(customer.shopName, `%${q}%`), ilike(customer.mobile, `%${q}%`), ilike(customer.ownerName, `%${q}%`)) : undefined;
-    const customers = await db.select().from(customer).where(where).orderBy(asc(customer.shopName)).limit(25);
+    const customers = await db.select().from(customer).where(where).orderBy(asc(customer.shopName)).limit(takeLimit);
     return NextResponse.json(customers);
   }
 
@@ -38,7 +40,7 @@ export async function GET(req: NextRequest) {
           ],
         }
       : {},
-    take: 25,
+    take: takeLimit,
     orderBy: { shopName: "asc" },
   });
   return NextResponse.json(customers);

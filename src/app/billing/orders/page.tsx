@@ -194,14 +194,9 @@ export default function BillsAndOrdersPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-ink">Bills &amp; Invoices Register</h1>
-            <span className="badge bg-accent/15 text-accent font-semibold text-xs border border-accent/30">
-              POS &amp; Orders History
-            </span>
+            <h1 className="text-xl font-bold text-ink">Bills &amp; Invoices</h1>
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Real-time audit log of all wholesale and retail counter bills, payment collection status, refunds, and customer receivables.
-          </p>
+
         </div>
 
         <div className="flex items-center gap-2">
@@ -268,9 +263,8 @@ export default function BillsAndOrdersPage() {
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line pb-2">
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "ALL" ? "bg-ink text-surface shadow-xs" : "bg-paper text-muted hover:bg-surface-hi hover:text-ink"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "ALL" ? "bg-ink text-surface shadow-xs" : "bg-paper text-muted hover:bg-surface-hi hover:text-ink"
+            }`}
           onClick={() => setActiveTab("ALL")}
         >
           📑 All Bills ({orders.length + waiting.length})
@@ -278,9 +272,8 @@ export default function BillsAndOrdersPage() {
 
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "PAID" ? "bg-good text-white shadow-xs" : "bg-paper text-good hover:bg-good/10"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "PAID" ? "bg-good text-white shadow-xs" : "bg-paper text-good hover:bg-good/10"
+            }`}
           onClick={() => setActiveTab("PAID")}
         >
           🟢 Paid Invoices ({orders.filter((o) => o.bill?.paymentStatus === "PAID").length})
@@ -288,9 +281,8 @@ export default function BillsAndOrdersPage() {
 
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "UNPAID" ? "bg-bad text-white shadow-xs" : "bg-paper text-bad hover:bg-bad/10"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "UNPAID" ? "bg-bad text-white shadow-xs" : "bg-paper text-bad hover:bg-bad/10"
+            }`}
           onClick={() => setActiveTab("UNPAID")}
         >
           🔴 Unpaid / Credit ({orders.filter((o) => o.bill?.paymentStatus === "UNPAID" || o.bill?.paymentStatus === "PENDING").length})
@@ -298,9 +290,8 @@ export default function BillsAndOrdersPage() {
 
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "PARTIAL" ? "bg-warn text-ink shadow-xs" : "bg-paper text-warn hover:bg-warn/10"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "PARTIAL" ? "bg-warn text-ink shadow-xs" : "bg-paper text-warn hover:bg-warn/10"
+            }`}
           onClick={() => setActiveTab("PARTIAL")}
         >
           🟡 Partial Paid ({orders.filter((o) => o.bill?.paymentStatus === "PARTIALLY_PAID").length})
@@ -308,9 +299,8 @@ export default function BillsAndOrdersPage() {
 
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "CANCELLED" ? "bg-ink/80 text-surface shadow-xs" : "bg-paper text-muted hover:bg-surface-hi"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "CANCELLED" ? "bg-ink/80 text-surface shadow-xs" : "bg-paper text-muted hover:bg-surface-hi"
+            }`}
           onClick={() => setActiveTab("CANCELLED")}
         >
           ⚪ Cancelled ({orders.filter((o) => o.status === "CANCELLED").length})
@@ -318,9 +308,8 @@ export default function BillsAndOrdersPage() {
 
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "RETURNED" ? "bg-accent text-white shadow-xs" : "bg-paper text-accent hover:bg-accent/10"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "RETURNED" ? "bg-accent text-white shadow-xs" : "bg-paper text-accent hover:bg-accent/10"
+            }`}
           onClick={() => setActiveTab("RETURNED")}
         >
           🔄 Returned / Adjustments
@@ -328,9 +317,8 @@ export default function BillsAndOrdersPage() {
 
         <button
           type="button"
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-            activeTab === "REFUNDED" ? "bg-purple-600 text-white shadow-xs" : "bg-paper text-purple-700 hover:bg-purple-50"
-          }`}
+          className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === "REFUNDED" ? "bg-purple-600 text-white shadow-xs" : "bg-paper text-purple-700 hover:bg-purple-50"
+            }`}
           onClick={() => setActiveTab("REFUNDED")}
         >
           🟣 Refunded

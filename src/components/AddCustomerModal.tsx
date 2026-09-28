@@ -28,7 +28,7 @@ export function AddCustomerModal({
 }) {
   const isNumeric = /^\d+$/.test(initialQuery.trim());
   const [shopName, setShopName] = useState(isNumeric ? "" : initialQuery.trim());
-  const [ownerName, setOwnerName] = useState(isNumeric ? "" : initialQuery.trim());
+  const [ownerName, setOwnerName] = useState("");
   const [mobile, setMobile] = useState(isNumeric ? initialQuery.trim() : "");
   const [address, setAddress] = useState("");
   const [gstin, setGstin] = useState("");
@@ -111,7 +111,7 @@ export function AddCustomerModal({
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div>
             <h2 className="text-base font-bold text-ink">Add New Customer</h2>
-            <p className="text-xs text-muted">Create customer account and attach immediately to this bill</p>
+            <p className="text-xs text-muted">Create customer account with distinct shop name & customer profile</p>
           </div>
           <button
             type="button"
@@ -129,18 +129,26 @@ export function AddCustomerModal({
         )}
 
         <form onSubmit={handleSave} className="space-y-3 text-xs">
-          <div>
-            <label className="mb-1 block font-semibold text-ink">Shop / Customer Name *</label>
-            <input
-              ref={shopNameRef}
-              className="w-full"
-              placeholder="e.g. Ramesh Kirana Store / Ramesh Kumar"
-              value={shopName}
-              onChange={(e) => {
-                setShopName(e.target.value);
-                setOwnerName(e.target.value);
-              }}
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Shop / Business Name *</label>
+              <input
+                ref={shopNameRef}
+                className="w-full"
+                placeholder="e.g. Ramesh Kirana Store"
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Customer / Owner Name</label>
+              <input
+                className="w-full"
+                placeholder="e.g. Ramesh Kumar"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -6,7 +6,8 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { fail } from "@/lib/api-error";
 
 const schema = z.object({
-  name: z.string().optional(),
+  sku: z.string().min(1).optional(),
+  name: z.string().min(1).optional(),
   // Throughout: null clears the field, undefined leaves it untouched. Without
   // the null, emptying a box in the edit modal sent `undefined` and the old
   // value silently stayed — a category typed by mistake could not be removed.
@@ -32,6 +33,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     return await patchProduct(session, id, parsed.data);
   } catch (err) {
+    if (isUniqueViolation(err, "sku")) {
+      return fail(409, "That SKU is already assigned to another product.", { label: "Find it", href: `/manager/products?q=${encodeURIComponent(parsed.data.sku ?? "")}` });
+    }
     if (isUniqueViolation(err, "barcode")) {
       return fail(409, "That barcode is already assigned to another product or unit.", { label: "Find it", href: `/manager/products?q=${encodeURIComponent(parsed.data.barcode ?? "")}` });
     }

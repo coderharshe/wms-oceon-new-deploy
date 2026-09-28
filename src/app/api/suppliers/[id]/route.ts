@@ -4,8 +4,9 @@ import { requireRole, isErrorResponse } from "@/lib/guard";
 import { isWorkersRuntime } from "@/lib/cf-env";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { supplierSchema } from "@/lib/purchase";
+import { serializeSupplierBankDetails } from "@/lib/supplier-bank";
 
-// Edit/deactivate, for ADMIN and MANAGER. The manager already creates
+// Edit/deactivate, for ADMIN, MANAGER, and FINANCE. The manager already creates
 // suppliers at the gate (POST /api/suppliers) and settles their bills
 // (PATCH /api/inventory/purchase-bills/[id]), so withholding "fix the phone
 // number you just typed wrong" only bought a queue at the admin's desk. Every
@@ -14,10 +15,20 @@ import { supplierSchema } from "@/lib/purchase";
 // There's still no DELETE: a supplier with purchase history is referenced by
 // every bill it ever sent, so `active: false` is the only sane retirement —
 // it drops out of the receive form's picker and stays in the ledger.
-const patchSchema = supplierSchema.partial().extend({ active: z.boolean().optional() });
+const patchSchema = supplierSchema.partial().extend({
+  active: z.boolean().optional(),
+  bankInfo: z.object({
+    accountHolder: z.string().optional(),
+    accountNumber: z.string().optional(),
+    bankName: z.string().optional(),
+    ifsc: z.string().optional(),
+    branch: z.string().optional(),
+    upiId: z.string().optional(),
+  }).optional(),
+});
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT", "FINANCE"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
 
@@ -36,7 +47,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ...(raw.city !== undefined ? { city: raw.city?.trim() || null } : {}),
     ...(raw.state !== undefined ? { state: raw.state?.trim() || null } : {}),
     ...(raw.paymentTerms !== undefined ? { paymentTerms: raw.paymentTerms?.trim() || null } : {}),
-    ...(raw.bankDetails !== undefined ? { bankDetails: raw.bankDetails?.trim() || null } : {}),
+    ...(raw.bankInfo !== undefined
+      ? { bankDetails: serializeSupplierBankDetails(raw.bankInfo) }
+      : raw.bankDetails !== undefined
+      ? { bankDetails: raw.bankDetails?.trim() || null }
+      : {}),
     ...(raw.contractStart !== undefined ? { contractStart: raw.contractStart ? new Date(raw.contractStart) : null } : {}),
     ...(raw.contractEnd !== undefined ? { contractEnd: raw.contractEnd ? new Date(raw.contractEnd) : null } : {}),
     ...(raw.supplyType !== undefined ? { supplyType: raw.supplyType || "INWARD" } : {}),

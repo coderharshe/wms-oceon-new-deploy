@@ -13,9 +13,13 @@ type FinanceDashboardData = {
   totalPayables: number;
   netWorkingCapital: number;
   netCashFlow: number;
+  totalReceivedToday?: number;
+  totalPaidToday?: number;
+  netReceivedToday?: number;
 
   cash: {
     status: "OPEN" | "CLOSED";
+    todayCash?: number;
     openingCash: number;
     expectedCash: number;
     actualCash: number;
@@ -25,6 +29,7 @@ type FinanceDashboardData = {
   };
 
   bank: {
+    todayBank?: number;
     closingBalance: number;
     unreconciledTxCount: number;
     unreconciledAmount: number;
@@ -143,7 +148,14 @@ type FinanceDashboardData = {
     warehouse?: { name: string; code: string };
   }[];
   warehouses?: { id: string; name: string; code: string }[];
+  currentWarehouse?: { id: string; name: string; code: string } | null;
   userRole?: string;
+  dateRange?: {
+    preset: string;
+    startDateStr: string;
+    endDateStr: string;
+    label: string;
+  };
 };
 
 export default function FinanceDashboardPage() {
@@ -165,24 +177,25 @@ export default function FinanceDashboardPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-black tracking-tight text-ink">Finance Control Center</h1>
-            <span className="badge bg-accent/10 text-accent font-semibold">14-Pillar System</span>
+            {d.currentWarehouse && (
+              <span className="badge bg-primary/10 text-primary font-bold text-xs border border-primary/20">
+                🏢 {d.currentWarehouse.name} ({d.currentWarehouse.code})
+              </span>
+            )}
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Real-time Liquidity, Cash & Bank, Ledgers, GST, Profitability, and Audit Integrity
-          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {d.warehouses && d.warehouses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {d.userRole === "ADMIN" && d.warehouses && d.warehouses.length > 0 && (
             <select
               value={warehouseFilter}
               onChange={(e) => setWarehouseFilter(e.target.value)}
               className="text-xs bg-paper border border-line rounded px-2.5 py-1.5 font-medium"
             >
-              <option value="all">All Warehouses</option>
+              <option value="all">🌐 All Warehouses</option>
               {d.warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.name} ({w.code})
+                  🏢 {w.name} ({w.code})
                 </option>
               ))}
             </select>
@@ -202,18 +215,22 @@ export default function FinanceDashboardPage() {
 
       {/* ── 1. Liquidity & Working Capital Master Stats ── */}
       <section className="space-y-2">
-        <div className="flex justify-between items-center text-xs font-semibold text-muted">
+        <div className="flex flex-wrap justify-between items-center text-xs font-semibold text-muted gap-2">
           <span>1. MASTER LIQUIDITY & WORKING CAPITAL</span>
-          <span>Net Daily Flow: <strong className={d.netCashFlow >= 0 ? "text-good" : "text-bad"}>{d.netCashFlow >= 0 ? `+₹${d.netCashFlow.toFixed(2)}` : `-₹${Math.abs(d.netCashFlow).toFixed(2)}`}</strong></span>
+          <div className="flex items-center gap-3 text-xs">
+            <span>Inflow: <strong className="text-good font-mono">+₹{Number(d.totalReceivedToday ?? d.collections.todayTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></span>
+            <span>Outflow: <strong className="text-bad font-mono">-₹{Number(d.totalPaidToday ?? (d.supplierPayments.todayPaid + d.expenses.todayTotal + d.refunds.todayRefunds)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></span>
+            <span>Net Position: <strong className={`font-mono font-black ${d.netCashFlow >= 0 ? "text-good" : "text-bad"}`}>{d.netCashFlow >= 0 ? `+₹${d.netCashFlow.toFixed(2)}` : `-₹${Math.abs(d.netCashFlow).toFixed(2)}`}</strong></span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="card border-l-4 border-l-good/80">
             <div className="text-[11px] text-muted flex justify-between items-center">
-              <span>Cash in Drawers</span>
+              <span>Cash in Hand</span>
               <span className="text-[10px] bg-surface-hi px-1 rounded">{d.cash.status}</span>
             </div>
-            <div className="text-xl font-black text-good mt-1">
+            <div className="text-xl font-black text-good mt-1 font-mono">
               ₹{Number(d.cashBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
             <div className="text-[10px] text-muted mt-0.5">Physical Counter Till</div>
@@ -221,10 +238,10 @@ export default function FinanceDashboardPage() {
 
           <div className="card border-l-4 border-l-primary/80">
             <div className="text-[11px] text-muted flex justify-between items-center">
-              <span>Bank Ledger</span>
-              <span className="text-[10px] text-primary font-semibold">Reconciled</span>
+              <span>Bank Balance</span>
+              <span className="text-[10px] text-primary font-semibold">In Account</span>
             </div>
-            <div className="text-xl font-black text-primary mt-1">
+            <div className="text-xl font-black text-primary mt-1 font-mono">
               ₹{Number(d.bankBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
             <div className="text-[10px] text-muted mt-0.5">Operating Accounts</div>
@@ -235,7 +252,7 @@ export default function FinanceDashboardPage() {
               <span>Accounts Receivable</span>
               <span className="text-[10px] text-warn font-semibold">{d.receivables.overdueCount} Overdue</span>
             </div>
-            <div className="text-xl font-black text-warn mt-1">
+            <div className="text-xl font-black text-warn mt-1 font-mono">
               ₹{Number(d.totalReceivables).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
             <div className="text-[10px] text-muted mt-0.5">{d.receivables.customerCount} Active Debtors</div>
@@ -246,7 +263,7 @@ export default function FinanceDashboardPage() {
               <span>Accounts Payable</span>
               <span className="text-[10px] text-bad font-semibold">{d.payables.overdueBillsCount} Due</span>
             </div>
-            <div className="text-xl font-black text-bad mt-1">
+            <div className="text-xl font-black text-bad mt-1 font-mono">
               ₹{Number(d.totalPayables).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
             <div className="text-[10px] text-muted mt-0.5">{d.payables.supplierCount} Suppliers</div>
@@ -255,451 +272,291 @@ export default function FinanceDashboardPage() {
           <div className="card border-l-4 border-l-ink col-span-2 sm:col-span-1">
             <div className="text-[11px] text-muted flex justify-between items-center">
               <span>Net Working Capital</span>
-              <span className="text-[10px] font-bold">C+B+AR-AP</span>
+              <span className="text-[10px] font-bold">Liquid - Dues</span>
             </div>
-            <div className={`text-xl font-black mt-1 ${d.netWorkingCapital >= 0 ? "text-good" : "text-bad"}`}>
+            <div className={`text-xl font-black mt-1 font-mono ${d.netWorkingCapital >= 0 ? "text-good" : "text-bad"}`}>
               ₹{Number(d.netWorkingCapital).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-muted mt-0.5">Immediate Solvency</div>
+            <div className="text-[10px] text-muted mt-0.5">Solvency (C+B+AR - AP)</div>
           </div>
         </div>
       </section>
 
       {/* ── 14 PILLARS STRUCTURED GRID ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
         {/* ── 2. Cash Management ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>💵 2. Cash Management</span>
+        <section className="card p-3.5 border-l-4 border-l-emerald-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>💵 Cash Received Today</span>
             </div>
             <Link href="/finance/cash" className="text-xs text-accent hover:underline font-semibold">
               EOD Till →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Drawer Status:</span>
-              <span className={`font-semibold ${d.cash.status === "OPEN" ? "text-good" : "text-muted"}`}>
+          <div className="text-xl font-black text-emerald-600 font-mono mt-1">
+            ₹{Number(d.cash.todayCash ?? d.collections.todayCash).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span className="flex items-center gap-1">
+              <span>Drawer:</span>
+              <strong className={d.cash.status === "OPEN" ? "text-good font-bold" : "text-muted"}>
                 {d.cash.status === "OPEN" ? "🟢 OPEN" : "⚪ CLOSED"}
-              </span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Opening Cash:</span>
-              <span className="font-medium">₹{d.cash.openingCash.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Expected Till Cash:</span>
-              <span className="font-semibold text-ink">₹{d.cash.expectedCash.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Drawer Discrepancies:</span>
-              <span className={`font-bold ${d.cash.discrepancyCount > 0 ? "text-bad" : "text-good"}`}>
-                {d.cash.discrepancyCount > 0 ? `⚠️ ${d.cash.discrepancyCount} Sessions with Variance` : "✓ None (Matched)"}
-              </span>
-            </div>
+              </strong>
+            </span>
+            <span>Till: ₹{Number(d.cash.expectedCash).toFixed(0)}</span>
           </div>
         </section>
 
         {/* ── 3. Bank Management ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>🏦 3. Bank Management</span>
+        <section className="card p-3.5 border-l-4 border-l-sky-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>🏦 Bank Received Today</span>
             </div>
             <Link href="/finance/bank" className="text-xs text-accent hover:underline font-semibold">
-              Bank Ledger →
+              Ledger →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Current Ledger Balance:</span>
-              <span className="font-bold text-primary">₹{d.bank.closingBalance.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Unreconciled Tx:</span>
-              <span className={d.bank.unreconciledTxCount > 0 ? "text-warn font-semibold" : "text-good font-semibold"}>
-                {d.bank.unreconciledTxCount} entries (₹{d.bank.unreconciledAmount.toFixed(2)})
-              </span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Reconciliation Status:</span>
-              <span className="text-good font-semibold">✓ Daily Statement In Sync</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Bank Payout Direct Debit:</span>
-              <span className="text-muted">Supported via BankTx</span>
-            </div>
+          <div className="text-xl font-black text-sky-600 font-mono mt-1">
+            ₹{Number(d.bank.todayBank ?? d.collections.todayBank).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Ledger: ₹{Number(d.bank.closingBalance).toFixed(0)}</span>
+            <span className={d.bank.unreconciledTxCount > 0 ? "text-warn font-semibold" : "text-good font-semibold"}>
+              {d.bank.unreconciledTxCount > 0 ? `⚠️ ${d.bank.unreconciledTxCount} Unreconciled` : "✓ Synced"}
+            </span>
           </div>
         </section>
 
         {/* ── 4. UPI / Digital Payments ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>📱 4. UPI / Digital Payments</span>
+        <section className="card p-3.5 border-l-4 border-l-indigo-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>📱 UPI Received Today</span>
             </div>
             <Link href="/finance/upi" className="text-xs text-accent hover:underline font-semibold">
               Settlements →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Today's UPI Inflow:</span>
-              <span className="font-bold text-good">₹{d.upi.todayTotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Pending Bank Settlement:</span>
-              <span className="font-semibold text-warn">₹{d.upi.pendingSettlementAmount.toFixed(2)} ({d.upi.pendingCount})</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Gateway Fee Deductions:</span>
-              <span className="font-medium text-bad">-₹{d.upi.totalFeeDeductions.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Settlement Discrepancies:</span>
-              <span className={`font-semibold ${d.upi.discrepancyCount > 0 ? "text-bad" : "text-good"}`}>
-                {d.upi.discrepancyCount > 0 ? `${d.upi.discrepancyCount} Pending Review` : "✓ 0 Discrepancy"}
-              </span>
-            </div>
+          <div className="text-xl font-black text-indigo-600 font-mono mt-1">
+            ₹{Number(d.upi.todayTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Pending: ₹{d.upi.pendingSettlementAmount.toFixed(0)}</span>
+            <span className={d.upi.discrepancyCount > 0 ? "text-bad font-semibold" : "text-good font-semibold"}>
+              {d.upi.discrepancyCount > 0 ? `⚠️ ${d.upi.discrepancyCount} Pending` : "✓ 0 Discrepancy"}
+            </span>
           </div>
         </section>
 
         {/* ── 5. Accounts Receivable ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>📥 5. Accounts Receivable</span>
+        <section className="card p-3.5 border-l-4 border-l-amber-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>📥 Receivables</span>
             </div>
             <Link href="/finance/receivables" className="text-xs text-accent hover:underline font-semibold">
-              Ageing Ledger →
+              Ageing →
             </Link>
           </div>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted">Total Customer Dues:</span>
-              <span className="font-bold text-warn">₹{d.receivables.total.toFixed(2)}</span>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] text-muted">
-                <span>0-15 Days: ₹{(d.receivables.ageing.bucket0_7 + d.receivables.ageing.bucket8_15).toFixed(0)}</span>
-                <span>16-60 Days: ₹{(d.receivables.ageing.bucket16_30 + d.receivables.ageing.bucket31_60).toFixed(0)}</span>
-                <span className="text-bad font-semibold">60+ Days: ₹{d.receivables.ageing.bucket60Plus.toFixed(0)}</span>
-              </div>
-              <div className="w-full bg-surface-hi h-2 rounded overflow-hidden flex">
-                <div style={{ width: `${d.receivables.total > 0 ? ((d.receivables.ageing.bucket0_7 + d.receivables.ageing.bucket8_15) / d.receivables.total) * 100 : 100}%` }} className="bg-good" title="0-15 Days" />
-                <div style={{ width: `${d.receivables.total > 0 ? ((d.receivables.ageing.bucket16_30 + d.receivables.ageing.bucket31_60) / d.receivables.total) * 100 : 0}%` }} className="bg-warn" title="16-60 Days" />
-                <div style={{ width: `${d.receivables.total > 0 ? (d.receivables.ageing.bucket60Plus / d.receivables.total) * 100 : 0}%` }} className="bg-bad" title="60+ Days Overdue" />
-              </div>
-            </div>
+          <div className="text-xl font-black text-warn font-mono mt-1">
+            ₹{Number(d.receivables.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>0-15d: ₹{(d.receivables.ageing.bucket0_7 + d.receivables.ageing.bucket8_15).toFixed(0)}</span>
+            <span className="text-bad font-semibold">60+d: ₹{d.receivables.ageing.bucket60Plus.toFixed(0)}</span>
           </div>
         </section>
 
         {/* ── 6. Accounts Payable ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>📤 6. Accounts Payable</span>
+        <section className="card p-3.5 border-l-4 border-l-rose-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>📤 Payables</span>
             </div>
             <Link href="/finance/payables" className="text-xs text-accent hover:underline font-semibold">
               Supplier Bills →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Total Supplier Dues:</span>
-              <span className="font-bold text-bad">₹{d.payables.total.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Unpaid GRN Invoices:</span>
-              <span className="font-semibold">{d.payables.pendingBillsCount} Invoices</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Overdue Invoices:</span>
-              <span className={`font-semibold ${d.payables.overdueBillsCount > 0 ? "text-bad" : "text-good"}`}>
-                {d.payables.overdueBillsCount > 0 ? `⚠️ ${d.payables.overdueBillsCount} Past Due Date` : "✓ No overdue bills"}
-              </span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Associated Suppliers:</span>
-              <span className="font-medium">{d.payables.supplierCount} Vendors</span>
-            </div>
+          <div className="text-xl font-black text-bad font-mono mt-1">
+            ₹{Number(d.payables.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>{d.payables.pendingBillsCount} Unpaid</span>
+            <span className={d.payables.overdueBillsCount > 0 ? "text-bad font-semibold" : "text-good font-semibold"}>
+              {d.payables.overdueBillsCount > 0 ? `⚠️ ${d.payables.overdueBillsCount} Overdue` : "✓ No Overdue"}
+            </span>
           </div>
         </section>
 
         {/* ── 7. Collections ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>💰 7. Collections</span>
+        <section className="card p-3.5 border-l-4 border-l-green-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>💰 Collections</span>
             </div>
             <Link href="/finance/vouchers" className="text-xs text-accent hover:underline font-semibold">
-              Receipt Vouchers →
+              Receipts →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Today's Inflow:</span>
-              <span className="font-bold text-good">₹{d.collections.todayTotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">💵 Cash Inflow:</span>
-              <span className="font-medium">₹{d.collections.todayCash.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">📱 UPI Inflow:</span>
-              <span className="font-medium">₹{d.collections.todayUpi.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">🏦 Bank / NEFT / IMPS:</span>
-              <span className="font-medium">₹{d.collections.todayBank.toFixed(2)}</span>
-            </div>
+          <div className="text-xl font-black text-good font-mono mt-1">
+            ₹{Number(d.collections.todayTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Cash: ₹{d.collections.todayCash.toFixed(0)}</span>
+            <span>UPI: ₹{d.collections.todayUpi.toFixed(0)}</span>
           </div>
         </section>
 
         {/* ── 8. Supplier Payments ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>🏢 8. Supplier Payments</span>
+        <section className="card p-3.5 border-l-4 border-l-red-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>🏢 Supplier Payments</span>
             </div>
             <Link href="/finance/vouchers" className="text-xs text-accent hover:underline font-semibold">
-              Payment Vouchers →
+              Vouchers →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Paid Today:</span>
-              <span className="font-bold text-bad">₹{d.supplierPayments.todayPaid.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Paid This Month (MTD):</span>
-              <span className="font-semibold">₹{d.supplierPayments.monthTotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Payment Vouchers Issued:</span>
-              <span className="font-medium">{d.supplierPayments.voucherCount} Vouchers</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Settlement Modes:</span>
-              <span className="text-muted">Bank Transfer / Cash / Cheque</span>
-            </div>
+          <div className="text-xl font-black text-bad font-mono mt-1">
+            ₹{Number(d.supplierPayments.todayPaid).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>MTD: ₹{d.supplierPayments.monthTotal.toFixed(0)}</span>
+            <span>{d.supplierPayments.voucherCount} Vouchers</span>
           </div>
         </section>
 
-        {/* ── 9. Expenses ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>💳 9. Operational Expenses</span>
+        {/* ── 9. Operational Expenses ── */}
+        <section className="card p-3.5 border-l-4 border-l-orange-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>💳 Expenses</span>
             </div>
             <Link href="/finance/expenses" className="text-xs text-accent hover:underline font-semibold">
-              Expense Slip →
+              Expenses →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Today's Expenses:</span>
-              <span className="font-bold text-bad">₹{d.expenses.todayTotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Month to Date (MTD):</span>
-              <span className="font-semibold text-ink">₹{d.expenses.monthTotal.toFixed(2)}</span>
-            </div>
-            <div className="py-1">
-              <span className="text-[11px] text-muted block mb-1">Top Expense Categories:</span>
-              <div className="flex flex-wrap gap-1">
-                {d.expenses.byCategory.length > 0 ? (
-                  d.expenses.byCategory.slice(0, 3).map((c) => (
-                    <span key={c.category} className="badge bg-surface-hi text-ink text-[10px]">
-                      {c.category}: ₹{c.amount.toFixed(0)}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-[10px] text-muted">No expenses recorded this month</span>
-                )}
-              </div>
-            </div>
+          <div className="text-xl font-black text-bad font-mono mt-1">
+            ₹{Number(d.expenses.todayTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>MTD: ₹{d.expenses.monthTotal.toFixed(0)}</span>
+            <span>{d.expenses.byCategory?.[0]?.category || "General"}</span>
           </div>
         </section>
 
         {/* ── 10. Refunds & Credit Notes ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>🔄 10. Refunds & Credit Notes</span>
+        <section className="card p-3.5 border-l-4 border-l-purple-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>🔄 Refunds & Adjustments</span>
             </div>
-            <span className="badge bg-surface-hi text-muted text-[10px]">Adjustments</span>
+            <span className="badge bg-surface-hi text-muted text-[10px]">Credits</span>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Refunds Issued Today:</span>
-              <span className="font-bold text-bad">₹{d.refunds.todayRefunds.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Total Refunds (MTD):</span>
-              <span className="font-semibold">₹{d.refunds.totalRefundsMonth.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Payment Adjustments Logged:</span>
-              <span className="font-medium">{d.refunds.adjustmentsCount} Adjustments</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Credit Note Reversals:</span>
-              <span className="text-good font-semibold">✓ Automated in BillVersion</span>
-            </div>
+          <div className="text-xl font-black text-bad font-mono mt-1">
+            ₹{Number(d.refunds.todayRefunds).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>MTD: ₹{d.refunds.totalRefundsMonth.toFixed(0)}</span>
+            <span>{d.refunds.adjustmentsCount} Logged</span>
           </div>
         </section>
 
-        {/* ── 11. Reconciliation ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>⚖️ 11. Financial Reconciliation</span>
+        {/* ── 11. Financial Reconciliation ── */}
+        <section className="card p-3.5 border-l-4 border-l-cyan-500 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>⚖️ Reconciliation</span>
             </div>
             <span className={`badge text-[10px] font-bold ${d.reconciliation.status === "BALANCED" ? "bg-good/15 text-good" : "bg-bad/15 text-bad"}`}>
               {d.reconciliation.status}
             </span>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Bank Statement Mismatch:</span>
-              <span className={d.reconciliation.bankMismatch === 0 ? "text-good font-semibold" : "text-bad font-bold"}>
-                {d.reconciliation.bankMismatch === 0 ? "✓ ₹0.00 (In Balance)" : `⚠️ ₹${d.reconciliation.bankMismatch.toFixed(2)}`}
-              </span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Drawer Cash Variances:</span>
-              <span className={d.reconciliation.cashDiscrepancies === 0 ? "text-good font-semibold" : "text-bad font-bold"}>
-                {d.reconciliation.cashDiscrepancies === 0 ? "✓ 0 Discrepancy" : `⚠️ ${d.reconciliation.cashDiscrepancies} Unresolved`}
-              </span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Unsettled UPI Ledger:</span>
-              <span className="font-medium">₹{d.reconciliation.upiUnsettled.toFixed(2)}</span>
-            </div>
+          <div className="text-xl font-black text-ink font-mono mt-1">
+            {d.reconciliation.status === "BALANCED" ? "Balanced" : "Review Req."}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span className={d.reconciliation.bankMismatch === 0 ? "text-good font-semibold" : "text-bad font-bold"}>
+              Bank: {d.reconciliation.bankMismatch === 0 ? "✓ Sync" : `⚠️ ₹${d.reconciliation.bankMismatch.toFixed(0)}`}
+            </span>
+            <span className={d.reconciliation.cashDiscrepancies === 0 ? "text-good font-semibold" : "text-bad font-bold"}>
+              Till: {d.reconciliation.cashDiscrepancies === 0 ? "✓ 0 Diff" : `⚠️ ${d.reconciliation.cashDiscrepancies}`}
+            </span>
           </div>
         </section>
 
-        {/* ── 12. Profitability ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>📈 12. Profitability & Margins</span>
+        {/* ── 12. Profitability & Margins ── */}
+        <section className="card p-3.5 border-l-4 border-l-emerald-600 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>📈 Profitability</span>
             </div>
             <span className="badge bg-good/10 text-good font-bold text-[10px]">MTD P&L</span>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Gross Revenue:</span>
-              <span className="font-bold text-ink">₹{d.profitability.grossRevenue.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Est. COGS (Purchase Cost):</span>
-              <span className="text-muted">₹{d.profitability.estimatedCogs.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Gross Profit:</span>
-              <span className="font-bold text-good">
-                ₹{d.profitability.grossProfit.toFixed(2)} ({d.profitability.grossMarginPercent.toFixed(1)}%)
-              </span>
-            </div>
-            <div className="flex justify-between py-0.5 border-t border-line/60 pt-1">
-              <span className="font-semibold">Net Operating Profit:</span>
-              <span className={`font-black ${d.profitability.netOperatingProfit >= 0 ? "text-good" : "text-bad"}`}>
-                ₹{d.profitability.netOperatingProfit.toFixed(2)} ({d.profitability.netMarginPercent.toFixed(1)}%)
-              </span>
-            </div>
+          <div className={`text-xl font-black font-mono mt-1 ${d.profitability.netOperatingProfit >= 0 ? "text-good" : "text-bad"}`}>
+            ₹{Number(d.profitability.netOperatingProfit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Gross: ₹{d.profitability.grossProfit.toFixed(0)}</span>
+            <span className="font-semibold text-good">Margin: {d.profitability.netMarginPercent.toFixed(1)}%</span>
           </div>
         </section>
 
         {/* ── 13. Tax / GST ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>🏛️ 13. Tax & GST Position</span>
+        <section className="card p-3.5 border-l-4 border-l-blue-600 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>🏛️ Tax & GST</span>
             </div>
             <Link href="/finance/tax" className="text-xs text-accent hover:underline font-semibold">
-              GST Portal & GSTR-1/3B →
+              GST Portal →
             </Link>
           </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Output GST (Collected on Sales):</span>
-              <span className="font-semibold text-ink">₹{d.taxGst.outputGst.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">Input Tax Credit (Purchases ITC):</span>
-              <span className="font-semibold text-good">₹{d.taxGst.inputTaxCredit.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between py-0.5 border-t border-line/60 pt-1">
-              <span className="font-semibold">Net GST Payable / (Credit):</span>
-              <span className="font-bold text-warn">₹{d.taxGst.netGstPayable.toFixed(2)}</span>
-            </div>
+          <div className="text-xl font-black text-warn font-mono mt-1">
+            ₹{Number(d.taxGst.netGstPayable).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Output: ₹{d.taxGst.outputGst.toFixed(0)}</span>
+            <span className="text-good font-semibold">ITC: ₹{d.taxGst.inputTaxCredit.toFixed(0)}</span>
           </div>
         </section>
 
         {/* ── 14. Financial Reports ── */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>📊 14. Financial Reports</span>
+        <section className="card p-3.5 border-l-4 border-l-violet-600 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>📊 Financial Reports</span>
             </div>
             <Link href="/finance/reports" className="text-xs text-accent hover:underline font-semibold">
-              Full Statements →
+              Statements →
             </Link>
           </div>
-          <div className="grid grid-cols-1 gap-1.5 text-xs">
-            <Link href="/finance/reports" className="p-1.5 rounded border border-line hover:bg-surface-hi flex justify-between items-center">
-              <span>📑 Profit & Loss (P&L) Statement</span>
-              <span className="text-muted">→</span>
-            </Link>
-            <Link href="/finance/reports" className="p-1.5 rounded border border-line hover:bg-surface-hi flex justify-between items-center">
-              <span>🏛️ Balance Sheet & Working Capital</span>
-              <span className="text-muted">→</span>
-            </Link>
-            <Link href="/finance/reports" className="p-1.5 rounded border border-line hover:bg-surface-hi flex justify-between items-center">
-              <span>🌊 Cash Flow Statement</span>
-              <span className="text-muted">→</span>
-            </Link>
+          <div className="text-base font-bold text-ink mt-1 truncate">
+            P&L, Balance Sheet
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Cash Flow & Ledgers</span>
+            <span className="text-accent font-semibold">View All →</span>
           </div>
         </section>
 
         {/* ── 15. Audit & Controls ── */}
-        <section className="card space-y-3 md:col-span-2 lg:col-span-2">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-sm">
-              <span>🛡️ 15. Audit, Dual-Controls & Approvals</span>
+        <section className="card p-3.5 border-l-4 border-l-slate-600 hover:shadow-sm transition-all">
+          <div className="flex justify-between items-center pb-1">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+              <span>🛡️ Approvals & Audit</span>
             </div>
-            <span className="badge bg-surface-hi text-[10px]">Compliance</span>
+            <span className="badge bg-surface-hi text-[10px]">Dual-Control</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-            <div className="p-2 rounded bg-surface border border-line">
-              <div className="text-muted text-[11px]">Voucher Approvals</div>
-              <div className="text-lg font-bold mt-0.5">{d.auditControls.pendingVouchersApproval} Pending</div>
-            </div>
-            <div className="p-2 rounded bg-surface border border-line">
-              <div className="text-muted text-[11px]">Discount Approvals</div>
-              <div className="text-lg font-bold mt-0.5">{d.auditControls.pendingDiscountApprovals} Pending</div>
-            </div>
-            <div className="p-2 rounded bg-surface border border-line">
-              <div className="text-muted text-[11px]">Stock Adjustment Approvals</div>
-              <div className="text-lg font-bold mt-0.5">{d.auditControls.pendingStockAdjustments} Pending</div>
-            </div>
+          <div className="text-xl font-black text-ink font-mono mt-1">
+            {d.auditControls.pendingVouchersApproval + d.auditControls.pendingDiscountApprovals + d.auditControls.pendingStockAdjustments} Pending
           </div>
-          {d.auditControls.recentAuditLogs && d.auditControls.recentAuditLogs.length > 0 && (
-            <div className="space-y-1 text-xs pt-1 border-t border-line/60">
-              <div className="text-[11px] font-semibold text-muted">Recent Financial Audit Events:</div>
-              <div className="space-y-1">
-                {d.auditControls.recentAuditLogs.slice(0, 3).map((log) => (
-                  <div key={log.id} className="flex justify-between items-center py-0.5 text-[11px]">
-                    <span className="font-mono text-muted">{log.action} on {log.entityType}</span>
-                    <span className="text-ink font-medium">{log.user}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-1.5 border-t border-line">
+            <span>Vouchers: {d.auditControls.pendingVouchersApproval}</span>
+            <span>Discounts: {d.auditControls.pendingDiscountApprovals}</span>
+          </div>
         </section>
       </div>
 
@@ -774,9 +631,8 @@ export default function FinanceDashboardPage() {
                     <td className="py-2 font-mono font-medium">{v.voucherNo}</td>
                     <td className="py-2">
                       <span
-                        className={`badge ${
-                          v.type === "RECEIPT_VOUCHER" ? "bg-good/15 text-good" : "bg-bad/15 text-bad"
-                        }`}
+                        className={`badge ${v.type === "RECEIPT_VOUCHER" ? "bg-good/15 text-good" : "bg-bad/15 text-bad"
+                          }`}
                       >
                         {v.type === "RECEIPT_VOUCHER" ? "Receipt" : "Payment"}
                       </span>
@@ -787,9 +643,8 @@ export default function FinanceDashboardPage() {
                     </td>
                     <td className="py-2 text-muted">{new Date(v.date).toLocaleDateString("en-IN")}</td>
                     <td
-                      className={`py-2 text-right font-bold ${
-                        v.type === "RECEIPT_VOUCHER" ? "text-good" : "text-bad"
-                      }`}
+                      className={`py-2 text-right font-bold ${v.type === "RECEIPT_VOUCHER" ? "text-good" : "text-bad"
+                        }`}
                     >
                       {v.type === "RECEIPT_VOUCHER" ? `+₹${Number(v.amount).toFixed(2)}` : `-₹${Number(v.amount).toFixed(2)}`}
                     </td>

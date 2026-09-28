@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireRole, isErrorResponse } from "@/lib/guard";
 import { getDb } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings";
+import { resolveDateRange } from "@/lib/date-filter";
 
 export type BankAccountConfig = {
   id: string;
@@ -63,15 +64,21 @@ const DEFAULT_ACCOUNTS: BankAccountConfig[] = [
 async function getBankAccountsConfig(): Promise<BankAccountConfig[]> {
   try {
     const raw = await getSetting("BANK_ACCOUNTS_CONFIG");
-    if (!raw) {
-      await setSetting("BANK_ACCOUNTS_CONFIG", JSON.stringify(DEFAULT_ACCOUNTS));
-      return DEFAULT_ACCOUNTS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    return DEFAULT_ACCOUNTS;
+    if (Array.isArray(parsed)) {
+      // Exclude boilerplate placeholder mock accounts if user hasn't created them
+      return parsed.filter((a: any) => {
+        if (!a || a.active === false) return false;
+        if (a.id === "hdfc-current" && a.accountNumber === "50200088991122") return false;
+        if (a.id === "sbi-current" && a.accountNumber === "38912345678") return false;
+        if (a.id === "other-bank" && a.accountNumber === "987654321098") return false;
+        return true;
+      });
+    }
+    return [];
   } catch {
-    return DEFAULT_ACCOUNTS;
+    return [];
   }
 }
 
@@ -82,6 +89,12 @@ export async function GET(req: NextRequest) {
   const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
   const accountId = req.nextUrl.searchParams.get("accountId") || "ALL";
 
+  const presetParam = req.nextUrl.searchParams.get("preset");
+  const startParam = req.nextUrl.searchParams.get("startDate");
+  const endParam = req.nextUrl.searchParams.get("endDate");
+  const hasDateFilter = Boolean(presetParam || startParam || endParam);
+  const dateRange = resolveDateRange(presetParam, startParam, endParam);
+
   try {
     const db = getDb();
     const accounts = await getBankAccountsConfig();
@@ -89,11 +102,18 @@ export async function GET(req: NextRequest) {
     const where: any = {};
     if (warehouseId && warehouseId !== "all") where.warehouseId = warehouseId;
 
-    // Fetch all bank transactions
+    if (hasDateFilter) {
+      where.businessDate = {
+        gte: dateRange.startDate,
+        lte: dateRange.endDate,
+      };
+    }
+
+    // Fetch bank transactions
     const allBankTxs = await db.bankTransaction.findMany({
       where,
       orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
-      take: 300,
+      take: 500,
     });
 
     // Also fetch cash drawer deposits and UPI settlements for reference
@@ -101,13 +121,17 @@ export async function GET(req: NextRequest) {
       db.cashTransaction.findMany({
         where: {
           type: "BANK_DEPOSIT",
+          ...(hasDateFilter ? { timestamp: { gte: dateRange.startDate, lte: dateRange.endDate } } : {}),
           ...(warehouseId && warehouseId !== "all" ? { cashSession: { warehouseId } } : {}),
         },
         orderBy: { timestamp: "desc" },
         take: 50,
       }),
       db.uPISettlement.findMany({
-        where: warehouseId && warehouseId !== "all" ? { warehouseId } : {},
+        where: {
+          ...(hasDateFilter ? { collectionDate: { gte: dateRange.startDate, lte: dateRange.endDate } } : {}),
+          ...(warehouseId && warehouseId !== "all" ? { warehouseId } : {}),
+        },
         orderBy: { collectionDate: "desc" },
         take: 50,
       }),
@@ -272,6 +296,12 @@ export async function GET(req: NextRequest) {
         note: u.notes,
         at: u.collectionDate.toISOString(),
       })),
+      dateRange: {
+        preset: dateRange.preset,
+        startDateStr: dateRange.startDateStr,
+        endDateStr: dateRange.endDateStr,
+        label: dateRange.label,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to load bank data" }, { status: 500 });

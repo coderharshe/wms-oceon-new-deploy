@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireRole, isErrorResponse } from "@/lib/guard";
 import { isWorkersRuntime } from "@/lib/cf-env";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { supplierSchema } from "@/lib/purchase";
+import { serializeSupplierBankDetails } from "@/lib/supplier-bank";
 
 // Suppliers are warehouse-agnostic master data (the same wholesaler delivers
 // to every branch), so no warehouse scoping on the supplier row itself — but
@@ -114,11 +116,25 @@ export async function POST(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
-  const parsed = supplierSchema.safeParse(await req.json().catch(() => null));
+  const createSchema = supplierSchema.extend({
+    bankInfo: z.object({
+      accountHolder: z.string().optional(),
+      accountNumber: z.string().optional(),
+      bankName: z.string().optional(),
+      ifsc: z.string().optional(),
+      branch: z.string().optional(),
+      upiId: z.string().optional(),
+    }).optional(),
+  });
+
+  const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const raw = parsed.data;
+  const bankDetailsValue = raw.bankInfo
+    ? serializeSupplierBankDetails(raw.bankInfo)
+    : raw.bankDetails?.trim() || null;
+
   const data = {
-    ...raw,
     name: raw.name.trim(),
     category: raw.category?.trim() || null,
     contactPerson: raw.contactPerson?.trim() || null,
@@ -129,7 +145,7 @@ export async function POST(req: NextRequest) {
     state: raw.state?.trim() || null,
     gstin: raw.gstin ? raw.gstin.trim().toUpperCase() : null,
     paymentTerms: raw.paymentTerms?.trim() || null,
-    bankDetails: raw.bankDetails?.trim() || null,
+    bankDetails: bankDetailsValue,
     contractStart: raw.contractStart ? new Date(raw.contractStart) : null,
     contractEnd: raw.contractEnd ? new Date(raw.contractEnd) : null,
     supplyType: raw.supplyType || "INWARD",

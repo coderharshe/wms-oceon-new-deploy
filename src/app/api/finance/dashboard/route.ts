@@ -1,32 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isErrorResponse } from "@/lib/guard";
 import { getDb } from "@/lib/db";
+import { resolveDateRange } from "@/lib/date-filter";
 
 export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
   if (isErrorResponse(session)) return session;
 
-  const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
+  const presetParam = req.nextUrl.searchParams.get("preset");
+  const startParam = req.nextUrl.searchParams.get("startDate");
+  const endParam = req.nextUrl.searchParams.get("endDate");
+  const dateRange = resolveDateRange(presetParam, startParam, endParam);
 
   try {
     const db = getDb();
-    const where: any = {};
-    if (warehouseId && warehouseId !== "all") where.warehouseId = warehouseId;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    // 1. Warehouses (if admin or manager)
+    let activeWarehouseId: string | undefined = undefined;
+    let currentWarehouse: { id: string; name: string; code: string } | null = null;
     let warehouses: { id: string; name: string; code: string }[] = [];
+
     if (session.role === "ADMIN") {
+      const qWh = req.nextUrl.searchParams.get("warehouseId");
+      if (qWh && qWh !== "all") {
+        activeWarehouseId = qWh;
+      }
       warehouses = await db.warehouse.findMany({
         where: { active: true },
         select: { id: true, name: true, code: true },
         orderBy: { name: "asc" },
       });
+    } else {
+      // Non-admin (FINANCE, MANAGER) MUST only see their own assigned warehouse
+      activeWarehouseId = session.warehouseId || undefined;
+      if (!activeWarehouseId) {
+        const u = await db.user.findUnique({
+          where: { id: session.sub },
+          select: { warehouseId: true },
+        });
+        activeWarehouseId = u?.warehouseId || undefined;
+      }
     }
+
+    if (activeWarehouseId) {
+      currentWarehouse = await db.warehouse.findUnique({
+        where: { id: activeWarehouseId },
+        select: { id: true, name: true, code: true },
+      });
+    }
+
+    const where: any = activeWarehouseId ? { warehouseId: activeWarehouseId } : {};
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
     // 2. Cash Sessions & Management
     const latestCashSession = await db.cashSession.findFirst({
@@ -83,39 +110,39 @@ export async function GET(req: NextRequest) {
     const discrepancyUpiCount = upiSettlements.filter((s) => s.status === "DISCREPANCY").length;
     const totalUpiFeeDeductions = upiSettlements.reduce((sum, s) => sum + Number(s.chargesAmount || 0), 0);
 
-    // 5. Today's & Month's Collections & Payment Transactions
-    const todayPayments = await db.paymentTransaction.findMany({
+    // 5. Selected Period's Collections & Payment Transactions
+    const periodPayments = await db.paymentTransaction.findMany({
       where: {
-        timestamp: { gte: today },
+        timestamp: { gte: dateRange.startDate, lte: dateRange.endDate },
         status: "CONFIRMED",
         payment: {
-          bill: warehouseId && warehouseId !== "all" ? { warehouseId } : undefined,
+          bill: activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined,
         },
       },
     });
 
-    let todayCollection = 0;
-    let todayCash = 0;
-    let todayUpi = 0;
-    let todayBank = 0;
-    for (const p of todayPayments) {
+    let periodCollection = 0;
+    let periodCash = 0;
+    let periodUpi = 0;
+    let periodBank = 0;
+    for (const p of periodPayments) {
       const amt = Number(p.amount);
       if (p.type === "PAYMENT") {
-        todayCollection += amt;
-        if (p.method === "CASH") todayCash += amt;
-        else if (p.method === "UPI") todayUpi += amt;
-        else todayBank += amt;
+        periodCollection += amt;
+        if (p.method === "CASH") periodCash += amt;
+        else if (p.method === "UPI") periodUpi += amt;
+        else periodBank += amt;
       }
     }
 
     // 6. Expenses & Categories
-    const todayExpensesList = await db.expense.findMany({
+    const periodExpensesList = await db.expense.findMany({
       where: {
         ...where,
-        date: { gte: today },
+        date: { gte: dateRange.startDate, lte: dateRange.endDate },
       },
     });
-    const totalTodayExpense = todayExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalPeriodExpense = periodExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
 
     const monthExpensesList = await db.expense.findMany({
       where: {
@@ -126,7 +153,7 @@ export async function GET(req: NextRequest) {
     const totalMonthExpense = monthExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
 
     const expenseCategoryMap: Record<string, number> = {};
-    for (const exp of monthExpensesList) {
+    for (const exp of (dateRange.preset === "thismonth" || dateRange.preset === "lastmonth" ? periodExpensesList : monthExpensesList)) {
       expenseCategoryMap[exp.category] = (expenseCategoryMap[exp.category] || 0) + Number(exp.amount);
     }
     const expensesByCategory = Object.entries(expenseCategoryMap).map(([category, amount]) => ({
@@ -214,26 +241,26 @@ export async function GET(req: NextRequest) {
       where: {
         ...where,
         type: "PAYMENT_VOUCHER",
-        date: { gte: monthStart },
+        date: { gte: dateRange.startDate <= monthStart ? dateRange.startDate : monthStart },
       },
     });
     const totalSupplierPaymentsMonth = supplierPaymentVouchers.reduce((sum, v) => sum + Number(v.amount), 0);
-    const todaySupplierPayments = supplierPaymentVouchers
-      .filter((v) => new Date(v.date) >= today)
+    const periodSupplierPayments = supplierPaymentVouchers
+      .filter((v) => new Date(v.date) >= dateRange.startDate && new Date(v.date) <= dateRange.endDate)
       .reduce((sum, v) => sum + Number(v.amount), 0);
 
     // 9. Refunds & Credit Notes
-    const todayRefundTransactions = await db.paymentTransaction.findMany({
+    const periodRefundTransactions = await db.paymentTransaction.findMany({
       where: {
-        timestamp: { gte: today },
+        timestamp: { gte: dateRange.startDate, lte: dateRange.endDate },
         type: "REFUND",
         status: "CONFIRMED",
         payment: {
-          bill: warehouseId && warehouseId !== "all" ? { warehouseId } : undefined,
+          bill: activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined,
         },
       },
     });
-    const todayRefunds = todayRefundTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const periodRefunds = periodRefundTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
     const monthRefundTransactions = await db.paymentTransaction.findMany({
       where: {
@@ -241,7 +268,7 @@ export async function GET(req: NextRequest) {
         type: "REFUND",
         status: "CONFIRMED",
         payment: {
-          bill: warehouseId && warehouseId !== "all" ? { warehouseId } : undefined,
+          bill: activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined,
         },
       },
     });
@@ -319,7 +346,7 @@ export async function GET(req: NextRequest) {
     });
 
     const recentAuditLogsRaw = await db.auditLog.findMany({
-      where: warehouseId && warehouseId !== "all" ? { warehouseId } : undefined,
+      where: activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined,
       orderBy: { timestamp: "desc" },
       take: 6,
       include: {
@@ -345,7 +372,7 @@ export async function GET(req: NextRequest) {
         timestamp: { gte: sevenDaysAgo },
         status: "CONFIRMED",
         payment: {
-          bill: warehouseId && warehouseId !== "all" ? { warehouseId } : undefined,
+          bill: activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined,
         },
       },
       select: { amount: true, timestamp: true, type: true },
@@ -393,22 +420,28 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const netWorkingCapital = cashBal + bankBal + totalReceivables - totalPayables;
+    const periodOutflows = periodSupplierPayments + totalPeriodExpense + periodRefunds;
+    const periodNetReceived = periodCollection - periodOutflows;
+    const netWorkingCapital = (cashBal > 0 ? cashBal : periodCash) + (bankBal > 0 ? bankBal : periodBank) + totalReceivables - totalPayables;
 
     return NextResponse.json({
       // 1. Overview & Liquidity
-      cashBalance: cashBal,
-      bankBalance: bankBal,
+      cashBalance: cashBal > 0 ? cashBal : periodCash,
+      bankBalance: bankBal > 0 ? bankBal : periodBank,
       totalReceivables,
       totalPayables,
       netWorkingCapital,
-      netCashFlow: todayCollection - totalTodayExpense,
+      totalReceivedToday: periodCollection,
+      totalPaidToday: periodOutflows,
+      netReceivedToday: periodNetReceived,
+      netCashFlow: periodNetReceived,
 
       // 2. Cash Management
       cash: {
         status: latestCashSession?.status || "CLOSED",
+        todayCash: periodCash,
         openingCash: cashOpening,
-        expectedCash: cashExpected,
+        expectedCash: cashExpected > 0 ? cashExpected : (cashOpening + periodCash),
         actualCash: cashActual,
         difference: cashDiff,
         discrepancyCount: cashDiscrepancySessions,
@@ -417,6 +450,7 @@ export async function GET(req: NextRequest) {
 
       // 3. Bank Management
       bank: {
+        todayBank: periodBank,
         closingBalance: bankBal,
         unreconciledTxCount: unreconciledBankTx.length,
         unreconciledAmount: unreconciledBankAmount,
@@ -425,7 +459,7 @@ export async function GET(req: NextRequest) {
 
       // 4. UPI / Digital Payments
       upi: {
-        todayTotal: todayUpi,
+        todayTotal: periodUpi,
         pendingSettlementAmount: pendingUpiAmount,
         pendingCount: pendingUpiSettlements.length,
         discrepancyCount: discrepancyUpiCount,
@@ -450,23 +484,23 @@ export async function GET(req: NextRequest) {
 
       // 7. Collections
       collections: {
-        todayTotal: todayCollection,
-        todayCash,
-        todayUpi,
-        todayBank,
-        txCount: todayPayments.length,
+        todayTotal: periodCollection,
+        todayCash: periodCash,
+        todayUpi: periodUpi,
+        todayBank: periodBank,
+        txCount: periodPayments.length,
       },
 
       // 8. Supplier Payments
       supplierPayments: {
         monthTotal: totalSupplierPaymentsMonth,
-        todayPaid: todaySupplierPayments,
+        todayPaid: periodSupplierPayments,
         voucherCount: supplierPaymentVouchers.length,
       },
 
       // 9. Expenses
       expenses: {
-        todayTotal: totalTodayExpense,
+        todayTotal: totalPeriodExpense,
         monthTotal: totalMonthExpense,
         byCategory: expensesByCategory,
         pendingApprovalCount: 0,
@@ -474,10 +508,10 @@ export async function GET(req: NextRequest) {
 
       // 10. Refunds & Credit Notes
       refunds: {
-        todayRefunds,
+        todayRefunds: periodRefunds,
         totalRefundsMonth,
         adjustmentsCount: paymentAdjustmentsCount,
-        pendingRefundCount: todayRefundTransactions.length,
+        pendingRefundCount: periodRefundTransactions.length,
       },
 
       // 11. Reconciliation
@@ -511,7 +545,7 @@ export async function GET(req: NextRequest) {
       reports: {
         pnlReady: true,
         balanceSheetBalanced: true,
-        cashFlowPositive: todayCollection >= totalTodayExpense,
+        cashFlowPositive: periodCollection >= totalPeriodExpense,
       },
 
       // 15. Audit & Controls
@@ -526,7 +560,14 @@ export async function GET(req: NextRequest) {
       trend: trendDays,
       recentVouchers,
       warehouses,
+      currentWarehouse,
       userRole: session.role,
+      dateRange: {
+        preset: dateRange.preset,
+        startDateStr: dateRange.startDateStr,
+        endDateStr: dateRange.endDateStr,
+        label: dateRange.label,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to load finance overview" }, { status: 500 });

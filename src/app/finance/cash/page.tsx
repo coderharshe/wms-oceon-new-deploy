@@ -8,6 +8,9 @@ import { Skeleton, SkeletonCard } from "@/components/Skeleton";
 import { subscribeSync } from "@/lib/offline-bills";
 import { fmtDate, fmtDateTime, fmtTime } from "@/lib/fmt";
 
+import { FinanceDateRangePicker } from "@/components/FinanceDateRangePicker";
+import type { DateRangePreset } from "@/lib/date-filter";
+
 type CashFormula = {
   openingCash: number;
   cashSales: number;
@@ -50,6 +53,12 @@ type TodayCashData = {
   formula: CashFormula;
   ledger: CashLedgerEntry[];
   counts: CashCountHistory[];
+  dateRange?: {
+    preset: DateRangePreset;
+    startDateStr: string;
+    endDateStr: string;
+    label: string;
+  };
 };
 
 const NOTES = [500, 200, 100, 50, 20, 10];
@@ -62,7 +71,19 @@ const MOVES = [
 const rs = (x: number | string) => `₹${Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function CashManagementPage() {
-  const { data, error, loading, reload: load } = useApiGet<TodayCashData>("/api/finance/cash/today");
+  const [datePreset, setDatePreset] = useState<DateRangePreset>("today");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const queryParams = new URLSearchParams();
+  if (datePreset !== "today") queryParams.set("preset", datePreset);
+  if (datePreset === "custom" && startDate && endDate) {
+    queryParams.set("startDate", startDate);
+    queryParams.set("endDate", endDate);
+  }
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  const { data, error, loading, reload: load } = useApiGet<TodayCashData>(`/api/finance/cash/today${queryString}`);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [coins, setCoins] = useState("");
   const [note, setNote] = useState("");
@@ -161,7 +182,7 @@ export default function CashManagementPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black tracking-tight text-ink">Physical Cash Management</h1>
+            <h1 className="text-xl font-black tracking-tight text-ink">Cash Management</h1>
             <span className={`badge ${data.open ? "bg-good/15 text-good" : "bg-muted/15 text-muted"} font-bold`}>
               {data.open ? "🟢 DRAWER OPEN" : "⚪ NO OPEN SESSION"}
             </span>
@@ -181,6 +202,25 @@ export default function CashManagementPage() {
         </div>
       </div>
 
+      {/* ── Date Range Filtering Bar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface p-2.5 rounded-xl border border-line">
+        <div className="text-xs font-bold text-ink flex items-center gap-1.5">
+          <span>📅 Statement Period:</span>
+          <strong className="text-accent font-mono">{data.dateRange?.label || "Today"}</strong>
+        </div>
+
+        <FinanceDateRangePicker
+          preset={datePreset}
+          startDate={startDate || data.dateRange?.startDateStr || ""}
+          endDate={endDate || data.dateRange?.endDateStr || ""}
+          onChange={(p, s, e) => {
+            setDatePreset(p);
+            setStartDate(s);
+            setEndDate(e);
+          }}
+        />
+      </div>
+
       {/* ── Status Banner (if stale or not counted) ── */}
       {data.open && stale && (
         <div className="card border-2 border-bad bg-bad/5 p-3 text-xs text-bad font-semibold flex items-center justify-between">
@@ -192,8 +232,8 @@ export default function CashManagementPage() {
       <section className="card space-y-4 border-l-4 border-l-primary">
         <div className="flex justify-between items-center border-b border-line pb-2">
           <div>
-            <h2 className="text-sm font-black text-ink tracking-tight uppercase">Physical Cash Reconciliation Formula</h2>
-            <p className="text-[11px] text-muted">Mathematical summary of all counter cash movements for current session</p>
+            <h2 className="text-sm font-black text-ink tracking-tight uppercase">Cash Reconciliation</h2>
+
           </div>
           <div className="text-right">
             <span className="text-[10px] text-muted block">Expected Closing Till Cash</span>
@@ -248,10 +288,7 @@ export default function CashManagementPage() {
           </div>
         </div>
 
-        <div className="bg-surface-hi p-2.5 rounded border border-line flex flex-wrap justify-between items-center text-xs font-semibold">
-          <span>🧮 Formula: Opening ({rs(f.openingCash)}) + Inflows ({rs(f.cashSales + f.cashReceived)}) − Outflows ({rs(f.cashExpenses + f.cashRefunds + f.bankDeposits)})</span>
-          <span className="text-good font-mono text-sm font-bold">= {rs(f.expectedClosingCash)}</span>
-        </div>
+
       </section>
 
       {/* ── SECTION 2: EXPANDABLE CASH LEDGER ── */}
@@ -265,7 +302,7 @@ export default function CashManagementPage() {
               <span>{ledgerExpanded ? "▼" : "▶"}</span>
               <span>📜 Expandable Cash Ledger ({data.ledger?.length || 0} Entries)</span>
             </button>
-            <span className="badge bg-surface-hi text-[10px]">Audit Trail</span>
+
           </div>
 
           <div className="flex items-center gap-2">
@@ -314,14 +351,14 @@ export default function CashManagementPage() {
                       <td className="py-2">
                         <span
                           className={`badge text-[10px] font-semibold ${tx.type === "SALE"
-                              ? "bg-good/15 text-good"
-                              : tx.type === "OTHER_RECEIPT"
-                                ? "bg-primary/15 text-primary"
-                                : tx.type === "WITHDRAWAL"
-                                  ? "bg-bad/15 text-bad"
-                                  : tx.type === "REFUND"
-                                    ? "bg-warn/15 text-warn"
-                                    : "bg-ink/10 text-ink"
+                            ? "bg-good/15 text-good"
+                            : tx.type === "OTHER_RECEIPT"
+                              ? "bg-primary/15 text-primary"
+                              : tx.type === "WITHDRAWAL"
+                                ? "bg-bad/15 text-bad"
+                                : tx.type === "REFUND"
+                                  ? "bg-warn/15 text-warn"
+                                  : "bg-ink/10 text-ink"
                             }`}
                         >
                           {tx.type}

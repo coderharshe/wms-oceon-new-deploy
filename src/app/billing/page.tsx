@@ -82,10 +82,8 @@ export default function BillingDashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-line">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black tracking-tight text-ink">🛒 Billing &amp; POS Dashboard</h1>
-            <span className="text-xs bg-accent/15 text-accent px-2.5 py-0.5 rounded-full font-bold">
-              Real-time Counter Till
-            </span>
+            <h1 className="text-xl font-black tracking-tight text-ink">🛒 Billing Dashboard</h1>
+
           </div>
           <p className="text-xs text-muted mt-0.5">
             Daily retail &amp; wholesale invoice operations, collections, and settlement metrics
@@ -96,15 +94,7 @@ export default function BillingDashboardPage() {
           <Link href="/billing/new" className="btn btn-primary text-sm font-bold shadow-sm flex items-center gap-1.5">
             <span>+</span> New Bill (F2)
           </Link>
-          <Link href="/billing/orders" className="btn text-sm font-semibold">
-            📑 View Bills (Alt+O)
-          </Link>
-          <Link href="/billing/gst-bill" className="btn text-sm font-semibold">
-            🏛️ GST Tax Invoice
-          </Link>
-          <Link href="/billing/discounts" className="btn text-sm font-semibold">
-            🏷️ Discounts
-          </Link>
+
           <button onClick={() => reload()} className="btn text-sm font-semibold" title="Refresh Live Data">
             🔄 Refresh
           </button>
@@ -131,7 +121,7 @@ export default function BillingDashboardPage() {
           <div className="text-[11px] text-muted mt-1">Generated invoices</div>
         </div>
 
-        {/* 3. Items Sold */}
+        {/* 3. Inventory Sold */}
         <div className="card p-3.5 border-l-4 border-l-teal-500">
           <div className="text-xs font-semibold text-teal-700">3. Items Sold</div>
           <div className="text-xl font-black text-teal-700 font-mono mt-0.5">
@@ -239,8 +229,8 @@ export default function BillingDashboardPage() {
       <div className="card p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
           <div>
-            <h3 className="text-sm font-bold text-ink">Recent Invoices Generated Today</h3>
-            <span className="text-xs text-muted">Latest live billed orders with payment and QC status</span>
+            <h3 className="text-sm font-bold text-ink">Recent Invoices</h3>
+
           </div>
 
           <div className="flex items-center gap-2">
@@ -282,9 +272,18 @@ export default function BillingDashboardPage() {
                 </tr>
               ) : (
                 filteredBills.map((b) => (
-                  <tr key={b.id} className="hover:bg-surface-hi/50">
+                  <tr key={b.id} className="hover:bg-surface-hi/50 transition-colors">
                     <td className="py-2 text-muted font-mono">{b.createdAt}</td>
-                    <td className="py-2 font-mono font-bold text-accent">{b.billNumber}</td>
+                    <td className="py-2 font-mono font-bold">
+                      <Link
+                        href={`/billing/orders/${b.id}`}
+                        className="text-accent hover:underline flex items-center gap-1 group"
+                        title={`Open Bill / Slip #${b.billNumber}`}
+                      >
+                        <span>{b.billNumber}</span>
+                        <span className="opacity-0 group-hover:opacity-100 text-[10px] transition-opacity">↗</span>
+                      </Link>
+                    </td>
                     <td className="py-2 font-semibold text-ink max-w-xs truncate">{b.customerName}</td>
                     <td className="py-2">
                       <span className="bg-surface-hi text-muted text-[10px] px-2 py-0.5 rounded font-semibold">
@@ -300,34 +299,33 @@ export default function BillingDashboardPage() {
                     </td>
                     <td className="py-2 text-center">
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          b.paymentStatus === "PAID"
-                            ? "bg-emerald-500/15 text-emerald-700"
-                            : b.paymentStatus === "PARTIALLY_PAID"
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${b.paymentStatus === "PAID"
+                          ? "bg-emerald-500/15 text-emerald-700"
+                          : b.paymentStatus === "PARTIALLY_PAID"
                             ? "bg-amber-500/15 text-amber-700"
                             : "bg-rose-500/15 text-rose-700"
-                        }`}
+                          }`}
                       >
                         {b.paymentStatus}
                       </span>
                     </td>
                     <td className="py-2 text-center">
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                          b.orderStatus === "COMPLETED" || b.orderStatus === "PAID"
-                            ? "bg-emerald-500/10 text-emerald-700"
-                            : b.orderStatus === "CANCELLED"
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${b.orderStatus === "COMPLETED" || b.orderStatus === "PAID"
+                          ? "bg-emerald-500/10 text-emerald-700"
+                          : b.orderStatus === "CANCELLED"
                             ? "bg-rose-500/10 text-rose-700 font-bold"
                             : "bg-sky-500/10 text-sky-700"
-                        }`}
+                          }`}
                       >
                         {b.orderStatus}
                       </span>
                     </td>
                     <td className="py-2 text-right">
                       <Link
-                        href={`/billing/orders?q=${encodeURIComponent(b.billNumber)}`}
-                        className="btn text-[11px] px-2.5 py-1"
+                        href={`/billing/orders/${b.id}`}
+                        className="btn text-[11px] px-2.5 py-1 hover:border-accent hover:text-accent font-medium"
+                        title={`View Slip #${b.billNumber}`}
                       >
                         View Slip
                       </Link>
@@ -340,48 +338,6 @@ export default function BillingDashboardPage() {
         </div>
       </div>
 
-      {/* ── 5. Quick Actions & Policy Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <section className="card p-4 space-y-3">
-          <h3 className="text-sm font-bold text-ink">🚀 Counter Billing Workflows</h3>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <Link href="/billing/new" className="p-3 rounded-lg border border-line bg-surface hover:bg-surface-hi">
-              <div className="font-bold text-accent text-sm">🛒 Create Retail / B2B Bill (F2)</div>
-              <div className="text-muted mt-0.5">High-speed barcode &amp; product lookup billing</div>
-            </Link>
-            <Link href="/billing/gst-bill" className="p-3 rounded-lg border border-line bg-surface hover:bg-surface-hi">
-              <div className="font-bold text-ink text-sm">🏛️ Registered GST Invoice</div>
-              <div className="text-muted mt-0.5">Official A4 tax invoices for GST registered buyers</div>
-            </Link>
-            <Link href="/billing/discounts" className="p-3 rounded-lg border border-line bg-surface hover:bg-surface-hi">
-              <div className="font-bold text-ink text-sm">🏷️ Discount Approval Desk</div>
-              <div className="text-muted mt-0.5">Request and track manager approval for &gt;2% discounts</div>
-            </Link>
-            <Link href="/billing/orders" className="p-3 rounded-lg border border-line bg-surface hover:bg-surface-hi">
-              <div className="font-bold text-ink text-sm">📑 Past Bills &amp; Slips (Alt+O)</div>
-              <div className="text-muted mt-0.5">Reprint thermal slips or review order revisions</div>
-            </Link>
-          </div>
-        </section>
-
-        <section className="card p-4 space-y-3">
-          <h3 className="text-sm font-bold text-ink">🔒 Counter &amp; POS Rules</h3>
-          <ul className="text-xs space-y-2 text-muted list-disc pl-4">
-            <li>
-              <strong>Direct Bill Generation:</strong> All staff can issue bills up to <strong>2% line discount</strong> without manager approval.
-            </li>
-            <li>
-              <strong>Manager Tier (2%–5%):</strong> Requires real-time Manager passcode or dashboard approval.
-            </li>
-            <li>
-              <strong>Admin / Sir Tier (&gt;5%):</strong> Requires Executive / Admin confirmation before invoice lock.
-            </li>
-            <li>
-              <strong>Immutable Audit Log:</strong> Invoices cannot be silently deleted; modifications create a tracked <code>BillVersion</code>.
-            </li>
-          </ul>
-        </section>
-      </div>
     </div>
   );
 }

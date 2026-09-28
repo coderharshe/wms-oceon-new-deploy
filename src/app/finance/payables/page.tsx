@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonStats } from "@/components/Skeleton";
+import { parseSupplierBankDetails } from "@/lib/supplier-bank";
 
 type TenderBreakdown = {
   bank: number;
@@ -724,6 +725,65 @@ export default function AccountsPayablePage() {
                 <span className="font-black text-bad">₹{payTarget.balanceDue.toFixed(2)}</span>
               </div>
             </div>
+
+            {/* Beneficiary Banking & Payout Account */}
+            {payTarget.bankDetails && (() => {
+              const b = parseSupplierBankDetails(payTarget.bankDetails);
+              return (
+                <div className="bg-accent/5 border border-accent/20 rounded-lg p-3 space-y-1 text-xs">
+                  <div className="font-bold text-accent flex items-center gap-1.5">
+                    <span>🏦</span>
+                    <span>Beneficiary Payout Details</span>
+                  </div>
+                  {b.bankName && <div className="font-semibold text-ink">{b.bankName} {b.branch ? `(${b.branch})` : ""}</div>}
+                  {b.accountNumber && (
+                    <div className="flex items-center justify-between bg-surface p-1 rounded border border-line">
+                      <span className="text-muted">A/C: <strong className="font-mono text-ink">{b.accountNumber}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(b.accountNumber!);
+                          alert(`Copied A/C: ${b.accountNumber}`);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-bold rounded bg-surface-2 hover:bg-surface-hi border border-line"
+                      >
+                        📋 Copy A/C
+                      </button>
+                    </div>
+                  )}
+                  {b.ifsc && (
+                    <div className="flex items-center justify-between bg-surface p-1 rounded border border-line">
+                      <span className="text-muted">IFSC: <strong className="font-mono text-accent uppercase">{b.ifsc}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(b.ifsc!);
+                          alert(`Copied IFSC: ${b.ifsc}`);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-bold rounded bg-surface-2 hover:bg-surface-hi border border-line"
+                      >
+                        📋 Copy IFSC
+                      </button>
+                    </div>
+                  )}
+                  {b.upiId && (
+                    <div className="flex items-center justify-between bg-surface p-1 rounded border border-line">
+                      <span className="text-muted">UPI: <strong className="font-mono text-good">{b.upiId}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(b.upiId!);
+                          alert(`Copied UPI: ${b.upiId}`);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-bold rounded bg-surface-2 hover:bg-surface-hi border border-line"
+                      >
+                        📋 Copy UPI
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {feedback && (
               <div

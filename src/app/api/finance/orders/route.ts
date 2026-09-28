@@ -86,6 +86,15 @@ const customerInput = z
   })
   .transform((c) => ({ ...c, ownerName: c.ownerName || c.shopName || WALK_IN, shopName: c.shopName || c.ownerName || WALK_IN }));
 
+const splitItemSchema = z.object({
+  method: z.enum(["CASH", "UPI", "BANK_TRANSFER", "CHEQUE"]),
+  amount: z.number().positive(),
+  reference: z.string().optional(),
+  bankName: z.string().optional(),
+  chequeDueDate: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 const createSchema = z.object({
   warehouseId: z.string().optional(), // required for ADMIN, ignored otherwise
   customer: customerInput.optional(),
@@ -100,7 +109,7 @@ const createSchema = z.object({
   // recorded as paid the moment it exists. Set when the bill goes on credit
   // instead — the customer owes it and it shows up as unpaid everywhere.
   unpaid: z.boolean().default(false),
-  paymentMethod: z.enum(["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "CREDIT"]).default("CASH").optional(),
+  paymentMethod: z.enum(["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "CREDIT", "SPLIT"]).default("CASH").optional(),
   paymentDetails: z
     .object({
       amountReceived: z.number().optional(),
@@ -112,6 +121,7 @@ const createSchema = z.object({
       chequeBank: z.string().optional(),
       chequeDueDate: z.string().optional(),
       notes: z.string().optional(),
+      splits: z.array(splitItemSchema).optional(),
     })
     .optional(),
   // Client-generated, one per submission. A billing screen that loses the
@@ -500,7 +510,59 @@ export async function POST(req: NextRequest) {
         if (!isCredit && totals.total.gt(0)) {
           const method = body.paymentMethod ?? "CASH";
           const pDetails = body.paymentDetails ?? {};
-          if (method === "UPI") {
+          if (method === "SPLIT" && Array.isArray(pDetails.splits) && pDetails.splits.length > 0) {
+            for (let idx = 0; idx < pDetails.splits.length; idx++) {
+              const split = pDetails.splits[idx]!;
+              if (split.amount <= 0) continue;
+              const splitReqId = body.clientRequestId ? `${body.clientRequestId}-split-${idx}` : undefined;
+              if (split.method === "CASH") {
+                await recordCashPaymentDrizzle(tx, {
+                  billId: newBill!.id,
+                  amountReceived: new Decimal(split.amount),
+                  userId: session.sub,
+                  warehouseId,
+                  orderId: ord!.id,
+                  clientRequestId: splitReqId,
+                });
+              } else if (split.method === "UPI") {
+                await recordUpiPaymentDirectDrizzle(tx, {
+                  billId: newBill!.id,
+                  amount: new Decimal(split.amount),
+                  userId: session.sub,
+                  warehouseId,
+                  orderId: ord!.id,
+                  upiReference: split.reference,
+                  notes: split.notes,
+                  clientRequestId: splitReqId,
+                });
+              } else if (split.method === "BANK_TRANSFER") {
+                await recordBankTransferPaymentDrizzle(tx, {
+                  billId: newBill!.id,
+                  amount: new Decimal(split.amount),
+                  userId: session.sub,
+                  warehouseId,
+                  orderId: ord!.id,
+                  bankReference: split.reference,
+                  bankName: split.bankName,
+                  notes: split.notes,
+                  clientRequestId: splitReqId,
+                });
+              } else if (split.method === "CHEQUE") {
+                await recordChequePaymentDrizzle(tx, {
+                  billId: newBill!.id,
+                  amount: new Decimal(split.amount),
+                  userId: session.sub,
+                  warehouseId,
+                  orderId: ord!.id,
+                  chequeNumber: split.reference,
+                  chequeBank: split.bankName,
+                  chequeDueDate: split.chequeDueDate ? new Date(split.chequeDueDate) : undefined,
+                  notes: split.notes,
+                  clientRequestId: splitReqId,
+                });
+              }
+            }
+          } else if (method === "UPI") {
             await recordUpiPaymentDirectDrizzle(tx, {
               billId: newBill!.id,
               amount: totals.total,
@@ -751,7 +813,59 @@ export async function POST(req: NextRequest) {
       if (!isCredit && totals.total.gt(0)) {
         const method = body.paymentMethod ?? "CASH";
         const pDetails = body.paymentDetails ?? {};
-        if (method === "UPI") {
+        if (method === "SPLIT" && Array.isArray(pDetails.splits) && pDetails.splits.length > 0) {
+          for (let idx = 0; idx < pDetails.splits.length; idx++) {
+            const split = pDetails.splits[idx]!;
+            if (split.amount <= 0) continue;
+            const splitReqId = body.clientRequestId ? `${body.clientRequestId}-split-${idx}` : undefined;
+            if (split.method === "CASH") {
+              await recordCashPayment(tx, {
+                billId: bill.id,
+                amountReceived: new Decimal(split.amount),
+                userId: session.sub,
+                warehouseId,
+                orderId: order.id,
+                clientRequestId: splitReqId,
+              });
+            } else if (split.method === "UPI") {
+              await recordUpiPaymentDirect(tx, {
+                billId: bill.id,
+                amount: new Decimal(split.amount),
+                userId: session.sub,
+                warehouseId,
+                orderId: order.id,
+                upiReference: split.reference,
+                notes: split.notes,
+                clientRequestId: splitReqId,
+              });
+            } else if (split.method === "BANK_TRANSFER") {
+              await recordBankTransferPayment(tx, {
+                billId: bill.id,
+                amount: new Decimal(split.amount),
+                userId: session.sub,
+                warehouseId,
+                orderId: order.id,
+                bankReference: split.reference,
+                bankName: split.bankName,
+                notes: split.notes,
+                clientRequestId: splitReqId,
+              });
+            } else if (split.method === "CHEQUE") {
+              await recordChequePayment(tx, {
+                billId: bill.id,
+                amount: new Decimal(split.amount),
+                userId: session.sub,
+                warehouseId,
+                orderId: order.id,
+                chequeNumber: split.reference,
+                chequeBank: split.bankName,
+                chequeDueDate: split.chequeDueDate ? new Date(split.chequeDueDate) : undefined,
+                notes: split.notes,
+                clientRequestId: splitReqId,
+              });
+            }
+          }
+        } else if (method === "UPI") {
           await recordUpiPaymentDirect(tx, {
             billId: bill.id,
             amount: totals.total,

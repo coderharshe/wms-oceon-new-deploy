@@ -116,13 +116,25 @@ export function EditCustomerModal({
       <div className="card max-h-full w-full max-w-lg space-y-3 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-base font-semibold">Edit {customer.shopName}</h2>
 
-        <div>
-          <label className="mb-1 block text-xs text-muted">Shop / Customer Name</label>
-          <input
-            className="w-full"
-            value={form.shopName}
-            onChange={(e) => setForm({ ...form, shopName: e.target.value, ownerName: e.target.value })}
-          />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs text-muted">Shop / Business Name</label>
+            <input
+              className="w-full"
+              placeholder="e.g. Ramesh Kirana Store"
+              value={form.shopName}
+              onChange={(e) => setForm({ ...form, shopName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Customer / Owner Name</label>
+            <input
+              className="w-full"
+              placeholder="e.g. Ramesh Kumar"
+              value={form.ownerName}
+              onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
+            />
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">

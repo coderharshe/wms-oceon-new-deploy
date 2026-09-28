@@ -63,6 +63,8 @@ async function getUpiAccountsConfig(): Promise<UpiAccountConfig[]> {
   }
 }
 
+import { resolveDateRange, type DateRangePreset } from "@/lib/date-filter";
+
 export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
   if (isErrorResponse(session)) return session;
@@ -70,11 +72,22 @@ export async function GET(req: NextRequest) {
   const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId || "none";
   const upiAccountId = req.nextUrl.searchParams.get("upiAccountId") || "ALL";
 
+  const preset = (req.nextUrl.searchParams.get("preset") as DateRangePreset) || "today";
+  const customStart = req.nextUrl.searchParams.get("startDate");
+  const customEnd = req.nextUrl.searchParams.get("endDate");
+
+  const dateRange = resolveDateRange(preset, customStart, customEnd);
+
   try {
     const db = getDb();
     const upiAccounts = await getUpiAccountsConfig();
 
-    const where: any = {};
+    const where: any = {
+      collectionDate: {
+        gte: dateRange.startDate,
+        lte: dateRange.endDate,
+      },
+    };
     if (warehouseId && warehouseId !== "all") where.warehouseId = warehouseId;
 
     // 1. Fetch settlements
@@ -89,6 +102,10 @@ export async function GET(req: NextRequest) {
       where: {
         method: "UPI",
         status: "CONFIRMED",
+        timestamp: {
+          gte: dateRange.startDate,
+          lte: dateRange.endDate,
+        },
         payment: {
           bill: warehouseId && warehouseId !== "all" ? { warehouseId } : undefined,
         },
@@ -200,6 +217,12 @@ export async function GET(req: NextRequest) {
         discrepancyCount,
       },
       entries: enrichedEntries,
+      dateFilter: {
+        preset: dateRange.preset,
+        startDateStr: dateRange.startDateStr,
+        endDateStr: dateRange.endDateStr,
+        label: dateRange.label,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to load UPI management data" }, { status: 500 });

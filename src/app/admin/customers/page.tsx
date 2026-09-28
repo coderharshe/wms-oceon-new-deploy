@@ -26,8 +26,8 @@ export default function AdminCustomersPage() {
           <table>
             <thead>
               <tr>
-                <th>Shop</th>
-                <th>Owner</th>
+                <th>Shop Name</th>
+                <th>Customer Name</th>
                 <th>Mobile</th>
                 <th>Type</th>
                 <th>Credit limit</th>

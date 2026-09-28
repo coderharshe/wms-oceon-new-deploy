@@ -34,7 +34,7 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
 
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Refused, not silently dropped: a screen that thinks it set a credit limit
   // and got a 200 back is worse than one told it may not.
-  if (session.role === "FINANCE") {
+  if (session.role === "FINANCE" || session.role === "BILLING") {
     const blocked = FINANCE_FORBIDDEN.filter((k) => k in patch);
     if (blocked.length) {
       return NextResponse.json({ error: `Only a manager can change ${blocked.join(" and ")}` }, { status: 403 });

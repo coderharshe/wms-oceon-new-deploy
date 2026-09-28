@@ -7,6 +7,9 @@ import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonStats } from "@/components/Skeleton";
 import { fmtDateTime } from "@/lib/fmt";
 
+import { FinanceDateRangePicker } from "@/components/FinanceDateRangePicker";
+import type { DateRangePreset } from "@/lib/date-filter";
+
 type UpiAccount = {
   id: string;
   name: string;
@@ -50,15 +53,32 @@ type UpiApiResponse = {
     discrepancyCount: number;
   };
   entries: UpiEntry[];
+  dateFilter?: {
+    preset: DateRangePreset;
+    startDateStr: string;
+    endDateStr: string;
+    label: string;
+  };
 };
 
 const rs = (x: number | string) => `₹${Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function UpiDigitalPaymentsPage() {
   const [selectedUpiAccount, setSelectedUpiAccount] = useState<string>("ALL");
-  const queryParam = selectedUpiAccount !== "ALL" ? `?upiAccountId=${selectedUpiAccount}` : "";
+  const [datePreset, setDatePreset] = useState<DateRangePreset>("today");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  const { data, error, loading, reload } = useApiGet<UpiApiResponse>(`/api/finance/upi${queryParam}`);
+  const queryParams = new URLSearchParams();
+  if (selectedUpiAccount !== "ALL") queryParams.set("upiAccountId", selectedUpiAccount);
+  if (datePreset !== "today") queryParams.set("preset", datePreset);
+  if (datePreset === "custom" && startDate && endDate) {
+    queryParams.set("startDate", startDate);
+    queryParams.set("endDate", endDate);
+  }
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  const { data, error, loading, reload } = useApiGet<UpiApiResponse>(`/api/finance/upi${queryString}`);
 
   // Modals & Selection
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -265,6 +285,25 @@ export default function UpiDigitalPaymentsPage() {
             🔄 Refresh
           </button>
         </div>
+      </div>
+
+      {/* ── Statement Period / Date Range Picker ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface p-2.5 rounded-xl border border-line">
+        <div className="text-xs font-bold text-ink flex items-center gap-1.5">
+          <span>📅 Statement Period:</span>
+          <strong className="text-accent font-mono">{data?.dateFilter?.label || "Today"}</strong>
+        </div>
+
+        <FinanceDateRangePicker
+          preset={datePreset}
+          startDate={startDate || data?.dateFilter?.startDateStr || ""}
+          endDate={endDate || data?.dateFilter?.endDateStr || ""}
+          onChange={(p, s, e) => {
+            setDatePreset(p);
+            setStartDate(s);
+            setEndDate(e);
+          }}
+        />
       </div>
 
       {/* ── UPI CHANNELS / VPA CARDS ── */}
