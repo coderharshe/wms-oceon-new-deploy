@@ -19,7 +19,7 @@ async function main() {
       { name: "dozen", symbol: "dz", type: "COUNT" as const },
     ].map((u) => db.unit.upsert({ where: { symbol: u.symbol }, update: {}, create: u }))
   );
-  const bySymbol = Object.fromEntries(units.map((u) => [u.symbol, u]));
+  const bySymbol = Object.fromEntries(units.map((u: any) => [u.symbol, u]));
 
   const warehouse = await db.warehouse.upsert({
     where: { code: "WH1" },

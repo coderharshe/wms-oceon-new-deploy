@@ -50,7 +50,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const productMap = new Map(products.map((p) => [p.id, p]));
     const unitMap = new Map(units.map((u) => [u.id, u]));
 
-    businessName = (await getSetting("BUSINESS_NAME")) || "Hub";
+    businessName = (await getSetting("BUSINESS_NAME")) || "OCEON";
     billNumber = b.billNumber;
     orderNumber = ord.orderNumber;
     ({ date, time } = invoiceStamp(ord.createdAt));
@@ -83,7 +83,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (forbidden) return forbidden;
 
     const version = order.bill.versions.find((v) => v.versionNumber === order.bill!.currentVersion) ?? order.bill.versions.at(-1)!;
-    businessName = (await getSetting("BUSINESS_NAME")) || "Hub";
+    businessName = (await getSetting("BUSINESS_NAME")) || "OCEON";
     billNumber = order.bill.billNumber;
     orderNumber = order.orderNumber;
     ({ date, time } = invoiceStamp(order.createdAt));

@@ -6,8 +6,8 @@ import { buildBillLine, shortfallIssues, sumBillTotals } from "@/lib/pricing";
 import { isWorkersRuntime } from "@/lib/cf-env";
 
 import { claimIdempotencyKey, claimIdempotencyKeyDrizzle, DuplicateRequestError } from "@/lib/idempotency";
-import { applyReceivableDelta, recordCashPayment } from "@/lib/payment-service";
-import { applyReceivableDeltaDrizzle, recordCashPaymentDrizzle } from "@/lib/drizzle-payment-service";
+import { applyReceivableDelta, recordCashPayment, recordUpiPaymentDirect, recordBankTransferPayment, recordChequePayment } from "@/lib/payment-service";
+import { applyReceivableDeltaDrizzle, recordCashPaymentDrizzle, recordUpiPaymentDirectDrizzle, recordBankTransferPaymentDrizzle, recordChequePaymentDrizzle } from "@/lib/drizzle-payment-service";
 import { completeIfQcOff } from "@/lib/complete-without-qc";
 import { acceptBilledAt } from "@/lib/business-date";
 
@@ -100,6 +100,20 @@ const createSchema = z.object({
   // recorded as paid the moment it exists. Set when the bill goes on credit
   // instead — the customer owes it and it shows up as unpaid everywhere.
   unpaid: z.boolean().default(false),
+  paymentMethod: z.enum(["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "CREDIT"]).default("CASH").optional(),
+  paymentDetails: z
+    .object({
+      amountReceived: z.number().optional(),
+      changeGiven: z.number().optional(),
+      upiReference: z.string().optional(),
+      bankReference: z.string().optional(),
+      bankName: z.string().optional(),
+      chequeNumber: z.string().optional(),
+      chequeBank: z.string().optional(),
+      chequeDueDate: z.string().optional(),
+      notes: z.string().optional(),
+    })
+    .optional(),
   // Client-generated, one per submission. A billing screen that loses the
   // response after the server already committed will retry the same click —
   // without this that retry is a second order with stock reserved twice.
@@ -154,6 +168,8 @@ export async function GET(req: NextRequest) {
   if (isErrorResponse(session)) return session;
 
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
+  const paymentStatus = req.nextUrl.searchParams.get("paymentStatus") ?? undefined;
+  const sellingMode = req.nextUrl.searchParams.get("sellingMode") ?? undefined;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const warehouseId = session.role === "ADMIN" ? req.nextUrl.searchParams.get("warehouseId") ?? undefined : session.warehouseId!;
   const since = req.nextUrl.searchParams.get("since") ? new Date(req.nextUrl.searchParams.get("since")!) : null;
@@ -168,20 +184,28 @@ export async function GET(req: NextRequest) {
     const conditions = [];
     if (warehouseId) conditions.push(eq(order.warehouseId, warehouseId));
     if (status) conditions.push(eq(order.status, status as any));
+    if (sellingMode) conditions.push(eq(order.sellingMode, sellingMode as any));
     if (since) conditions.push(gte(order.createdAt, since.toISOString()));
     if (until) conditions.push(lte(order.createdAt, until.toISOString()));
-    let orderIdsMatchingQ: string[] | null = null;
+
     if (q) {
-      const matchingCustomers = await db.select({ id: customer.id }).from(customer).where(ilike(customer.shopName, `%${q}%`));
+      const [matchingCustomers, matchingBills] = await Promise.all([
+        db
+          .select({ id: customer.id })
+          .from(customer)
+          .where(or(ilike(customer.shopName, `%${q}%`), ilike(customer.ownerName, `%${q}%`), ilike(customer.mobile, `%${q}%`))),
+        db.select({ orderId: bill.orderId }).from(bill).where(ilike(bill.billNumber, `%${q}%`)),
+      ]);
       const customerIds = matchingCustomers.map((c) => c.id);
-      conditions.push(
-        customerIds.length
-          ? or(ilike(order.orderNumber, `%${q}%`), ilike(order.offlineRef, `%${q}%`), inArray(order.customerId, customerIds))!
-          : or(ilike(order.orderNumber, `%${q}%`), ilike(order.offlineRef, `%${q}%`))!
-      );
+      const billOrderIds = matchingBills.map((b) => b.orderId);
+
+      const qOrs = [ilike(order.orderNumber, `%${q}%`), ilike(order.offlineRef, `%${q}%`)];
+      if (customerIds.length) qOrs.push(inArray(order.customerId, customerIds));
+      if (billOrderIds.length) qOrs.push(inArray(order.id, billOrderIds));
+      conditions.push(or(...qOrs)!);
     }
     const where = conditions.length ? and(...conditions) : undefined;
-    const orders = await db.select().from(order).where(where).orderBy(desc(order.createdAt)).limit(100);
+    const orders = await db.select().from(order).where(where).orderBy(desc(order.createdAt)).limit(150);
     if (orders.length === 0) return NextResponse.json([]);
 
     const orderIds = orders.map((o) => o.id);
@@ -196,7 +220,11 @@ export async function GET(req: NextRequest) {
     const customerMap = new Map(customers.map((c) => [c.id, c]));
     const billByOrder = new Map(bills.map((b) => [b.orderId, { ...b, payment: paymentByBill.get(b.id) ?? null }]));
 
-    return NextResponse.json(orders.map((o) => ({ ...o, customer: customerMap.get(o.customerId) ?? null, bill: billByOrder.get(o.id) ?? null })));
+    let results = orders.map((o) => ({ ...o, customer: customerMap.get(o.customerId) ?? null, bill: billByOrder.get(o.id) ?? null }));
+    if (paymentStatus) {
+      results = results.filter((r) => r.bill?.paymentStatus === paymentStatus);
+    }
+    return NextResponse.json(results);
   }
 
   const db = (await import("@/lib/db")).getDb();
@@ -204,21 +232,42 @@ export async function GET(req: NextRequest) {
     where: {
       ...(warehouseId ? { warehouseId } : {}),
       ...(status ? { status: status as any } : {}),
+      ...(sellingMode ? { sellingMode: sellingMode as any } : {}),
+      ...(paymentStatus ? { bill: { paymentStatus: paymentStatus as any } } : {}),
       ...(since || until ? { createdAt: { gte: since ?? undefined, lte: until ?? undefined } } : {}),
       ...(q
         ? {
             OR: [
               { orderNumber: { contains: q, mode: "insensitive" } },
-              // The provisional OFF-… number off an offline slip.
               { offlineRef: { contains: q, mode: "insensitive" } },
+              { bill: { billNumber: { contains: q, mode: "insensitive" } } },
               { customer: { shopName: { contains: q, mode: "insensitive" } } },
+              { customer: { ownerName: { contains: q, mode: "insensitive" } } },
+              { customer: { mobile: { contains: q, mode: "insensitive" } } },
+              { customer: { gstin: { contains: q, mode: "insensitive" } } },
             ],
           }
         : {}),
     },
-    include: { customer: true, bill: { include: { payment: true } } },
+    include: {
+      customer: true,
+      items: { include: { product: true } },
+      bill: {
+        include: {
+          payment: {
+            include: {
+              transactions: true,
+            },
+          },
+          versions: {
+            take: 1,
+            orderBy: { versionNumber: "desc" },
+          },
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    take: 150,
   });
   return NextResponse.json(orders);
 }
@@ -446,10 +495,59 @@ export async function POST(req: NextRequest) {
         // The bill now exists and is unpaid: that is money the customer owes.
         // Every other mutation of it routes through applyReceivableDelta too.
         await applyReceivableDeltaDrizzle(tx, cust.id, { due: 0, paid: 0 }, { due: totals.total, paid: 0 });
-        // ...and then settled in the same breath, unless finance said the
-        // bill is on credit. A zero-total bill has nothing to collect.
-        if (!body.unpaid && totals.total.gt(0)) {
-          await recordCashPaymentDrizzle(tx, { billId: newBill!.id, amountReceived: totals.total, userId: session.sub, warehouseId, orderId: ord!.id });
+        
+        const isCredit = body.unpaid || body.paymentMethod === "CREDIT";
+        if (!isCredit && totals.total.gt(0)) {
+          const method = body.paymentMethod ?? "CASH";
+          const pDetails = body.paymentDetails ?? {};
+          if (method === "UPI") {
+            await recordUpiPaymentDirectDrizzle(tx, {
+              billId: newBill!.id,
+              amount: totals.total,
+              userId: session.sub,
+              warehouseId,
+              orderId: ord!.id,
+              upiReference: pDetails.upiReference,
+              notes: pDetails.notes,
+              clientRequestId: body.clientRequestId,
+            });
+          } else if (method === "BANK_TRANSFER") {
+            await recordBankTransferPaymentDrizzle(tx, {
+              billId: newBill!.id,
+              amount: totals.total,
+              userId: session.sub,
+              warehouseId,
+              orderId: ord!.id,
+              bankReference: pDetails.bankReference,
+              bankName: pDetails.bankName,
+              notes: pDetails.notes,
+              clientRequestId: body.clientRequestId,
+            });
+          } else if (method === "CHEQUE") {
+            await recordChequePaymentDrizzle(tx, {
+              billId: newBill!.id,
+              amount: totals.total,
+              userId: session.sub,
+              warehouseId,
+              orderId: ord!.id,
+              chequeNumber: pDetails.chequeNumber,
+              chequeBank: pDetails.chequeBank,
+              chequeDueDate: pDetails.chequeDueDate ? new Date(pDetails.chequeDueDate) : undefined,
+              notes: pDetails.notes,
+              clientRequestId: body.clientRequestId,
+            });
+          } else {
+            // CASH
+            const tendered = pDetails.amountReceived ? new Decimal(pDetails.amountReceived) : totals.total;
+            await recordCashPaymentDrizzle(tx, {
+              billId: newBill!.id,
+              amountReceived: tendered,
+              userId: session.sub,
+              warehouseId,
+              orderId: ord!.id,
+              clientRequestId: body.clientRequestId,
+            });
+          }
         }
 
 
@@ -648,10 +746,59 @@ export async function POST(req: NextRequest) {
 
       // The bill now exists and is unpaid: that is money the customer owes.
       await applyReceivableDelta(tx, customer.id, { due: 0, paid: 0 }, { due: totals.total, paid: 0 });
-      // ...and then settled in the same breath, unless finance said the bill
-      // is on credit. A zero-total bill has nothing to collect.
-      if (!body.unpaid && totals.total.gt(0)) {
-        await recordCashPayment(tx, { billId: bill.id, amountReceived: totals.total, userId: session.sub, warehouseId, orderId: order.id });
+      
+      const isCredit = body.unpaid || body.paymentMethod === "CREDIT";
+      if (!isCredit && totals.total.gt(0)) {
+        const method = body.paymentMethod ?? "CASH";
+        const pDetails = body.paymentDetails ?? {};
+        if (method === "UPI") {
+          await recordUpiPaymentDirect(tx, {
+            billId: bill.id,
+            amount: totals.total,
+            userId: session.sub,
+            warehouseId,
+            orderId: order.id,
+            upiReference: pDetails.upiReference,
+            notes: pDetails.notes,
+            clientRequestId: body.clientRequestId,
+          });
+        } else if (method === "BANK_TRANSFER") {
+          await recordBankTransferPayment(tx, {
+            billId: bill.id,
+            amount: totals.total,
+            userId: session.sub,
+            warehouseId,
+            orderId: order.id,
+            bankReference: pDetails.bankReference,
+            bankName: pDetails.bankName,
+            notes: pDetails.notes,
+            clientRequestId: body.clientRequestId,
+          });
+        } else if (method === "CHEQUE") {
+          await recordChequePayment(tx, {
+            billId: bill.id,
+            amount: totals.total,
+            userId: session.sub,
+            warehouseId,
+            orderId: order.id,
+            chequeNumber: pDetails.chequeNumber,
+            chequeBank: pDetails.chequeBank,
+            chequeDueDate: pDetails.chequeDueDate ? new Date(pDetails.chequeDueDate) : undefined,
+            notes: pDetails.notes,
+            clientRequestId: body.clientRequestId,
+          });
+        } else {
+          // CASH
+          const tendered = pDetails.amountReceived ? new Decimal(pDetails.amountReceived) : totals.total;
+          await recordCashPayment(tx, {
+            billId: bill.id,
+            amountReceived: tendered,
+            userId: session.sub,
+            warehouseId,
+            orderId: order.id,
+            clientRequestId: body.clientRequestId,
+          });
+        }
       }
 
       await writeAudit(
@@ -674,7 +821,8 @@ export async function POST(req: NextRequest) {
     // Paid on creation, so with QC off the order is already finished — same
     // follow-up the cash route does, and outside the transaction for the same
     // reason.
-    if (result.bill && !body.unpaid) await completeIfQcOff(result.order.id, session.sub);
+    const isCredit = body.unpaid || body.paymentMethod === "CREDIT";
+    if (result.bill && !isCredit) await completeIfQcOff(result.order.id, session.sub);
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     // A retried submission of a click the server already committed. The order

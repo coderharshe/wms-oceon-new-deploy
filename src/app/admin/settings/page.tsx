@@ -276,7 +276,7 @@ export default function SettingsPage() {
                 <div className="flex gap-2">
                   <input
                     className="input flex-1 text-xs"
-                    placeholder="e.g. Taresh Wholesale Traders"
+                    placeholder="e.g. OCEON Wholesale Traders"
                     value={values.BUSINESS_NAME ?? ""}
                     onChange={(e) => setValues({ ...values, BUSINESS_NAME: e.target.value })}
                   />
@@ -545,7 +545,7 @@ export default function SettingsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
                     <div className="flex items-center gap-2">
                       <span className="h-3.5 w-3.5 rounded-full bg-accent" />
-                      <span className="font-bold text-sm text-ink">Taresh WMS Counter POS</span>
+                      <span className="font-bold text-sm text-ink">OCEON WMS Counter POS</span>
                       <span className="badge bg-surface-hi text-muted text-[11px] border border-line">
                         Font: {FONT_FAMILIES[myFont]?.label}
                       </span>

@@ -161,6 +161,105 @@ export async function failUpiPaymentDrizzle(tx: Tx, args: { transactionId: strin
   publish(`order:${args.orderId}`, "payment:failed", { transactionId: args.transactionId });
 }
 
+export async function recordUpiPaymentDirectDrizzle(
+  tx: Tx,
+  args: { billId: string; amount: Decimal; userId: string; warehouseId: string; orderId: string; upiReference?: string; notes?: string; clickedAt?: Date; clientRequestId?: string }
+) {
+  if (args.clientRequestId) await claimIdempotencyKeyDrizzle(tx, args.clientRequestId);
+  const [pay] = await tx.select().from(payment).where(eq(payment.billId, args.billId)).for("update");
+  if (!pay) throw new Error("Bill has no payment record");
+  const priorPaid = await sumConfirmedPaymentsDrizzle(tx, pay.id);
+  const remainingDue = new Decimal(pay.amountDue).sub(priorPaid);
+  if (remainingDue.lte(0)) throw new PaymentError("Bill is already fully paid");
+  const applied = Decimal.min(args.amount, remainingDue);
+
+  const [transaction] = await tx
+    .insert(paymentTransaction)
+    .values({
+      id: crypto.randomUUID(),
+      paymentId: pay.id,
+      type: "PAYMENT",
+      method: "UPI",
+      amount: applied.toString(),
+      amountReceived: args.amount.toString(),
+      upiReference: args.upiReference,
+      status: "CONFIRMED",
+      recordedByUserId: args.userId,
+      clickedAt: args.clickedAt?.toISOString(),
+    })
+    .returning();
+
+  await afterLedgerChange(tx, args.billId, args.warehouseId, args.orderId);
+  await writeAuditDrizzle({ userId: args.userId, warehouseId: args.warehouseId, action: "PAYMENT_RECORDED", entityType: "PaymentTransaction", entityId: transaction!.id, newValue: { method: "UPI", amount: applied.toString(), upiReference: args.upiReference } }, tx);
+  return { transaction, change: new Decimal(0) };
+}
+
+export async function recordBankTransferPaymentDrizzle(
+  tx: Tx,
+  args: { billId: string; amount: Decimal; userId: string; warehouseId: string; orderId: string; bankReference?: string; bankName?: string; notes?: string; clickedAt?: Date; clientRequestId?: string }
+) {
+  if (args.clientRequestId) await claimIdempotencyKeyDrizzle(tx, args.clientRequestId);
+  const [pay] = await tx.select().from(payment).where(eq(payment.billId, args.billId)).for("update");
+  if (!pay) throw new Error("Bill has no payment record");
+  const priorPaid = await sumConfirmedPaymentsDrizzle(tx, pay.id);
+  const remainingDue = new Decimal(pay.amountDue).sub(priorPaid);
+  if (remainingDue.lte(0)) throw new PaymentError("Bill is already fully paid");
+  const applied = Decimal.min(args.amount, remainingDue);
+
+  const [transaction] = await tx
+    .insert(paymentTransaction)
+    .values({
+      id: crypto.randomUUID(),
+      paymentId: pay.id,
+      type: "PAYMENT",
+      method: "BANK_TRANSFER",
+      amount: applied.toString(),
+      amountReceived: args.amount.toString(),
+      upiReference: args.bankReference,
+      status: "CONFIRMED",
+      recordedByUserId: args.userId,
+      clickedAt: args.clickedAt?.toISOString(),
+    })
+    .returning();
+
+  await afterLedgerChange(tx, args.billId, args.warehouseId, args.orderId);
+  await writeAuditDrizzle({ userId: args.userId, warehouseId: args.warehouseId, action: "PAYMENT_RECORDED", entityType: "PaymentTransaction", entityId: transaction!.id, newValue: { method: "BANK_TRANSFER", amount: applied.toString(), utr: args.bankReference } }, tx);
+  return { transaction, change: new Decimal(0) };
+}
+
+export async function recordChequePaymentDrizzle(
+  tx: Tx,
+  args: { billId: string; amount: Decimal; userId: string; warehouseId: string; orderId: string; chequeNumber?: string; chequeBank?: string; chequeDueDate?: Date; notes?: string; clickedAt?: Date; clientRequestId?: string }
+) {
+  if (args.clientRequestId) await claimIdempotencyKeyDrizzle(tx, args.clientRequestId);
+  const [pay] = await tx.select().from(payment).where(eq(payment.billId, args.billId)).for("update");
+  if (!pay) throw new Error("Bill has no payment record");
+  const priorPaid = await sumConfirmedPaymentsDrizzle(tx, pay.id);
+  const remainingDue = new Decimal(pay.amountDue).sub(priorPaid);
+  if (remainingDue.lte(0)) throw new PaymentError("Bill is already fully paid");
+  const applied = Decimal.min(args.amount, remainingDue);
+
+  const [transaction] = await tx
+    .insert(paymentTransaction)
+    .values({
+      id: crypto.randomUUID(),
+      paymentId: pay.id,
+      type: "PAYMENT",
+      method: "CHEQUE",
+      amount: applied.toString(),
+      amountReceived: args.amount.toString(),
+      upiReference: args.chequeNumber,
+      status: "CONFIRMED",
+      recordedByUserId: args.userId,
+      clickedAt: args.clickedAt?.toISOString(),
+    })
+    .returning();
+
+  await afterLedgerChange(tx, args.billId, args.warehouseId, args.orderId);
+  await writeAuditDrizzle({ userId: args.userId, warehouseId: args.warehouseId, action: "PAYMENT_RECORDED", entityType: "PaymentTransaction", entityId: transaction!.id, newValue: { method: "CHEQUE", amount: applied.toString(), chequeNumber: args.chequeNumber } }, tx);
+  return { transaction, change: new Decimal(0) };
+}
+
 export async function applyBillRevisionAdjustmentDrizzle(tx: Tx, args: { billId: string; previousTotal: Decimal; newTotal: Decimal; warehouseId: string; orderId: string }) {
   const [pay] = await tx.select().from(payment).where(eq(payment.billId, args.billId));
   if (!pay) throw new Error("Bill has no payment record");

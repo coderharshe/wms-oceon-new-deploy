@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useShortcuts, getShortcutKey, FINANCE_SHORTCUTS } from "@/lib/shortcuts";
 import { onFieldNavKeyDown, useEscapeKey } from "@/lib/keynav";
-import { nextIndex, carryIndex } from "@/lib/dropdown-nav";
+import { nextIndex } from "@/lib/dropdown-nav";
 import { AddProductModal } from "@/components/AddProductModal";
 import { useApiGet } from "@/lib/useApiGet";
 import { describeHttpError } from "@/lib/http-error";
@@ -12,12 +12,46 @@ import { fmtDateTime } from "@/lib/fmt";
 import type { BillingContext } from "@/app/api/customers/[id]/billing-context/route";
 import { Highlight } from "@/components/Highlight";
 import { barcodesForProduct } from "@/lib/barcode";
-import { submitBill, printLocalBill, getLocalBill, lineMoney as moneyOf, moneyTotals, BillAlreadySentError, type BillDisplay, type LocalBill } from "@/lib/offline-bills";
+import {
+  submitBill,
+  printLocalBill,
+  getLocalBill,
+  lineMoney as moneyOf,
+  moneyTotals,
+  BillAlreadySentError,
+  type BillDisplay,
+  type LocalBill,
+} from "@/lib/offline-bills";
 import { LocalBillOverlay } from "@/components/LocalBillView";
-import { ensureFreshCatalog, getCachedProducts, getCachedCustomers, searchProducts, rankProducts, searchCustomers, SEARCH_LIMIT, paintResults, type Painted, saveEntry, readEntry, clearEntry, ENTRY_KEYS } from "@/lib/offline-catalog";
+import {
+  ensureFreshCatalog,
+  getCachedProducts,
+  getCachedCustomers,
+  searchProducts,
+  rankProducts,
+  searchCustomers,
+  paintResults,
+  type Painted,
+  saveEntry,
+  readEntry,
+  clearEntry,
+  ENTRY_KEYS,
+} from "@/lib/offline-catalog";
+import { offlineSession } from "@/lib/offline-login";
+import { amountInWords } from "@/lib/invoice";
 
-type Customer = { id: string; shopName: string; mobile: string | null; type: "WHOLESALE" | "RETAIL"; ownerName?: string | null; address?: string | null; gstin?: string | null };
+type Customer = {
+  id: string;
+  shopName: string;
+  mobile: string | null;
+  type: "WHOLESALE" | "RETAIL";
+  ownerName?: string | null;
+  address?: string | null;
+  gstin?: string | null;
+};
+
 type Unit = { id: string; symbol: string };
+
 type Product = {
   id: string;
   sku: string;
@@ -27,11 +61,29 @@ type Product = {
   taxPercent: string;
   barcode?: string | null;
   baseUnit: Unit | null;
-  saleUnits: { unitId: string; isBaseUnit: boolean; isDefaultSaleUnit: boolean; factorToBase: string; wholesalePrice: string | null; retailPrice: string | null; barcode: string | null; unit: Unit | null }[];
+  saleUnits: {
+    unitId: string;
+    isBaseUnit: boolean;
+    isDefaultSaleUnit: boolean;
+    factorToBase: string;
+    wholesalePrice: string | null;
+    retailPrice: string | null;
+    barcode: string | null;
+    unit: Unit | null;
+  }[];
   available: number | null;
   matchedUnitId?: string | null;
 };
-type Line = { product: Product; quantity: number; unitId: string; discount: number; unitPrice?: number };
+
+type Line = {
+  product: Product;
+  quantity: number;
+  unitId: string;
+  discount: number; // in percent
+  unitPrice?: number;
+};
+
+export type PaymentTenderMode = "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
 
 const scrollToActive = (active: boolean) => (el: HTMLElement | null) => {
   if (active) el?.scrollIntoView({ block: "nearest" });
@@ -55,34 +107,57 @@ function baseQtyForProduct(lines: Line[], productId: string) {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const Key = ({ k }: { k: string }) => (
-  <kbd className="rounded border border-line bg-paper px-1 font-mono text-[11px] text-ink">{k}</kbd>
+  <kbd className="rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink shadow-xs">
+    {k}
+  </kbd>
 );
 
 const KEY_GUIDE: { title: string; keys: [string, string][] }[] = [
   {
-    title: "Move around",
-    keys: [["id:focus-customer", "customer search"], ["id:focus-product", "product search"], ["Enter", "next field"], ["Shift+Enter", "previous field"], ["Esc", "close / leave"], ["id:toggle-key-guide", "hide / show this panel"]],
+    title: "Navigation",
+    keys: [
+      ["id:focus-customer", "Customer search"],
+      ["id:focus-product", "Product / Barcode"],
+      ["Enter", "Next field"],
+      ["Shift+Enter", "Previous field"],
+      ["Esc", "Close / Leave"],
+      ["id:toggle-key-guide", "Hide / Show guide"],
+    ],
   },
   {
-    title: "Product search",
-    keys: [["↑ ↓", "pick a result"], ["Enter", "add it, cursor to Qty"], ["Enter (empty)", "go to Generate Bill"]],
+    title: "Product Search",
+    keys: [
+      ["↑ ↓", "Pick search item"],
+      ["Enter", "Add item & focus Qty"],
+      ["Enter (empty)", "Jump to Generate Bill"],
+    ],
   },
   {
-    title: "On a line",
-    keys: [["↑ ↓", "line above / below"], ["Tab", "Qty → Unit → Price → Disc"], ["Enter", "Qty → Unit (opens list) → next product"], ["Alt+L", "customer's last rate"], ["Ctrl+Delete", "remove line"]],
+    title: "Table Lines",
+    keys: [
+      ["↑ ↓", "Move between lines"],
+      ["Tab", "Qty → Unit → Price → Disc"],
+      ["Alt+L", "Recall customer's last rate"],
+      ["Ctrl+Delete", "Remove line item"],
+    ],
   },
   {
-    title: "Bill",
-    keys: [["id:toggle-selling-mode", "wholesale / retail"], ["id:hold-new-bill", "hold, start new bill"], ["Alt+1…9", "open a held bill"], ["id:submit-order", "generate bill"]],
+    title: "Billing Actions",
+    keys: [
+      ["id:toggle-selling-mode", "Wholesale / Retail mode"],
+      ["id:hold-new-bill", "Hold & start new bill"],
+      ["Alt+1…9", "Switch to held bill"],
+      ["id:submit-order", "Generate & print bill"],
+    ],
   },
 ];
 
 function zoneOf(el: EventTarget): string {
-  if (!(el instanceof HTMLElement)) return "Move around";
-  if (el.closest("tbody")) return "On a line";
-  if (el.getAttribute("placeholder")?.startsWith("Barcode")) return "Product search";
-  if (el.closest("[data-guide='bill']")) return "Bill";
-  return "Move around";
+  if (!(el instanceof HTMLElement)) return "Navigation";
+  if (el.closest("tbody")) return "Table Lines";
+  if (el.getAttribute("placeholder")?.startsWith("Barcode")) return "Product Search";
+  if (el.closest("[data-guide='bill']")) return "Billing Actions";
+  return "Navigation";
 }
 
 const WALK_IN = "CASH";
@@ -94,18 +169,54 @@ type SavedBasket = {
   sellingMode: "WHOLESALE" | "RETAIL";
   lines: Line[];
   notes: string;
-  unpaid?: boolean;
+  paymentMethod: PaymentTenderMode;
+  amountTendered?: string;
+  upiReference?: string;
+  bankReference?: string;
+  bankName?: string;
+  chequeNumber?: string;
+  chequeBank?: string;
+  chequeDueDate?: string;
   requestId: string | null;
 };
 
 export default function BillingNewOrderPage() {
   const router = useRouter();
+
+  // Clock & Employee info
+  const [clock, setClock] = useState<string>("");
+  const { data: authSession } = useApiGet<{ authenticated: boolean; user: { id: string; staffId: string; name: string; role: string } }>("/api/auth/me");
+  const activeStaff = authSession?.user ?? offlineSession() ?? { staffId: "POS-1", name: "Billing Staff", role: "BILLING" };
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setClock(
+        now.toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Customer state
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [details, setDetails] = useState({ shopName: "", mobile: "", ownerName: WALK_IN, address: "", gstin: "" });
   const [showExtraCustomerDetails, setShowExtraCustomerDetails] = useState(false);
 
+  // Products & Table state
   const [sellingMode, setSellingMode] = useState<"WHOLESALE" | "RETAIL">("WHOLESALE");
   const [productQuery, setProductQuery] = useState("");
   const [productResults, setProductResults] = useState<Product[]>([]);
@@ -114,7 +225,19 @@ export default function BillingNewOrderPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [focusQtyIdx, setFocusQtyIdx] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
-  const [unpaid, setUnpaid] = useState(false);
+
+  // Payment Tender State
+  const [paymentMethod, setPaymentMethod] = useState<PaymentTenderMode>("CASH");
+  const [amountTendered, setAmountTendered] = useState<string>("");
+  const [upiReference, setUpiReference] = useState<string>("");
+  const [bankReference, setBankReference] = useState<string>("");
+  const [bankName, setBankName] = useState<string>("HDFC Bank");
+  const [chequeNumber, setChequeNumber] = useState<string>("");
+  const [chequeBank, setChequeBank] = useState<string>("");
+  const [chequeDueDate, setChequeDueDate] = useState<string>("");
+  const [showUpiQr, setShowUpiQr] = useState(false);
+
+  // Form submission & offline queue
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [allUnits, setAllUnits] = useState<(Unit & { name: string })[]>([]);
@@ -128,6 +251,7 @@ export default function BillingNewOrderPage() {
   function currentRequestId() {
     return (requestIdRef.current ??= crypto.randomUUID());
   }
+
   const productInputRef = useRef<HTMLInputElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -139,6 +263,7 @@ export default function BillingNewOrderPage() {
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
   const [localBillId, setLocalBillId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ requestId: string; text: string } | null>(null);
+
   const alreadySaved = (b: LocalBill) => ({
     requestId: b.requestId,
     text: `This bill was already saved as ${b.server?.billNumber ?? b.offlineRef}${b.server?.billNumber ? ` (${b.offlineRef})` : ""} — changes to it go through Modify Bill.`,
@@ -168,7 +293,7 @@ export default function BillingNewOrderPage() {
     if (!recovered.current) return;
     if (lines.length === 0) clearEntry(ENTRY_KEYS.newOrder);
     else saveEntry(ENTRY_KEYS.newOrder, snapshot());
-  }, [details, customer, customerQuery, sellingMode, lines, notes, unpaid]);
+  }, [details, customer, customerQuery, sellingMode, lines, notes, paymentMethod, amountTendered, upiReference, bankReference, bankName, chequeNumber, chequeBank, chequeDueDate]);
 
   const [held, setHeld] = useState<SavedBasket[]>([]);
   useEffect(() => {
@@ -178,7 +303,23 @@ export default function BillingNewOrderPage() {
   }, [held]);
 
   function snapshot(): SavedBasket {
-    return { details, customer, customerQuery, sellingMode, lines, notes, unpaid, requestId: requestIdRef.current };
+    return {
+      details,
+      customer,
+      customerQuery,
+      sellingMode,
+      lines,
+      notes,
+      paymentMethod,
+      amountTendered,
+      upiReference,
+      bankReference,
+      bankName,
+      chequeNumber,
+      chequeBank,
+      chequeDueDate,
+      requestId: requestIdRef.current,
+    };
   }
 
   function loadBasket(b: SavedBasket | null) {
@@ -188,7 +329,14 @@ export default function BillingNewOrderPage() {
     setSellingMode(b?.sellingMode ?? "WHOLESALE");
     setLines(b?.lines ?? []);
     setNotes(b?.notes ?? "");
-    setUnpaid(b?.unpaid ?? false);
+    setPaymentMethod(b?.paymentMethod ?? "CASH");
+    setAmountTendered(b?.amountTendered ?? "");
+    setUpiReference(b?.upiReference ?? "");
+    setBankReference(b?.bankReference ?? "");
+    setBankName(b?.bankName ?? "HDFC Bank");
+    setChequeNumber(b?.chequeNumber ?? "");
+    setChequeBank(b?.chequeBank ?? "");
+    setChequeDueDate(b?.chequeDueDate ?? "");
     requestIdRef.current = b?.requestId ?? null;
     setProductQuery("");
     setRestoredAt(null);
@@ -248,54 +396,57 @@ export default function BillingNewOrderPage() {
 
   const paintedCustomers = useRef<Painted<Customer>>({ q: "", rows: [] });
   const paintedProducts = useRef<Painted<Product>>({ q: "", rows: [] });
-  function paintCustomers(q: string, rows: Customer[], fromCache = false) {
-    paintedCustomers.current = paintResults(paintedCustomers.current, q, rows, fromCache);
-    setCustomerResults(paintedCustomers.current.rows);
+
+  function paintCustomers(q: string, rows: Customer[]) {
+    const p = paintResults(paintedCustomers.current, q, rows);
+    paintedCustomers.current = p;
+    setCustomerResults(p.rows);
+    setCustomerIdx(0);
   }
-  function paintProducts(q: string, rows: Product[], fromCache = false) {
-    paintedProducts.current = paintResults(paintedProducts.current, q, rows, fromCache);
-    setProductResults(paintedProducts.current.rows);
+
+  function paintProducts(q: string, rows: Product[]) {
+    const p = paintResults(paintedProducts.current, q, rows);
+    paintedProducts.current = p;
+    setProductResults(p.rows);
+    setProductIdx(0);
   }
 
   useEffect(() => {
-    if (!customerQuery.trim() || customer) {
+    if (!customerQuery.trim()) {
       paintedCustomers.current = { q: "", rows: [] };
-      return setCustomerResults([]);
+      setCustomerResults([]);
+      return;
     }
-    paintCustomers(customerQuery, searchCustomers(cachedCustomers, customerQuery) as Customer[], true);
+    const SEARCH_LIMIT = 25;
+    const local = searchCustomers(cachedCustomers, customerQuery);
+    if (local.length > 0) paintCustomers(customerQuery, local as Customer[]);
+    if (!navigator.onLine) return;
     const ac = new AbortController();
     const t = setTimeout(() => {
-      fetch(`/api/customers?q=${encodeURIComponent(customerQuery)}`, { signal: ac.signal })
+      fetch(`/api/customers?q=${encodeURIComponent(customerQuery)}&limit=${SEARCH_LIMIT}`, { signal: ac.signal })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => Array.isArray(d) && paintCustomers(customerQuery, d))
+        .then((d) => Array.isArray(d) && paintCustomers(customerQuery, d as Customer[]))
         .catch(() => {});
     }, 150);
     return () => {
       clearTimeout(t);
       ac.abort();
     };
-  }, [customerQuery, customer, cachedCustomers]);
-
-  const shownCustomers = useRef<Customer[]>([]);
-  const shownProducts = useRef<Product[]>([]);
-  useEffect(() => {
-    setCustomerIdx((i) => Math.max(0, carryIndex(shownCustomers.current, i, customerResults)));
-    shownCustomers.current = customerResults;
-  }, [customerResults]);
-  useEffect(() => {
-    setProductIdx((i) => carryIndex(shownProducts.current, i, productResults));
-    shownProducts.current = productResults;
-  }, [productResults]);
+  }, [customerQuery, cachedCustomers]);
 
   useEffect(() => {
     if (!productQuery.trim()) {
       paintedProducts.current = { q: "", rows: [] };
-      return setProductResults([]);
+      setProductResults([]);
+      return;
     }
-    paintProducts(productQuery, searchProducts(cachedProducts, productQuery).map((p) => ({ ...p, available: null })) as Product[], true);
+    const SEARCH_LIMIT = 25;
+    const local = searchProducts(cachedProducts, productQuery);
+    if (local.length > 0) paintProducts(productQuery, local as unknown as Product[]);
+    if (!navigator.onLine) return;
     const ac = new AbortController();
     const t = setTimeout(() => {
-      fetch(`/api/products?q=${encodeURIComponent(productQuery)}`, { signal: ac.signal })
+      fetch(`/api/products?q=${encodeURIComponent(productQuery)}&limit=${SEARCH_LIMIT}`, { signal: ac.signal })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => Array.isArray(d) && paintProducts(productQuery, rankProducts(d as Product[], productQuery)))
         .catch(() => {});
@@ -480,7 +631,7 @@ export default function BillingNewOrderPage() {
           id: `new-${Date.now()}`,
           shopName: isNum ? `Customer ${trimmed}` : trimmed,
           ownerName: isNum ? `Customer ${trimmed}` : trimmed,
-          mobile: isNum ? trimmed : (details.mobile || null),
+          mobile: isNum ? trimmed : details.mobile || null,
           address: details.address || null,
           gstin: details.gstin || null,
           type: sellingMode,
@@ -550,9 +701,7 @@ export default function BillingNewOrderPage() {
         saleUnits: [...line.product.saleUnits.map((su) => (f.makeDefault ? { ...su, isDefaultSaleUnit: false } : su)), added],
       };
       return prev.map((l, i) =>
-        l.product.id === product.id
-          ? { ...l, product, ...(i === f.idx ? { unitId: added.unitId, unitPrice: undefined } : {}) }
-          : l
+        l.product.id === product.id ? { ...l, product, ...(i === f.idx ? { unitId: added.unitId, unitPrice: undefined } : {}) } : l
       );
     });
     setUnitForm(null);
@@ -589,6 +738,11 @@ export default function BillingNewOrderPage() {
   const { subtotal, discountTotal, taxTotal, total } = moneyTotals(money);
   const overLimitBy = ctx?.creditLimit != null ? round2(ctx.outstanding + total - ctx.creditLimit) : 0;
 
+  // Cash change computation
+  const tenderedNum = Number(amountTendered) || 0;
+  const changeDue = paymentMethod === "CASH" && tenderedNum >= total ? round2(tenderedNum - total) : 0;
+  const isCreditSale = paymentMethod === "CREDIT";
+
   function billed() {
     requestIdRef.current = null;
     clearEntry(ENTRY_KEYS.newOrder);
@@ -597,20 +751,36 @@ export default function BillingNewOrderPage() {
   async function submit() {
     if (submittingRef.current) return;
     if (lines.length === 0) {
-      setError("Add at least one product");
+      setError("Add at least one product to generate a bill");
       return;
     }
     submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     const cust = customerPayload();
+
+    const paymentDetails = {
+      amountReceived: paymentMethod === "CASH" ? (tenderedNum > 0 ? tenderedNum : total) : total,
+      changeGiven: changeDue,
+      upiReference: paymentMethod === "UPI" ? upiReference.trim() || undefined : undefined,
+      bankReference: paymentMethod === "BANK_TRANSFER" ? bankReference.trim() || undefined : undefined,
+      bankName: paymentMethod === "BANK_TRANSFER" ? bankName.trim() || undefined : undefined,
+      chequeNumber: paymentMethod === "CHEQUE" ? chequeNumber.trim() || undefined : undefined,
+      chequeBank: paymentMethod === "CHEQUE" ? chequeBank.trim() || undefined : undefined,
+      chequeDueDate: paymentMethod === "CHEQUE" && chequeDueDate ? chequeDueDate : undefined,
+      notes: notes.trim() || undefined,
+    };
+
     const payload = {
       customer: cust,
       sellingMode,
       notes: notes || undefined,
-      ...(unpaid ? { unpaid: true } : {}),
+      unpaid: isCreditSale,
+      paymentMethod,
+      paymentDetails,
       items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity, unitId: l.unitId, discount: l.discount, unitPrice: rateFor(l) })),
     };
+
     const display: BillDisplay = {
       customerName: cust.ownerName,
       customerMobile: cust.mobile ?? null,
@@ -630,7 +800,12 @@ export default function BillingNewOrderPage() {
       discountTotal,
       taxTotal,
       total,
+      paymentMethod,
+      paymentDetails,
+      employeeName: activeStaff.name,
+      employeeStaffId: activeStaff.staffId,
     };
+
     const requestId = currentRequestId();
     saveEntry(ENTRY_KEYS.newOrder, snapshot());
     const bill = await submitBill({ requestId, payload, display }).catch((err: unknown) => {
@@ -641,6 +816,7 @@ export default function BillingNewOrderPage() {
       } else setError(`Could not save the bill on this PC: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     });
+
     submittingRef.current = false;
     setSubmitting(false);
     if (!bill) return;
@@ -662,7 +838,7 @@ export default function BillingNewOrderPage() {
   async function saveDraft() {
     if (submittingRef.current) return;
     if (lines.length === 0) {
-      setError("Add at least one product");
+      setError("Add at least one product to save draft");
       return;
     }
     if (!navigator.onLine) {
@@ -688,6 +864,7 @@ export default function BillingNewOrderPage() {
         clientRequestId: currentRequestId(),
       }),
     }).catch(() => null);
+
     submittingRef.current = false;
     setSubmitting(false);
     if (!res) {
@@ -743,7 +920,7 @@ export default function BillingNewOrderPage() {
 
   const [remapped, setRemapped] = useState<Record<string, string>>({});
   useEffect(() => setRemapped(Object.fromEntries(FINANCE_SHORTCUTS.map((s) => [s.id, getShortcutKey(s.id)]))), []);
-  const [guideZone, setGuideZone] = useState("Move around");
+  const [guideZone, setGuideZone] = useState("Navigation");
   const GUIDE_HIDDEN_KEY = "new-order:key-guide-hidden";
   const [guideHidden, setGuideHidden] = useState(false);
   useEffect(() => {
@@ -767,660 +944,1004 @@ export default function BillingNewOrderPage() {
   }
 
   return (
-    <div className={`mx-auto grid items-start gap-3 ${guideHidden ? "max-w-4xl" : "max-w-6xl lg:grid-cols-[minmax(0,1fr)_15rem]"}`}>
-    <div
-      className="space-y-3"
-      ref={formRef}
-      onKeyDown={(e) => {
-        if (e.altKey && !e.ctrlKey && /^[1-9]$/.test(e.key)) {
-          e.preventDefault();
-          return switchToHeld(Number(e.key) - 1);
-        }
-        onFieldNavKeyDown(e, formRef.current);
-      }}
-      onFocus={(e) => setGuideZone(zoneOf(e.target))}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-lg font-semibold">New Bill</h1>
-        {held.map((b, i) => (
-          <button key={i} type="button" tabIndex={-1} className="btn text-xs" onClick={() => switchToHeld(i)} title="Swap this bill in; the one on screen is held in its place">
-            Held {i + 1}: {billLabel(b)} (Alt+{i + 1})
-          </button>
-        ))}
-        <button type="button" tabIndex={-1} className="btn text-xs" onClick={holdAndStartNew}>
-          Hold &amp; new bill ({keyFor("hold-new-bill")})
-        </button>
-        {guideHidden && (
-          <button type="button" tabIndex={-1} className="btn text-xs" onClick={toggleGuide}>
-            Show shortcuts ({keyFor("toggle-key-guide")})
-          </button>
-        )}
-      </div>
-
-      {notice && (
-        <p className="flex items-center justify-between gap-2 border border-bad bg-paper p-2 text-sm" role="alert">
-          <span>{notice.text}</span>
-          <span className="flex gap-2">
-            <button className="btn text-xs" onClick={() => setLocalBillId(notice.requestId)}>
-              Open it
-            </button>
-            <button className="btn text-xs" onClick={() => setNotice(null)}>
-              Dismiss
-            </button>
-          </span>
-        </p>
-      )}
-
-      {restoredAt != null && lines.length > 0 && (
-        <p className="flex items-center justify-between gap-2 border border-line bg-paper p-2 text-sm">
-          <span>
-            Picked up where you left off — {lines.length} {lines.length === 1 ? "product" : "products"} from{" "}
-            {fmtDateTime(new Date(restoredAt).toISOString())}. Nothing has been billed yet.
-          </span>
-          <button className="btn text-xs" onClick={() => { setLines([]); setNotes(""); billed(); setRestoredAt(null); }}>
-            Start a fresh bill
-          </button>
-        </p>
-      )}
-
-      {/* Customer Single Unified Bar & Inline Details */}
-      {customer ? (
-        <div className="card relative border-accent/40 bg-accent/5 p-3 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className={`mx-auto grid items-start gap-4 ${guideHidden ? "max-w-6xl" : "max-w-7xl lg:grid-cols-[minmax(0,1fr)_16rem]"}`}>
+      <div
+        className="space-y-4"
+        ref={formRef}
+        onKeyDown={(e) => {
+          if (e.altKey && !e.ctrlKey && /^[1-9]$/.test(e.key)) {
+            e.preventDefault();
+            return switchToHeld(Number(e.key) - 1);
+          }
+          onFieldNavKeyDown(e, formRef.current);
+        }}
+        onFocus={(e) => setGuideZone(zoneOf(e.target))}
+      >
+        {/* Header Ribbon: Title, Clock, Billed By, Held Bills, Shortcuts */}
+        <div className="card bg-paper border border-line p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-surface font-bold text-xs">
-                {customer.shopName.slice(0, 2).toUpperCase()}
-              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white font-black text-lg shadow-sm">
+                🧾
+              </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-ink">{customer.shopName}</span>
-                  <span className="badge bg-ink text-surface text-[10px]">{customer.type}</span>
+                  <h1 className="text-xl font-bold text-ink">New Bill / POS Terminal</h1>
+                  <span className="badge bg-accent/15 text-accent font-semibold text-xs border border-accent/30">
+                    Live Counter
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-3 text-xs text-muted">
-                  {details.mobile && <span>📞 {details.mobile}</span>}
-                  {details.address && <span>📍 {details.address}</span>}
-                  {details.gstin && <span>🏛️ GSTIN: {details.gstin}</span>}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted mt-0.5">
+                  <span>📅 {clock || "Loading clock..."}</span>
+                  <span>👤 Cashier: <strong className="text-ink">{activeStaff.name}</strong> ({activeStaff.staffId})</span>
+                  <span>🏷️ Mode: <strong className="text-accent">{sellingMode}</strong></span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex flex-wrap items-center gap-2">
+              {held.map((b, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  tabIndex={-1}
+                  className="btn text-xs font-medium border-warn/40 bg-warn/10 text-ink hover:bg-warn/20"
+                  onClick={() => switchToHeld(i)}
+                  title="Swap this held bill in"
+                >
+                  ⏸️ Held {i + 1}: {billLabel(b)} (Alt+{i + 1})
+                </button>
+              ))}
               <button
                 type="button"
+                tabIndex={-1}
                 className="btn text-xs font-semibold hover:bg-surface-hi"
+                onClick={holdAndStartNew}
+              >
+                ⏸️ Hold &amp; New ({keyFor("hold-new-bill")})
+              </button>
+              {guideHidden && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="btn text-xs hover:bg-surface-hi"
+                  onClick={toggleGuide}
+                >
+                  ⌨️ Shortcuts ({keyFor("toggle-key-guide")})
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {notice && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-bad/50 bg-bad/10 p-3 text-sm text-bad" role="alert">
+            <span className="font-medium">{notice.text}</span>
+            <div className="flex gap-2">
+              <button className="btn text-xs font-semibold" onClick={() => setLocalBillId(notice.requestId)}>
+                Open Bill
+              </button>
+              <button className="btn text-xs" onClick={() => setNotice(null)}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {restoredAt != null && lines.length > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/5 p-3 text-sm">
+            <span>
+              Picked up where you left off — {lines.length} {lines.length === 1 ? "product" : "products"} from{" "}
+              {fmtDateTime(new Date(restoredAt).toISOString())}.
+            </span>
+            <button className="btn text-xs font-semibold" onClick={() => { setLines([]); setNotes(""); billed(); setRestoredAt(null); }}>
+              Start Fresh Bill
+            </button>
+          </div>
+        )}
+
+        {/* 1. Customer / Retailer Card */}
+        {customer ? (
+          <div className="card relative border-accent/50 bg-accent/5 p-4 space-y-3 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-white font-bold text-sm shadow-xs">
+                  {customer.shopName.slice(0, 2).toUpperCase()}
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base text-ink">{customer.shopName}</span>
+                    <span className="badge bg-ink text-surface text-xs font-semibold">{customer.type}</span>
+                    {customer.ownerName && customer.ownerName !== customer.shopName && (
+                      <span className="text-xs text-muted">({customer.ownerName})</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted mt-0.5">
+                    {details.mobile && <span>📞 {details.mobile}</span>}
+                    {details.address && <span>📍 {details.address}</span>}
+                    {details.gstin && <span>🏛️ GSTIN: {details.gstin}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn text-xs font-semibold hover:bg-surface-hi"
+                  onClick={() => setShowExtraCustomerDetails((v) => !v)}
+                >
+                  {showExtraCustomerDetails ? "Hide Fields" : "✏️ Edit / GSTIN"}
+                </button>
+                <button
+                  type="button"
+                  className="btn text-xs font-semibold hover:bg-surface-hi"
+                  onClick={() => {
+                    setCustomer(null);
+                    setCustomerQuery("");
+                    setDetails({ shopName: "", mobile: "", ownerName: WALK_IN, address: "", gstin: "" });
+                    setTimeout(() => customerInputRef.current?.focus(), 50);
+                  }}
+                >
+                  Change Customer ({keyFor("focus-customer")})
+                </button>
+                <button
+                  type="button"
+                  className="btn text-xs text-muted hover:text-bad"
+                  onClick={() => {
+                    setCustomer(null);
+                    setCustomerQuery("");
+                    setDetails({ shopName: "", mobile: "", ownerName: WALK_IN, address: "", gstin: "" });
+                    setTimeout(() => productInputRef.current?.focus(), 50);
+                  }}
+                  title="Switch to Walk-in Cash"
+                >
+                  ✕ Walk-in Cash
+                </button>
+              </div>
+            </div>
+
+            {showExtraCustomerDetails && (
+              <div className="grid grid-cols-1 gap-3 border-t border-line/60 pt-3 sm:grid-cols-3 text-xs">
+                <div>
+                  <label className="mb-1 block font-semibold text-muted">Mobile Number</label>
+                  <input
+                    className="w-full text-sm"
+                    inputMode="numeric"
+                    placeholder="10-digit mobile"
+                    value={details.mobile}
+                    onChange={(e) => setDetails({ ...details, mobile: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-semibold text-muted">Address / City</label>
+                  <input
+                    className="w-full text-sm"
+                    placeholder="City / location"
+                    value={details.address}
+                    onChange={(e) => setDetails({ ...details, address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-semibold text-muted">GSTIN</label>
+                  <input
+                    className="w-full text-sm uppercase"
+                    placeholder="22AAAAA0000A1Z5"
+                    value={details.gstin}
+                    onChange={(e) => setDetails({ ...details, gstin: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {ctx && (
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-line/60 pt-2.5 text-xs text-muted">
+                <span className={ctx.outstanding > 0 ? "font-bold text-bad" : "text-muted"}>
+                  {ctx.outstanding > 0 ? `⚠️ Current Ledger Due: ₹${ctx.outstanding.toFixed(2)}` : "✅ Zero outstanding balance"}
+                </span>
+                {ctx.creditLimit != null && (
+                  <span className={overLimitBy > 0 ? "font-bold text-bad" : "text-muted font-medium"}>
+                    Credit Limit: ₹{ctx.creditLimit.toFixed(2)}
+                    {overLimitBy > 0 ? ` (Over by ₹${overLimitBy.toFixed(2)})` : ` (₹${Math.max(0, ctx.creditLimit - ctx.outstanding).toFixed(2)} available)`}
+                  </span>
+                )}
+                {ctx.lastBill && (
+                  <span>
+                    Last Bill: {ctx.lastBill.orderNumber} (₹{Number(ctx.lastBill.total).toFixed(2)}) on {fmtDateTime(ctx.lastBill.at)}
+                  </span>
+                )}
+                {ctx.lastRates.length > 0 && (
+                  <span className="text-accent font-semibold italic">💡 Alt+L on any line recalls previous rate</span>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="card relative space-y-2 p-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-ink">
+                👤 Customer / Retailer ({keyFor("focus-customer")}) — Search Name / Phone / GSTIN
+              </label>
+              <button
+                type="button"
+                className="text-xs text-accent font-semibold hover:underline"
                 onClick={() => setShowExtraCustomerDetails((v) => !v)}
               >
-                {showExtraCustomerDetails ? "Hide Details" : "Edit / Extra Details"}
+                {showExtraCustomerDetails ? "Hide Extra Fields" : "+ Optional Phone / GSTIN"}
               </button>
-              <button
-                type="button"
-                className="btn text-xs font-semibold hover:bg-surface-hi"
-                onClick={() => {
-                  setCustomer(null);
-                  setCustomerQuery("");
-                  setDetails({ shopName: "", mobile: "", ownerName: WALK_IN, address: "", gstin: "" });
-                  setTimeout(() => customerInputRef.current?.focus(), 50);
-                }}
+            </div>
+            <div className="flex gap-2">
+              <input
+                ref={customerInputRef}
+                className="flex-1 text-base font-medium"
+                autoFocus
+                placeholder="Type customer or shop name, phone number, GSTIN (Press Enter to select or start Cash sale)…"
+                value={customerQuery}
+                onChange={(e) => setCustomerQuery(e.target.value)}
+                onKeyDown={onCustomerKeyDown}
+              />
+            </div>
+
+            {showExtraCustomerDetails && (
+              <div className="grid grid-cols-1 gap-3 border-t border-line pt-3 sm:grid-cols-3 text-xs">
+                <div>
+                  <label className="mb-1 block font-semibold text-muted">Mobile Number</label>
+                  <input
+                    className="w-full text-sm"
+                    inputMode="numeric"
+                    placeholder="10-digit number"
+                    value={details.mobile}
+                    onChange={(e) => setDetails({ ...details, mobile: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-semibold text-muted">Address / City</label>
+                  <input
+                    className="w-full text-sm"
+                    placeholder="Area / city"
+                    value={details.address}
+                    onChange={(e) => setDetails({ ...details, address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-semibold text-muted">GSTIN</label>
+                  <input
+                    className="w-full text-sm uppercase"
+                    placeholder="Optional GSTIN"
+                    value={details.gstin}
+                    onChange={(e) => setDetails({ ...details, gstin: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {customerResults.length > 0 && (
+              <div
+                role="listbox"
+                className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-line bg-paper shadow-xl"
               >
-                Change (F3)
-              </button>
-              <button
-                type="button"
-                className="btn text-xs text-muted hover:text-bad"
-                onClick={() => {
-                  setCustomer(null);
-                  setCustomerQuery("");
-                  setDetails({ shopName: "", mobile: "", ownerName: WALK_IN, address: "", gstin: "" });
-                  setTimeout(() => productInputRef.current?.focus(), 50);
-                }}
-                title="Switch to Walk-in Cash"
-              >
-                ✕ Switch to Cash
-              </button>
-            </div>
-          </div>
-
-          {showExtraCustomerDetails && (
-            <div className="grid grid-cols-1 gap-2 border-t border-line/60 pt-2 sm:grid-cols-3 text-xs">
-              <div>
-                <label className="mb-1 block font-semibold text-muted">Mobile Number</label>
-                <input
-                  className="w-full"
-                  inputMode="numeric"
-                  placeholder="10-digit mobile"
-                  value={details.mobile}
-                  onChange={(e) => setDetails({ ...details, mobile: e.target.value })}
-                />
+                {customerResults.map((c, i) => (
+                  <button
+                    key={c.id}
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={i === customerIdx}
+                    ref={scrollToActive(i === customerIdx)}
+                    className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-surface-hi ${
+                      i === customerIdx ? "bg-accent/15 font-semibold ring-1 ring-inset ring-accent" : ""
+                    }`}
+                    onClick={() => selectCustomer(c)}
+                  >
+                    <div>
+                      <span className="font-bold text-ink"><Highlight text={c.shopName} q={customerQuery} /></span>
+                      {c.mobile && <span className="text-xs text-muted"> · 📞 <Highlight text={c.mobile} q={customerQuery} /></span>}
+                      {c.gstin && <span className="text-xs text-muted"> · 🏛️ <Highlight text={c.gstin} q={customerQuery} /></span>}
+                    </div>
+                    <span className="badge text-xs bg-surface-hi text-muted font-semibold">{c.type}</span>
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="mb-1 block font-semibold text-muted">Address</label>
-                <input
-                  className="w-full"
-                  placeholder="City / location"
-                  value={details.address}
-                  onChange={(e) => setDetails({ ...details, address: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block font-semibold text-muted">GSTIN</label>
-                <input
-                  className="w-full uppercase"
-                  placeholder="22AAAAA0000A1Z5"
-                  value={details.gstin}
-                  onChange={(e) => setDetails({ ...details, gstin: e.target.value.toUpperCase() })}
-                />
-              </div>
-            </div>
-          )}
-
-          {ctx && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line/60 pt-2 text-xs text-muted">
-              <span className={ctx.outstanding > 0 ? "font-semibold text-bad" : "text-muted"}>
-                {ctx.outstanding > 0 ? `Owes ₹${ctx.outstanding.toFixed(2)}` : "Nothing due"}
-              </span>
-              {ctx.creditLimit != null && (
-                <span className={overLimitBy > 0 ? "font-semibold text-bad" : "text-muted"}>
-                  Limit ₹{ctx.creditLimit.toFixed(2)}
-                  {overLimitBy > 0 ? ` — over by ₹${overLimitBy.toFixed(2)}` : ` — ₹${Math.max(0, ctx.creditLimit - ctx.outstanding).toFixed(2)} left`}
-                </span>
-              )}
-              {ctx.lastBill && (
-                <span>
-                  Last bill {ctx.lastBill.orderNumber}: ₹{Number(ctx.lastBill.total).toFixed(2)}
-                  {Number(ctx.lastBill.paid) >= Number(ctx.lastBill.total) ? " paid" : `, ₹${(Number(ctx.lastBill.total) - Number(ctx.lastBill.paid)).toFixed(2)} unpaid`}, {fmtDateTime(ctx.lastBill.at)}
-                </span>
-              )}
-              {ctx.lastPayment && (
-                <span>
-                  Last paid ₹{Number(ctx.lastPayment.amount).toFixed(2)} {ctx.lastPayment.method}, {fmtDateTime(ctx.lastPayment.at)}
-                </span>
-              )}
-              {ctx.lastRates.length > 0 && <span className="italic">Alt+L on any line to reuse their last rate</span>}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="card relative space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-muted">
-              Customer (F3) — Search Existing or Type New Name / Mobile
-            </label>
-            <button
-              type="button"
-              className="text-xs text-accent hover:underline"
-              onClick={() => setShowExtraCustomerDetails((v) => !v)}
-            >
-              {showExtraCustomerDetails ? "Hide Extra Fields" : "+ Optional Details (Phone/GSTIN)"}
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <input
-              ref={customerInputRef}
-              className="flex-1 text-sm font-medium"
-              autoFocus
-              placeholder="Type customer/shop name or mobile (press Enter to pick or start Cash sale)…"
-              value={customerQuery}
-              onChange={(e) => setCustomerQuery(e.target.value)}
-              onKeyDown={onCustomerKeyDown}
-            />
-          </div>
-
-          {showExtraCustomerDetails && (
-            <div className="grid grid-cols-1 gap-2 border-t border-line pt-2 sm:grid-cols-3 text-xs">
-              <div>
-                <label className="mb-1 block font-semibold text-muted">Mobile Number</label>
-                <input
-                  className="w-full"
-                  inputMode="numeric"
-                  placeholder="10-digit number"
-                  value={details.mobile}
-                  onChange={(e) => setDetails({ ...details, mobile: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block font-semibold text-muted">Address</label>
-                <input
-                  className="w-full"
-                  placeholder="Area / city"
-                  value={details.address}
-                  onChange={(e) => setDetails({ ...details, address: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block font-semibold text-muted">GSTIN</label>
-                <input
-                  className="w-full uppercase"
-                  placeholder="Optional"
-                  value={details.gstin}
-                  onChange={(e) => setDetails({ ...details, gstin: e.target.value.toUpperCase() })}
-                />
-              </div>
-            </div>
-          )}
-
-          {customerResults.length > 0 && (
-            <div role="listbox" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded border border-line bg-paper shadow-lg">
-              {customerResults.map((c, i) => (
-                <button
-                  key={c.id}
-                  role="option"
-                  tabIndex={-1}
-                  aria-selected={i === customerIdx}
-                  ref={scrollToActive(i === customerIdx)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-hi ${
-                    i === customerIdx ? "bg-accent/10 font-medium ring-1 ring-inset ring-accent" : ""
-                  }`}
-                  onClick={() => selectCustomer(c)}
-                >
-                  <div>
-                    <span className="font-semibold"><Highlight text={c.shopName} q={customerQuery} /></span>
-                    {c.mobile && <span className="text-xs text-muted"> · 📞 <Highlight text={c.mobile} q={customerQuery} /></span>}
-                  </div>
-                  <span className="badge text-[10px] bg-surface-hi text-muted">{c.type}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Product search */}
-      <div className="card relative">
-        <div className="mb-1 flex items-center justify-between">
-          <label className="text-xs text-muted">Product (F5) — name, SKU or scan barcode</label>
-          <div className="flex gap-1 text-xs" data-guide="bill">
-            <button
-              type="button"
-              className={`rounded px-2 py-0.5 ${sellingMode === "WHOLESALE" ? "bg-ink text-surface" : "bg-surface-hi"}`}
-              onClick={() => setSellingMode("WHOLESALE")}
-            >
-              Wholesale
-            </button>
-            <button
-              type="button"
-              className={`rounded px-2 py-0.5 ${sellingMode === "RETAIL" ? "bg-ink text-surface" : "bg-surface-hi"}`}
-              onClick={() => setSellingMode("RETAIL")}
-            >
-              Retail
-            </button>
-            <span className="text-muted">({keyFor("toggle-selling-mode")})</span>
-          </div>
-        </div>
-        <input
-          ref={productInputRef}
-          className="w-full"
-          placeholder="Barcode scan or type name/SKU…"
-          value={productQuery}
-          onChange={(e) => setProductQuery(e.target.value)}
-          onKeyDown={onProductKeyDown}
-        />
-        {(productResults.length > 0 || (canAddProduct && productQuery.trim())) && (
-          <div role="listbox" className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto border border-line bg-paper">
-            {productResults.map((p, i) => {
-              const defUnit = defaultUnitOf(p);
-              const outOfStock = p.available != null && p.available <= 0;
-              const lowStock = p.available != null && p.available > 0 && p.available <= 5;
-              return (
-                <button
-                  key={p.id}
-                  role="option"
-                  tabIndex={-1}
-                  aria-selected={i === productIdx}
-                  ref={scrollToActive(i === productIdx)}
-                  className={`flex w-full items-center justify-between px-2 py-1 text-left text-sm hover:bg-surface-hi ${
-                    i === productIdx ? "bg-accent/10 font-medium ring-1 ring-inset ring-accent" : ""
-                  }`}
-                  onClick={() => addProduct(p)}
-                >
-                  <span>
-                    <Highlight text={p.name} q={productQuery} />{" "}
-                    <span className="text-xs text-muted">
-                      (<Highlight text={p.sku} q={productQuery} />
-                      {p.barcode ? <> · <Highlight text={p.barcode} q={productQuery} /></> : ""})
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2 text-xs">
-                    {p.available != null && (
-                      <span className={outOfStock ? "text-bad font-semibold" : lowStock ? "text-warn" : "text-muted"}>
-                        {outOfStock ? "0 in stock" : `${p.available} ${unitSym(p.baseUnit)}`}
-                      </span>
-                    )}
-                    <span className="font-semibold">
-                      ₹{priceFor(p).toFixed(2)}
-                      {defUnit ? `/${unitSym(defUnit.unit)}` : ""}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-            {canAddProduct && productQuery.trim() && (
-              <button
-                type="button"
-                role="option"
-                tabIndex={-1}
-                aria-selected={productIdx === productResults.length}
-                ref={scrollToActive(productIdx === productResults.length)}
-                className={`flex w-full items-center justify-between border-t border-line px-2 py-1.5 text-left text-sm text-accent hover:bg-surface-hi ${
-                  productIdx === productResults.length ? "bg-accent/10 font-medium ring-1 ring-inset ring-accent" : ""
-                }`}
-                onClick={() => {
-                  if (allUnits.length === 0) {
-                    fetch("/api/admin/units")
-                      .then((r) => (r.ok ? r.json() : null))
-                      .then((d) => Array.isArray(d) && setAllUnits(d))
-                      .catch(() => {});
-                  }
-                  setShowAddProductModal(true);
-                }}
-              >
-                <span>+ Add &ldquo;{productQuery.trim()}&rdquo; to catalogue…</span>
-                <span className="text-xs text-muted">Creates product &amp; adds to bill</span>
-              </button>
             )}
           </div>
         )}
-      </div>
 
-      {/* Bill items table */}
-      <div className="card overflow-x-auto p-0">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs text-muted">
-              <th className="p-2">#</th>
-              <th className="p-2">Product</th>
-              <th className="p-2 w-24">Qty</th>
-              <th className="p-2 w-32">Unit</th>
-              <th className="p-2 w-24">Price (₹)</th>
-              <th className="p-2 w-20">Disc (%)</th>
-              <th className="p-2 text-right">Total (₹)</th>
-              <th className="p-2 w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.length === 0 && (
-              <tr>
-                <td colSpan={8} className="p-4 text-center text-xs text-muted">
-                  No items added yet. Type or scan a product above.
-                </td>
-              </tr>
-            )}
-            {lines.map((l, i) => {
-              const rowTotal = money[i]!;
-              const last = lastRateFor(l);
-              const isOverridden = l.unitPrice !== undefined;
-              return (
-                <tr
-                  key={`${l.product.id}-${l.unitId}-${i}`}
-                  className="border-b border-line hover:bg-surface-hi"
-                  onKeyDown={(e) => onLineKeyDown(e, i)}
+        {/* 2. SKU / Product Search Bar */}
+        <div className="card relative p-4 space-y-2 shadow-xs">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-ink">
+              📦 SKU / Product ({keyFor("focus-product")}) — Scan Barcode or Search by Name / SKU
+            </label>
+            <div className="flex items-center gap-1.5 text-xs" data-guide="bill">
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1 font-semibold transition-colors ${sellingMode === "WHOLESALE" ? "bg-ink text-surface" : "bg-surface-hi text-muted hover:text-ink"}`}
+                onClick={() => setSellingMode("WHOLESALE")}
+              >
+                Wholesale Price
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1 font-semibold transition-colors ${sellingMode === "RETAIL" ? "bg-ink text-surface" : "bg-surface-hi text-muted hover:text-ink"}`}
+                onClick={() => setSellingMode("RETAIL")}
+              >
+                Retail Price
+              </button>
+              <span className="text-muted ml-1">({keyFor("toggle-selling-mode")})</span>
+            </div>
+          </div>
+          <input
+            ref={productInputRef}
+            className="w-full text-base font-medium"
+            placeholder="Scan barcode scanner or type product name / SKU / category…"
+            value={productQuery}
+            onChange={(e) => setProductQuery(e.target.value)}
+            onKeyDown={onProductKeyDown}
+          />
+          {(productResults.length > 0 || (canAddProduct && productQuery.trim())) && (
+            <div role="listbox" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-80 overflow-y-auto rounded-lg border border-line bg-paper shadow-xl">
+              {productResults.map((p, i) => {
+                const defUnit = defaultUnitOf(p);
+                const outOfStock = p.available != null && p.available <= 0;
+                const lowStock = p.available != null && p.available > 0 && p.available <= 5;
+                return (
+                  <button
+                    key={p.id}
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={i === productIdx}
+                    ref={scrollToActive(i === productIdx)}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-hi ${
+                      i === productIdx ? "bg-accent/15 font-semibold ring-1 ring-inset ring-accent" : ""
+                    }`}
+                    onClick={() => addProduct(p)}
+                  >
+                    <span>
+                      <strong className="text-ink"><Highlight text={p.name} q={productQuery} /></strong>{" "}
+                      <span className="text-xs text-muted">
+                        (<Highlight text={p.sku} q={productQuery} />
+                        {p.barcode ? <> · <Highlight text={p.barcode} q={productQuery} /></> : ""})
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-3 text-xs">
+                      {p.available != null && (
+                        <span className={outOfStock ? "text-bad font-bold" : lowStock ? "text-warn font-semibold" : "text-muted"}>
+                          {outOfStock ? "0 in stock" : `${p.available} ${unitSym(p.baseUnit)} in stock`}
+                        </span>
+                      )}
+                      <span className="font-bold text-sm text-ink">
+                        ₹{priceFor(p).toFixed(2)}
+                        {defUnit ? `/${unitSym(defUnit.unit)}` : ""}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+              {canAddProduct && productQuery.trim() && (
+                <button
+                  type="button"
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={productIdx === productResults.length}
+                  ref={scrollToActive(productIdx === productResults.length)}
+                  className={`flex w-full items-center justify-between border-t border-line px-3 py-2.5 text-left text-sm text-accent hover:bg-surface-hi ${
+                    productIdx === productResults.length ? "bg-accent/15 font-bold ring-1 ring-inset ring-accent" : ""
+                  }`}
+                  onClick={() => {
+                    if (allUnits.length === 0) {
+                      fetch("/api/admin/units")
+                        .then((r) => (r.ok ? r.json() : null))
+                        .then((d) => Array.isArray(d) && setAllUnits(d))
+                        .catch(() => {});
+                    }
+                    setShowAddProductModal(true);
+                  }}
                 >
-                  <td className="p-2 text-xs text-muted">{i + 1}</td>
-                  <td className="p-2">
-                    <div className="font-medium">{l.product.name}</div>
-                    <div className="text-[11px] text-muted">{l.product.sku}</div>
-                  </td>
-                  <td className="p-2">
-                    <input
-                      ref={(el) => { qtyRefs.current[i] = el; }}
-                      data-col="qty"
-                      type="number"
-                      min="0.001"
-                      step="any"
-                      className="w-20"
-                      value={l.quantity || ""}
-                      onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                    />
-                  </td>
-                  <td className="p-2">
-                    <div className="flex items-center gap-1">
-                      <select
-                        data-unit
-                        className="w-24"
-                        value={l.unitId}
-                        onChange={(e) => updateLine(i, { unitId: e.target.value })}
-                      >
-                        {l.product.saleUnits.map((su) => (
-                          <option key={su.unitId} value={su.unitId}>
-                            {unitSym(su.unit)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        className="text-xs text-accent hover:underline"
-                        onClick={() => openUnitForm(i)}
-                        title="Add missing unit packaging"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-2">
-                    <input
-                      data-col="price"
-                      type="number"
-                      min="0"
-                      step="any"
-                      className={`w-24 ${isOverridden ? "border-accent font-semibold" : ""}`}
-                      value={l.unitPrice ?? priceFor(l.product, l.unitId)}
-                      onChange={(e) => updateLine(i, { unitPrice: e.target.value === "" ? undefined : Number(e.target.value) })}
-                      title={isOverridden ? "Custom price applied" : "Catalogue price"}
-                    />
-                    {last && !isOverridden && (
-                      <div className="text-[10px] text-muted cursor-pointer" onClick={() => updateLine(i, { unitPrice: last.unitPrice })}>
-                        Last: ₹{last.unitPrice.toFixed(2)}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    <input
-                      data-col="disc"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="any"
-                      className="w-16"
-                      value={l.discount || ""}
-                      onChange={(e) => updateLine(i, { discount: Number(e.target.value) })}
-                    />
-                  </td>
-                  <td className="p-2 text-right font-medium">₹{rowTotal.total.toFixed(2)}</td>
-                  <td className="p-2 text-center">
-                    <button
-                      type="button"
-                      className="text-muted hover:text-bad"
-                      onClick={() => removeLine(i)}
-                      title="Remove line (Ctrl+Delete)"
-                    >
-                      ✕
-                    </button>
+                  <span>+ Add &ldquo;{productQuery.trim()}&rdquo; to catalogue…</span>
+                  <span className="text-xs text-muted">Creates product &amp; adds directly to bill</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 3. SKU / Product Bill Items Table */}
+        <div className="card overflow-x-auto p-0 shadow-xs border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line bg-surface-hi text-left text-xs font-bold text-muted uppercase tracking-wider">
+                <th className="p-3 w-10">#</th>
+                <th className="p-3">SKU / Product</th>
+                <th className="p-3 w-28">Quantity</th>
+                <th className="p-3 w-36">Unit</th>
+                <th className="p-3 w-32">Selling Price (₹)</th>
+                <th className="p-3 w-24">Disc (%)</th>
+                <th className="p-3 w-28">GST Tax</th>
+                <th className="p-3 text-right w-36">Total (₹)</th>
+                <th className="p-3 w-12 text-center"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="p-8 text-center text-sm text-muted">
+                    <div className="text-2xl mb-1">🛒</div>
+                    No items in this bill yet. Scan a barcode or search for products above.
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              )}
+              {lines.map((l, i) => {
+                const rowTotal = money[i]!;
+                const last = lastRateFor(l);
+                const isOverridden = l.unitPrice !== undefined;
+                const taxPct = Number(l.product.taxPercent) || 0;
+                return (
+                  <tr
+                    key={`${l.product.id}-${l.unitId}-${i}`}
+                    className="border-b border-line/70 hover:bg-surface-hi/80 transition-colors"
+                    onKeyDown={(e) => onLineKeyDown(e, i)}
+                  >
+                    <td className="p-3 text-xs text-muted font-bold">{i + 1}</td>
+                    <td className="p-3">
+                      <div className="font-bold text-ink text-sm">{l.product.name}</div>
+                      <div className="text-xs text-muted">
+                        SKU: <span className="font-mono">{l.product.sku}</span>
+                        {l.product.barcode && <span> · Barcode: {l.product.barcode}</span>}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <input
+                        ref={(el) => { qtyRefs.current[i] = el; }}
+                        data-col="qty"
+                        type="number"
+                        min="0.001"
+                        step="any"
+                        className="w-24 text-sm font-bold"
+                        value={l.quantity || ""}
+                        onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                      />
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-1">
+                        <select
+                          data-unit
+                          className="w-28 text-sm font-medium"
+                          value={l.unitId}
+                          onChange={(e) => updateLine(i, { unitId: e.target.value })}
+                        >
+                          {l.product.saleUnits.map((su) => (
+                            <option key={su.unitId} value={su.unitId}>
+                              {unitSym(su.unit)} ({su.factorToBase}x)
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          className="btn text-xs px-2 py-1 text-accent font-bold"
+                          onClick={() => openUnitForm(i)}
+                          title="Add missing unit packaging"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <input
+                        data-col="price"
+                        type="number"
+                        min="0"
+                        step="any"
+                        className={`w-28 text-sm font-semibold ${isOverridden ? "border-accent text-accent ring-1 ring-accent" : ""}`}
+                        value={l.unitPrice ?? priceFor(l.product, l.unitId)}
+                        onChange={(e) => updateLine(i, { unitPrice: e.target.value === "" ? undefined : Number(e.target.value) })}
+                        title={isOverridden ? "Custom price applied" : "Catalogue master price"}
+                      />
+                      {last && !isOverridden && (
+                        <div
+                          className="text-[11px] text-muted cursor-pointer hover:text-accent mt-0.5"
+                          onClick={() => updateLine(i, { unitPrice: last.unitPrice })}
+                          title="Click to apply last billed rate"
+                        >
+                          Last: ₹{last.unitPrice.toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <input
+                        data-col="disc"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="any"
+                        className="w-20 text-sm"
+                        placeholder="0%"
+                        value={l.discount || ""}
+                        onChange={(e) => updateLine(i, { discount: Number(e.target.value) })}
+                      />
+                    </td>
+                    <td className="p-3 text-xs">
+                      <div className="font-semibold text-ink">{taxPct}% GST</div>
+                      <div className="text-muted">₹{rowTotal.tax.toFixed(2)}</div>
+                    </td>
+                    <td className="p-3 text-right font-bold text-base text-ink">
+                      ₹{rowTotal.total.toFixed(2)}
+                    </td>
+                    <td className="p-3 text-center">
+                      <button
+                        type="button"
+                        className="text-muted hover:text-bad font-bold text-sm"
+                        onClick={() => removeLine(i)}
+                        title="Remove line (Ctrl+Delete)"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Unit Form Modal */}
-      {unitForm && (
-        <div className="card space-y-2 border-accent bg-accent/5">
-          <div className="text-xs font-semibold">Add new packaging unit for {lines[unitForm.idx]?.product.name}</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <select
-              value={unitForm.unitId}
-              onChange={(e) => setUnitForm({ ...unitForm, unitId: e.target.value })}
-            >
-              <option value="">Select Unit</option>
-              {allUnits.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.symbol})
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder="Conversion factor (e.g. 10)"
-              type="number"
-              value={unitForm.factor}
-              onChange={(e) => setUnitForm({ ...unitForm, factor: e.target.value })}
-            />
-            <input
-              placeholder="Custom rate (optional)"
-              type="number"
-              value={unitForm.price}
-              onChange={(e) => setUnitForm({ ...unitForm, price: e.target.value })}
-            />
-            <div className="flex items-center gap-2">
-              <button className="btn btn-primary text-xs" disabled={unitForm.saving} onClick={saveUnit}>
-                {unitForm.saving ? "Saving…" : "Save Unit"}
-              </button>
-              <button className="btn text-xs" onClick={() => setUnitForm(null)}>
-                Cancel
-              </button>
+        {/* Unit Form Modal */}
+        {unitForm && (
+          <div className="card space-y-3 border-accent bg-accent/5 p-4 shadow-sm">
+            <div className="text-sm font-bold text-ink">
+              Add new packaging unit for &ldquo;{lines[unitForm.idx]?.product.name}&rdquo;
             </div>
-          </div>
-          {unitForm.error && <div className="text-xs text-bad">{unitForm.error}</div>}
-        </div>
-      )}
-
-      {/* Summary and Actions */}
-      <div className="card space-y-3" data-guide="bill">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <div className="text-xs text-muted">Subtotal</div>
-            <div className="text-base font-semibold">₹{subtotal.toFixed(2)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted">Discount</div>
-            <div className="text-base font-semibold text-warn">-₹{discountTotal.toFixed(2)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted">GST Tax</div>
-            <div className="text-base font-semibold">₹{taxTotal.toFixed(2)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted">Grand Total</div>
-            <div className="text-2xl font-bold text-good">₹{total.toFixed(2)}</div>
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs text-muted">Order Notes / Remark</label>
-          <input
-            className="w-full"
-            placeholder="Special instructions or delivery details…"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-
-        {overLimitBy > 0 && (
-          <div className="text-xs text-bad font-semibold">
-            ⚠️ Bill exceeds customer credit limit by ₹{overLimitBy.toFixed(2)}
-          </div>
-        )}
-
-        {shortLines.length > 0 && (
-          <p className="text-xs text-warn">
-            ⚠️ Billing more than available stock for {[...new Set(shortLines.map((l) => l.product.name))].join(", ")}. Stock will go negative.
-          </p>
-        )}
-
-        {zeroLines.length > 0 && (
-          <p className="text-xs text-warn">
-            ⚠️ Some items have 0 quantity or 0 rate. Bill will be flagged for manager review.
-          </p>
-        )}
-
-        <label className="flex w-fit items-center gap-2 text-sm">
-          <input type="checkbox" checked={unpaid} onChange={(e) => setUnpaid(e.target.checked)} />
-          Unpaid — Record on customer credit ledger (otherwise marked as settled)
-        </label>
-
-        {error && <div className="text-sm text-bad font-medium">{error}</div>}
-
-        <div className="flex gap-2">
-          <button className="btn w-40 py-2 text-base" disabled={submitting || lines.length === 0} onClick={saveDraft}>
-            Save as Draft
-          </button>
-          <button ref={submitButtonRef} className="btn-primary flex-1 py-2 text-base font-bold" disabled={submitting} onClick={submit}>
-            {submitting ? "Generating…" : "Generate Bill (F10)"}
-          </button>
-        </div>
-      </div>
-
-      {confirmDiscard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setConfirmDiscard(false)}>
-          <div className="w-full max-w-sm space-y-3 rounded border-2 border-bad bg-paper p-3" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-bad">Discard this bill?</h2>
-            <p className="text-sm">
-              {lines.length} {lines.length === 1 ? "product" : "products"} worth ₹{total.toFixed(2)} will be discarded.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button className="btn" onClick={() => setConfirmDiscard(false)}>
-                Keep editing (Esc)
-              </button>
-              <button
-                autoFocus
-                className="btn-danger"
-                onClick={() => {
-                  billed();
-                  router.push("/billing");
-                }}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 text-sm">
+              <select
+                className="w-full"
+                value={unitForm.unitId}
+                onChange={(e) => setUnitForm({ ...unitForm, unitId: e.target.value })}
               >
-                Discard (Enter)
-              </button>
+                <option value="">Select Unit</option>
+                {allUnits.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.symbol})
+                  </option>
+                ))}
+              </select>
+              <input
+                placeholder="Conversion factor (e.g. 10)"
+                type="number"
+                value={unitForm.factor}
+                onChange={(e) => setUnitForm({ ...unitForm, factor: e.target.value })}
+              />
+              <input
+                placeholder="Custom rate (optional)"
+                type="number"
+                value={unitForm.price}
+                onChange={(e) => setUnitForm({ ...unitForm, price: e.target.value })}
+              />
+              <div className="flex items-center gap-2">
+                <button className="btn-primary text-xs font-bold py-2 flex-1" disabled={unitForm.saving} onClick={saveUnit}>
+                  {unitForm.saving ? "Saving…" : "Save Unit"}
+                </button>
+                <button className="btn text-xs py-2" onClick={() => setUnitForm(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+            {unitForm.error && <div className="text-xs text-bad font-semibold">{unitForm.error}</div>}
+          </div>
+        )}
+
+        {/* 4. Payment Mode & Tender Recording Panel */}
+        <div className="card p-5 space-y-4 border border-line shadow-sm" data-guide="bill">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💳</span>
+              <h2 className="text-base font-bold text-ink">Payment Tender Mode</h2>
+            </div>
+            <span className="text-xs text-muted">
+              Select how this bill is paid or recorded on ledger
+            </span>
+          </div>
+
+          {/* Payment Method Selector Pills */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <button
+              type="button"
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
+                paymentMethod === "CASH"
+                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
+                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
+              }`}
+              onClick={() => setPaymentMethod("CASH")}
+            >
+              <span className="text-2xl">💵</span>
+              <span className="text-xs">Cash Payment</span>
+            </button>
+
+            <button
+              type="button"
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
+                paymentMethod === "UPI"
+                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
+                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
+              }`}
+              onClick={() => setPaymentMethod("UPI")}
+            >
+              <span className="text-2xl">📱</span>
+              <span className="text-xs">UPI / Dynamic QR</span>
+            </button>
+
+            <button
+              type="button"
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
+                paymentMethod === "BANK_TRANSFER"
+                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
+                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
+              }`}
+              onClick={() => setPaymentMethod("BANK_TRANSFER")}
+            >
+              <span className="text-2xl">🏦</span>
+              <span className="text-xs">NEFT / RTGS / Bank</span>
+            </button>
+
+            <button
+              type="button"
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
+                paymentMethod === "CHEQUE"
+                  ? "border-accent bg-accent/15 text-ink font-bold ring-2 ring-accent shadow-xs"
+                  : "border-line bg-paper text-muted hover:border-accent/40 hover:bg-surface-hi"
+              }`}
+              onClick={() => setPaymentMethod("CHEQUE")}
+            >
+              <span className="text-2xl">📑</span>
+              <span className="text-xs">Cheque / DD</span>
+            </button>
+
+            <button
+              type="button"
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-all ${
+                paymentMethod === "CREDIT"
+                  ? "border-bad bg-bad/15 text-bad font-bold ring-2 ring-bad shadow-xs"
+                  : "border-line bg-paper text-muted hover:border-bad/40 hover:bg-surface-hi"
+              }`}
+              onClick={() => setPaymentMethod("CREDIT")}
+            >
+              <span className="text-2xl">⏳</span>
+              <span className="text-xs">Credit (Unpaid)</span>
+            </button>
+          </div>
+
+          {/* Contextual Payment Inputs */}
+          {paymentMethod === "CASH" && (
+            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-center">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">
+                    Cash Amount Received from Customer (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    className="w-full text-lg font-bold"
+                    placeholder={`Exact ₹${total.toFixed(2)}`}
+                    value={amountTendered}
+                    onChange={(e) => setAmountTendered(e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      className="btn text-xs font-semibold py-1 px-2 hover:bg-accent/10"
+                      onClick={() => setAmountTendered(String(total))}
+                    >
+                      Exact (₹{total.toFixed(2)})
+                    </button>
+                    {[100, 200, 500, 2000].map((denom) => {
+                      const roundedUp = Math.ceil(total / denom) * denom;
+                      if (roundedUp <= total && roundedUp !== total) return null;
+                      return (
+                        <button
+                          key={denom}
+                          type="button"
+                          className="btn text-xs font-semibold py-1 px-2 hover:bg-accent/10"
+                          onClick={() => setAmountTendered(String(roundedUp))}
+                        >
+                          ₹{roundedUp}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col justify-center rounded-xl bg-paper p-4 border border-line text-center">
+                  <span className="text-xs font-semibold text-muted">Change / Return to Customer</span>
+                  <span className={`text-2xl font-black mt-1 ${changeDue > 0 ? "text-good" : "text-ink"}`}>
+                    ₹{changeDue.toFixed(2)}
+                  </span>
+                  {tenderedNum > 0 && tenderedNum < total && (
+                    <span className="text-xs text-bad font-semibold mt-1">
+                      Short by ₹{(total - tenderedNum).toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === "UPI" && (
+            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-center">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">
+                    UPI Transaction ID / UTR Reference (12 digits)
+                  </label>
+                  <input
+                    className="w-full text-base font-mono font-semibold uppercase"
+                    placeholder="e.g. 428192837482"
+                    value={upiReference}
+                    onChange={(e) => setUpiReference(e.target.value)}
+                  />
+                  <p className="text-xs text-muted mt-1">
+                    Enter the UTR reference number from the customer&apos;s UPI app screenshot or SMS.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center justify-center rounded-xl bg-paper p-4 border border-line text-center">
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      type="button"
+                      className="btn text-xs font-semibold"
+                      onClick={() => setShowUpiQr((v) => !v)}
+                    >
+                      {showUpiQr ? "Hide QR Code" : "📱 Show Counter QR Code"}
+                    </button>
+                  </div>
+                  {showUpiQr ? (
+                    <div className="p-2 bg-white rounded-lg border border-line flex flex-col items-center">
+                      <div className="text-xs text-slate-700 font-mono mb-1 font-bold">UPI Amount: ₹{total.toFixed(2)}</div>
+                      {/* Simple dynamic SVG QR representation */}
+                      <div className="w-36 h-36 bg-slate-100 flex items-center justify-center border border-dashed border-slate-300 rounded font-mono text-[10px] text-center p-2 text-slate-600">
+                        Scan with GPay / PhonePe / Paytm / Any UPI App
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-good font-semibold">
+                      ✅ Instant settlement recorded directly in UPI ledger upon billing.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === "BANK_TRANSFER" && (
+            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">Bank Name</label>
+                  <input
+                    className="w-full text-sm font-medium"
+                    placeholder="e.g. HDFC Bank, ICICI, SBI..."
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">
+                    UTR / IMPS / NEFT Reference Number
+                  </label>
+                  <input
+                    className="w-full text-sm font-mono font-semibold uppercase"
+                    placeholder="e.g. HDFCN240928001"
+                    value={bankReference}
+                    onChange={(e) => setBankReference(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted">
+                Direct bank transfer automatically logs into Bank Transactions ledger for end-of-day bank reconciliation.
+              </p>
+            </div>
+          )}
+
+          {paymentMethod === "CHEQUE" && (
+            <div className="rounded-xl border border-line bg-surface-hi/40 p-4 space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">Cheque Number (6 digits)</label>
+                  <input
+                    className="w-full text-sm font-mono font-bold"
+                    placeholder="e.g. 000412"
+                    value={chequeNumber}
+                    onChange={(e) => setChequeNumber(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">Issuing Bank</label>
+                  <input
+                    className="w-full text-sm font-medium"
+                    placeholder="e.g. State Bank of India"
+                    value={chequeBank}
+                    onChange={(e) => setChequeBank(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-ink">Cheque Date / Due Date</label>
+                  <input
+                    type="date"
+                    className="w-full text-sm font-medium"
+                    value={chequeDueDate}
+                    onChange={(e) => setChequeDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === "CREDIT" && (
+            <div className="rounded-xl border border-bad/40 bg-bad/5 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-bad font-bold text-sm">
+                <span>⚠️ Unpaid Credit Sale</span>
+              </div>
+              <p className="text-xs text-muted">
+                This bill total of <strong className="text-ink">₹{total.toFixed(2)}</strong> will be added to customer{" "}
+                <strong className="text-ink">{customer?.shopName || details.shopName || "Walk-in Retailer"}</strong>&apos;s accounts receivable ledger.
+              </p>
+              {ctx && (
+                <div className="text-xs text-bad font-semibold">
+                  Projected Customer Balance: ₹{(ctx.outstanding + total).toFixed(2)}
+                  {ctx.creditLimit != null && ` (Credit Limit: ₹${ctx.creditLimit.toFixed(2)})`}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 5. Financial Summary & Totals Breakdown */}
+        <div className="card p-5 space-y-4 border border-line shadow-sm" data-guide="bill">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 bg-surface-hi/50 p-4 rounded-xl border border-line/60">
+            <div>
+              <div className="text-xs font-bold text-muted uppercase">Gross Subtotal</div>
+              <div className="text-lg font-bold text-ink mt-0.5">₹{subtotal.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-muted uppercase">Total Discount</div>
+              <div className="text-lg font-bold text-warn mt-0.5">-₹{discountTotal.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-muted uppercase">Total GST Tax</div>
+              <div className="text-lg font-bold text-ink mt-0.5">+₹{taxTotal.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-muted uppercase">Grand Total</div>
+              <div className="text-3xl font-black text-good mt-0.5">₹{total.toFixed(2)}</div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Add Product Modal */}
-      {showAddProductModal && (
-        <div
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === "Escape") return closeAddProductModal();
-            onFieldNavKeyDown(e, e.currentTarget);
-          }}
-        >
-          <AddProductModal
-            initialName={productQuery.trim()}
-            onClose={closeAddProductModal}
-            onCreated={(p) => {
-              setShowAddProductModal(false);
-              addProduct(p);
-            }}
-          />
-        </div>
-      )}
-    </div>
+          {total > 0 && (
+            <div className="text-xs text-muted italic">
+              <strong>In Words:</strong> {amountInWords(total)} Rupees Only
+            </div>
+          )}
 
-    {localBillId && <LocalBillOverlay requestId={localBillId} onClose={closeLocalBill} />}
-
-    {!guideHidden && (
-      <aside className="card space-y-3 text-xs lg:sticky lg:top-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-semibold">Keyboard Shortcuts</span>
-          <button type="button" tabIndex={-1} className="text-muted underline" onClick={toggleGuide}>
-            Hide ({keyFor("toggle-key-guide")})
-          </button>
-        </div>
-        {KEY_GUIDE.map((g) => (
-          <div key={g.title} className={`-mx-1 rounded px-1 py-0.5 ${g.title === guideZone ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}>
-            <div className="mb-1 font-semibold">{g.title}</div>
-            <ul className="space-y-0.5">
-              {g.keys.map(([k, what]) => (
-                <li key={k + what} className="flex items-baseline gap-1.5">
-                  <Key k={k.startsWith("id:") ? keyFor(k.slice(3)) : k} />
-                  <span className="text-muted">{what}</span>
-                </li>
-              ))}
-            </ul>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-muted">Order Remark / Delivery Notes</label>
+            <input
+              className="w-full text-sm"
+              placeholder="Special instructions or delivery remarks…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </div>
-        ))}
-      </aside>
-    )}
+
+          {overLimitBy > 0 && isCreditSale && (
+            <div className="text-xs text-bad font-bold">
+              ⚠️ Warning: Bill exceeds customer credit limit by ₹{overLimitBy.toFixed(2)}
+            </div>
+          )}
+
+          {shortLines.length > 0 && (
+            <p className="text-xs text-warn font-semibold">
+              ⚠️ Billing more than available stock for {[...new Set(shortLines.map((l) => l.product.name))].join(", ")}. Stock will go negative.
+            </p>
+          )}
+
+          {zeroLines.length > 0 && (
+            <p className="text-xs text-warn font-semibold">
+              ⚠️ Some items have 0 quantity or 0 rate. Bill will be flagged for manager review.
+            </p>
+          )}
+
+          {error && <div className="text-sm text-bad font-bold bg-bad/10 p-3 rounded-lg border border-bad/30">{error}</div>}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button
+              className="btn w-44 py-3 text-base font-semibold"
+              disabled={submitting || lines.length === 0}
+              onClick={saveDraft}
+            >
+              📝 Save as Draft
+            </button>
+            <button
+              ref={submitButtonRef}
+              className="btn-primary flex-1 py-3 text-lg font-black shadow-md transition-all hover:scale-[1.01]"
+              disabled={submitting}
+              onClick={submit}
+            >
+              {submitting ? "Generating & Printing…" : `⚡ Generate & Print Bill (${keyFor("submit-order") || "F10"})`}
+            </button>
+          </div>
+        </div>
+
+        {/* Discard Confirmation Modal */}
+        {confirmDiscard && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs" onClick={() => setConfirmDiscard(false)}>
+            <div className="w-full max-w-sm space-y-4 rounded-xl border-2 border-bad bg-paper p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold text-bad">Discard this active bill?</h2>
+              <p className="text-sm text-muted">
+                {lines.length} {lines.length === 1 ? "product" : "products"} worth <strong>₹{total.toFixed(2)}</strong> will be discarded.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <button className="btn font-semibold" onClick={() => setConfirmDiscard(false)}>
+                  Keep Editing (Esc)
+                </button>
+                <button
+                  autoFocus
+                  className="btn-danger font-bold px-4"
+                  onClick={() => {
+                    billed();
+                    router.push("/billing");
+                  }}
+                >
+                  Discard (Enter)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Product Modal */}
+        {showAddProductModal && (
+          <div
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Escape") return closeAddProductModal();
+              onFieldNavKeyDown(e, e.currentTarget);
+            }}
+          >
+            <AddProductModal
+              initialName={productQuery.trim()}
+              onClose={closeAddProductModal}
+              onCreated={(p) => {
+                setShowAddProductModal(false);
+                addProduct(p);
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {localBillId && <LocalBillOverlay requestId={localBillId} onClose={closeLocalBill} />}
+
+      {!guideHidden && (
+        <aside className="card space-y-4 text-xs lg:sticky lg:top-4 border border-line shadow-sm">
+          <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
+            <span className="font-bold text-ink">⌨️ Keyboard Shortcuts</span>
+            <button type="button" tabIndex={-1} className="text-muted hover:text-ink underline" onClick={toggleGuide}>
+              Hide ({keyFor("toggle-key-guide")})
+            </button>
+          </div>
+          {KEY_GUIDE.map((g) => (
+            <div key={g.title} className={`-mx-1 rounded-lg p-2 transition-colors ${g.title === guideZone ? "bg-accent/15 ring-1 ring-inset ring-accent font-semibold" : ""}`}>
+              <div className="mb-1.5 font-bold text-ink">{g.title}</div>
+              <ul className="space-y-1">
+                {g.keys.map(([k, what]) => (
+                  <li key={k + what} className="flex items-baseline gap-2">
+                    <Key k={k.startsWith("id:") ? keyFor(k.slice(3)) : k} />
+                    <span className="text-muted">{what}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </aside>
+      )}
     </div>
   );
 }

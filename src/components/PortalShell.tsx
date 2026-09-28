@@ -40,38 +40,42 @@ export default function PortalShell({
       style={themeVars(theme)}
     >
       <SessionGuard />
-      <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper/95 backdrop-blur px-3.5 py-2 shadow-xs">
-        <div className="flex flex-wrap items-center gap-3.5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-surface font-black text-xs shadow-xs">
-              O
-            </span>
-            <span className="text-sm font-bold tracking-tight text-ink">
-              OCEON-WMS <span className="font-normal text-muted">· {title}</span>
-            </span>
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur-md shadow-xs">
+        <div className="mx-auto flex w-full max-w-[1700px] flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 sm:px-6">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-surface font-black text-xs shadow-xs">
+                O
+              </span>
+              <span className="text-sm font-bold tracking-tight text-ink">
+                OCEON-WMS <span className="font-normal text-muted">· {title}</span>
+              </span>
+            </div>
+
+            <PortalNav links={links} />
           </div>
 
-          <PortalNav links={links} />
-        </div>
-
-        <div className="flex items-center gap-2">
-          {shortcuts && <ShortcutsButton />}
-          {syncStaffId && <SyncStatus staffId={syncStaffId} />}
-          <ThemeStudioButton />
-          <RefreshButton />
-          <InstallButton />
-          <NotificationBell />
-          <span className="hidden sm:inline-block rounded-full bg-surface-hi px-2.5 py-0.5 text-xs font-semibold text-muted">
-            👤 {userName}
-          </span>
-          <LogoutButton />
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {shortcuts && <ShortcutsButton />}
+            {syncStaffId && <SyncStatus staffId={syncStaffId} />}
+            <ThemeStudioButton />
+            <RefreshButton />
+            <InstallButton />
+            <NotificationBell />
+            <span className="hidden sm:inline-block rounded-full bg-surface-hi px-3 py-1 text-xs font-bold text-muted border border-line">
+              👤 {userName}
+            </span>
+            <LogoutButton />
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 p-3.5 sm:p-4">{children}</main>
+      <main className="flex-1 w-full max-w-[1700px] mx-auto p-3.5 sm:p-5 lg:p-6 min-h-[calc(100vh-120px)]">{children}</main>
 
-      <footer className="border-t border-line bg-paper py-2.5">
-        <Copyright />
+      <footer className="border-t border-line bg-paper py-3">
+        <div className="mx-auto max-w-[1700px] px-3.5 sm:px-6">
+          <Copyright />
+        </div>
       </footer>
     </div>
   );

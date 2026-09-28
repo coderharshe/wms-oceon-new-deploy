@@ -1001,7 +1001,7 @@ async function main() {
   const dbUnits = await Promise.all(
     unitDefs.map((u) => db.unit.upsert({ where: { symbol: u.symbol }, update: {}, create: u }))
   );
-  const unitMap = Object.fromEntries(dbUnits.map((u) => [u.symbol, u.id]));
+  const unitMap = Object.fromEntries(dbUnits.map((u: any) => [u.symbol, u.id]));
 
   // Deduplicate products by cleaned name
   const seenNames = new Set<string>();

@@ -117,24 +117,24 @@ export async function GET(req: NextRequest) {
     ]),
   ]);
 
-  const totalSales = bills.reduce((s, b) => s + Number(b.versions[0]?.total ?? 0), 0);
+  const totalSales = bills.reduce((s: number, b: any) => s + Number(b.versions[0]?.total ?? 0), 0);
   const totalBills = bills.length;
   const aov = totalBills > 0 ? totalSales / totalBills : 0;
-  const outstandingReceivables = payments.reduce((s, p) => s + (Number(p.amountDue) - Number(p.amountPaid)), 0);
+  const outstandingReceivables = payments.reduce((s: number, p: any) => s + (Number(p.amountDue) - Number(p.amountPaid)), 0);
 
-  const totalPurchases = purchaseBills.reduce((s, p) => s + Number(p.total), 0);
+  const totalPurchases = purchaseBills.reduce((s: number, p: any) => s + Number(p.total), 0);
   const totalPayables = purchaseBills
-    .filter((p) => p.paymentStatus === "UNPAID" || p.paymentStatus === "PARTIAL")
-    .reduce((s, p) => s + Number(p.total), 0);
+    .filter((p: any) => p.paymentStatus === "UNPAID" || p.paymentStatus === "PARTIAL")
+    .reduce((s: number, p: any) => s + Number(p.total), 0);
 
   const inventoryValue = inventoryRows.reduce(
-    (s, i) => s + Number(i.quantityOnHand) * Number(i.product.wholesalePrice),
+    (s: number, i: any) => s + Number(i.quantityOnHand) * Number(i.product.wholesalePrice),
     0
   );
   const lowStock = inventoryRows.filter(
-    (i) => i.product.minStock != null && Number(i.quantityOnHand) <= Number(i.product.minStock)
+    (i: any) => i.product.minStock != null && Number(i.quantityOnHand) <= Number(i.product.minStock)
   );
-  const outOfStockCount = inventoryRows.filter((i) => Number(i.quantityOnHand) <= 0).length;
+  const outOfStockCount = inventoryRows.filter((i: any) => Number(i.quantityOnHand) <= 0).length;
 
   const totalExpenses = Number(expenses._sum.amount ?? 0);
   const grossMargin = totalSales > 0 ? Math.max(0, ((totalSales - totalPurchases) / totalSales) * 100) : 0;
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
     inventoryValue,
     lowStockCount: lowStock.length,
     outOfStockCount,
-    lowStockItems: lowStock.slice(0, 15).map((i) => ({
+    lowStockItems: lowStock.slice(0, 15).map((i: any) => ({
       product: i.product.name,
       sku: i.product.sku,
       warehouse: i.warehouse.name,

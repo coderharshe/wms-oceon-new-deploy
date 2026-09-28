@@ -1,47 +1,84 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { Skeleton, SkeletonCard } from "@/components/Skeleton";
 import { subscribeSync } from "@/lib/offline-bills";
 import { fmtDate, fmtDateTime, fmtTime } from "@/lib/fmt";
 
-type Today = {
+type CashFormula = {
+  openingCash: number;
+  cashSales: number;
+  salesCount: number;
+  cashReceived: number;
+  receivedCount: number;
+  cashExpenses: number;
+  expensesCount: number;
+  cashRefunds: number;
+  refundsCount: number;
+  bankDeposits: number;
+  depositsCount: number;
+  expectedClosingCash: number;
+};
+
+type CashLedgerEntry = {
+  id: string;
+  type: string;
+  amount: number;
+  sign: number;
+  note: string | null;
+  referenceId: string | null;
+  at: string;
+  runningBalance: number;
+};
+
+type CashCountHistory = {
+  id: string;
+  closedAt: string;
+  openingCash: string;
+  expectedCash: string;
+  actualCash: string;
+  difference: string;
+  note: string | null;
+};
+
+type TodayCashData = {
   today: string;
-  open: { id: string; businessDate: string; openedAt: string; bills: number } | null;
-  movements: { type: string; amount: string; note: string | null; at: string }[];
-  counts: { id: string; closedAt: string; expectedCash: string; actualCash: string; difference: string; note: string | null }[];
+  open: { id: string; businessDate: string; openedAt: string; openingCash: string; bills: number } | null;
+  formula: CashFormula;
+  ledger: CashLedgerEntry[];
+  counts: CashCountHistory[];
 };
 
 const NOTES = [500, 200, 100, 50, 20, 10];
 const MOVES = [
   { type: "BANK_DEPOSIT", label: "Deposited in bank", sign: -1 },
   { type: "WITHDRAWAL", label: "Paid out (expense / owner)", sign: -1 },
-  { type: "OTHER_RECEIPT", label: "Cash put in", sign: 1 },
+  { type: "OTHER_RECEIPT", label: "Cash put in (other receipt)", sign: 1 },
 ] as const;
-const rs = (x: number | string) => `₹${Number(x).toFixed(2)}`;
 
-// The counter's whole EOD job: count the drawer. The drawer opens itself on
-// the first cash bill and carries the last count forward, so there is no
-// opening balance to type. The count is blind — what the software expects is
-// only shown after it is saved.
-export default function CashEodPage() {
-  const { data, error, loading, reload: load } = useApiGet<Today>("/api/finance/cash/today");
+const rs = (x: number | string) => `₹${Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export default function CashManagementPage() {
+  const { data, error, loading, reload: load } = useApiGet<TodayCashData>("/api/finance/cash/today");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [coins, setCoins] = useState("");
   const [note, setNote] = useState("");
   const [move, setMove] = useState<{ type: string; amount: string; note: string }>({ type: "BANK_DEPOSIT", amount: "", note: "" });
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Bills and cash still only on this PC aren't in the server's figures yet —
-  // counting now compares the drawer against a total that's short.
+  const [ledgerExpanded, setLedgerExpanded] = useState(true);
+  const [filterType, setFilterType] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [unsynced, setUnsynced] = useState({ pending: 0, attention: 0 });
   useEffect(() => subscribeSync(setUnsynced), []);
   const unsyncedCount = unsynced.pending + unsynced.attention;
 
   useEffect(() => {
-    const t = setInterval(load, 60000); // human-paced; this page sits open all shift
+    const t = setInterval(load, 45000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -81,130 +118,417 @@ export default function CashEodPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-md space-y-3">
-        <Skeleton className="h-5 w-48" />
-        <SkeletonCard lines={3} />
+      <div className="max-w-5xl mx-auto space-y-4">
+        <Skeleton className="h-6 w-56" />
+        <SkeletonCard lines={6} />
       </div>
     );
   }
-  if (error || !data) return <ErrorRetry message={error ?? "Could not load"} onRetry={load} />;
+
+  if (error || !data) return <ErrorRetry message={error ?? "Could not load cash management data"} onRetry={load} />;
+
   const stale = data.open && data.open.businessDate < data.today;
+  const f = data.formula || {
+    openingCash: 0,
+    cashSales: 0,
+    salesCount: 0,
+    cashReceived: 0,
+    receivedCount: 0,
+    cashExpenses: 0,
+    expensesCount: 0,
+    cashRefunds: 0,
+    refundsCount: 0,
+    bankDeposits: 0,
+    depositsCount: 0,
+    expectedClosingCash: 0,
+  };
+
+  const filteredLedger = (data.ledger || []).filter((tx) => {
+    if (filterType !== "ALL" && tx.type !== filterType) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchNote = tx.note?.toLowerCase().includes(q);
+      const matchRef = tx.referenceId?.toLowerCase().includes(q);
+      const matchType = tx.type.toLowerCase().includes(q);
+      return matchNote || matchRef || matchType;
+    }
+    return true;
+  });
 
   return (
-    <div className="mx-auto max-w-md space-y-3">
-      <h1 className="text-lg font-semibold">Cash / End of Day</h1>
+    <div className="w-full space-y-6 pb-12">
+      {/* ── Header ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-black tracking-tight text-ink">Physical Cash Management</h1>
+            <span className={`badge ${data.open ? "bg-good/15 text-good" : "bg-muted/15 text-muted"} font-bold`}>
+              {data.open ? "🟢 DRAWER OPEN" : "⚪ NO OPEN SESSION"}
+            </span>
+          </div>
+          <p className="text-xs text-muted mt-0.5">
+            Real-time Drawer Till Reconciliation, Flow Breakdown & Expandable Cash Ledger
+          </p>
+        </div>
 
-      <div className="card space-y-1 text-sm">
-        {data.open ? (
-          <>
-            <p>
-              Drawer open since {fmtDateTime(data.open.openedAt)} · {data.open.bills} cash {data.open.bills === 1 ? "bill" : "bills"}
-            </p>
-            {stale && <p className="font-semibold text-bad">Not counted since {fmtDate(data.open.businessDate)} — count it now.</p>}
-          </>
-        ) : (
-          <p className="text-muted">Drawer opens by itself on the first cash bill. Starting with cash already in it? Count it below.</p>
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/finance" className="btn text-xs font-semibold">
+            ← Finance Control Center
+          </Link>
+          <button onClick={() => load()} className="btn text-xs font-semibold" title="Refresh data">
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
-      <div className="card space-y-2">
-        <p className="text-sm font-semibold">Cash taken out / put in</p>
-        <select className="w-full" value={move.type} onChange={(e) => setMove({ ...move, type: e.target.value })}>
-          {MOVES.map((m) => (
-            <option key={m.type} value={m.type}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <input className="w-full" type="number" min={0} placeholder="Amount" value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
-        <input className="w-full" placeholder="What for (required)" value={move.note} onChange={(e) => setMove({ ...move, note: e.target.value })} />
-        <button className="btn w-full" disabled={busy || !(Number(move.amount) > 0) || !move.note.trim()} onClick={saveMove}>
-          Record
-        </button>
-        {data.movements.map((m, i) => {
-          const def = MOVES.find((x) => x.type === m.type);
-          return (
-            <div key={i} className="flex justify-between text-sm">
-              <span>
-                {fmtTime(m.at)} · {def?.label ?? m.type}
-                {m.note && <span className="text-muted"> — {m.note}</span>}
-              </span>
-              <span>
-                {def?.sign === 1 ? "+" : "−"}
-                {rs(m.amount)}
-              </span>
+      {/* ── Status Banner (if stale or not counted) ── */}
+      {data.open && stale && (
+        <div className="card border-2 border-bad bg-bad/5 p-3 text-xs text-bad font-semibold flex items-center justify-between">
+          <span>⚠️ Drawer has been open since {fmtDate(data.open.businessDate)} and was not closed EOD. Please count and close it now.</span>
+        </div>
+      )}
+
+      {/* ── SECTION 1: PHYSICAL CASH MATHEMATICAL FORMULA CARD ── */}
+      <section className="card space-y-4 border-l-4 border-l-primary">
+        <div className="flex justify-between items-center border-b border-line pb-2">
+          <div>
+            <h2 className="text-sm font-black text-ink tracking-tight uppercase">Physical Cash Reconciliation Formula</h2>
+            <p className="text-[11px] text-muted">Mathematical summary of all counter cash movements for current session</p>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-muted block">Expected Closing Till Cash</span>
+            <span className="text-lg font-black text-good font-mono">{rs(f.expectedClosingCash)}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div className="space-y-2 bg-surface p-3 rounded border border-line">
+            <div className="flex justify-between items-center py-1 border-b border-line/60">
+              <span className="text-muted font-medium">Opening Cash (Till Start):</span>
+              <span className="font-bold text-ink font-mono">{rs(f.openingCash)}</span>
             </div>
-          );
-        })}
-      </div>
-      <div className="card space-y-2">
-        <p className="text-sm font-semibold">Count the drawer</p>
-        <p className="text-xs text-muted">Took cash to the bank or paid something out? Record it above before counting.</p>
-        <div className="grid grid-cols-3 gap-2">
-          {NOTES.map((n) => (
-            <label key={n} className="text-xs text-muted">
-              ₹{n} ×
-              <input className="w-full" type="number" min={0} inputMode="numeric" value={notes[n] ?? ""} onChange={(e) => setNotes({ ...notes, [n]: e.target.value })} />
+            <div className="flex justify-between items-center py-1 border-b border-line/60">
+              <div className="flex items-center gap-1.5">
+                <span className="text-good font-bold">+</span>
+                <span className="text-ink font-medium">Cash Sales ({f.salesCount} bills):</span>
+              </div>
+              <span className="font-bold text-good font-mono">+{rs(f.cashSales)}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-line/60">
+              <div className="flex items-center gap-1.5">
+                <span className="text-good font-bold">+</span>
+                <span className="text-ink font-medium">Cash Received / Put In ({f.receivedCount} vouchers):</span>
+              </div>
+              <span className="font-bold text-good font-mono">+{rs(f.cashReceived)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 bg-surface p-3 rounded border border-line">
+            <div className="flex justify-between items-center py-1 border-b border-line/60">
+              <div className="flex items-center gap-1.5">
+                <span className="text-bad font-bold">−</span>
+                <span className="text-ink font-medium">Cash Expenses / Payouts ({f.expensesCount} slips):</span>
+              </div>
+              <span className="font-bold text-bad font-mono">−{rs(f.cashExpenses)}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-line/60">
+              <div className="flex items-center gap-1.5">
+                <span className="text-bad font-bold">−</span>
+                <span className="text-ink font-medium">Cash Refunds ({f.refundsCount} returns):</span>
+              </div>
+              <span className="font-bold text-bad font-mono">−{rs(f.cashRefunds)}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-line/60">
+              <div className="flex items-center gap-1.5">
+                <span className="text-bad font-bold">−</span>
+                <span className="text-ink font-medium">Bank Deposits ({f.depositsCount} transfers):</span>
+              </div>
+              <span className="font-bold text-bad font-mono">−{rs(f.bankDeposits)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-surface-hi p-2.5 rounded border border-line flex flex-wrap justify-between items-center text-xs font-semibold">
+          <span>🧮 Formula: Opening ({rs(f.openingCash)}) + Inflows ({rs(f.cashSales + f.cashReceived)}) − Outflows ({rs(f.cashExpenses + f.cashRefunds + f.bankDeposits)})</span>
+          <span className="text-good font-mono text-sm font-bold">= {rs(f.expectedClosingCash)}</span>
+        </div>
+      </section>
+
+      {/* ── SECTION 2: EXPANDABLE CASH LEDGER ── */}
+      <section className="card space-y-3">
+        <div className="flex flex-wrap justify-between items-center border-b border-line pb-2 gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLedgerExpanded(!ledgerExpanded)}
+              className="font-black text-sm text-ink flex items-center gap-1 hover:text-accent"
+            >
+              <span>{ledgerExpanded ? "▼" : "▶"}</span>
+              <span>📜 Expandable Cash Ledger ({data.ledger?.length || 0} Entries)</span>
+            </button>
+            <span className="badge bg-surface-hi text-[10px]">Audit Trail</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex bg-surface rounded border border-line p-0.5 text-xs">
+              {["ALL", "SALE", "OTHER_RECEIPT", "WITHDRAWAL", "REFUND", "BANK_DEPOSIT"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFilterType(t)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold ${filterType === t ? "bg-accent text-white" : "text-muted hover:text-ink"
+                    }`}
+                >
+                  {t === "ALL" ? "All" : t === "OTHER_RECEIPT" ? "Receipts" : t === "WITHDRAWAL" ? "Expenses" : t}
+                </button>
+              ))}
+            </div>
+
+            <input
+              type="search"
+              placeholder="Search note / ref…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="text-xs px-2 py-1 w-36"
+            />
+          </div>
+        </div>
+
+        {ledgerExpanded && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-line text-muted">
+                  <th className="py-2">Time</th>
+                  <th className="py-2">Transaction Type</th>
+                  <th className="py-2">Ref / Order #</th>
+                  <th className="py-2">Narration / Note</th>
+                  <th className="py-2 text-right">Inflow (+)</th>
+                  <th className="py-2 text-right">Outflow (−)</th>
+                  <th className="py-2 text-right font-bold">Running Till Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLedger.length > 0 ? (
+                  filteredLedger.map((tx) => (
+                    <tr key={tx.id} className="border-b border-line hover:bg-surface-hi">
+                      <td className="py-2 font-mono text-muted text-[11px]">{fmtTime(tx.at)}</td>
+                      <td className="py-2">
+                        <span
+                          className={`badge text-[10px] font-semibold ${tx.type === "SALE"
+                              ? "bg-good/15 text-good"
+                              : tx.type === "OTHER_RECEIPT"
+                                ? "bg-primary/15 text-primary"
+                                : tx.type === "WITHDRAWAL"
+                                  ? "bg-bad/15 text-bad"
+                                  : tx.type === "REFUND"
+                                    ? "bg-warn/15 text-warn"
+                                    : "bg-ink/10 text-ink"
+                            }`}
+                        >
+                          {tx.type}
+                        </span>
+                      </td>
+                      <td className="py-2 font-mono text-[11px]">{tx.referenceId || "—"}</td>
+                      <td className="py-2 text-ink">{tx.note || "Cash Movement"}</td>
+                      <td className="py-2 text-right font-mono font-semibold text-good">
+                        {tx.sign > 0 ? `+${rs(tx.amount)}` : "—"}
+                      </td>
+                      <td className="py-2 text-right font-mono font-semibold text-bad">
+                        {tx.sign < 0 ? `−${rs(tx.amount)}` : "—"}
+                      </td>
+                      <td className="py-2 text-right font-mono font-bold text-ink">
+                        {rs(tx.runningBalance)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-muted text-xs">
+                      No cash transactions matching the filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ── SECTION 3: QUICK CASH ACTIONS & DENOMINATION EOD COUNT ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Quick Action Movement Card */}
+        <section className="card space-y-3">
+          <div className="flex justify-between items-center border-b border-line pb-2">
+            <h2 className="text-sm font-bold text-ink">⚡ Quick Cash Movement</h2>
+            <span className="text-[10px] text-muted">Drawer Inflow / Outflow</span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <label className="block text-muted">
+              Movement Action:
+              <select className="w-full mt-1" value={move.type} onChange={(e) => setMove({ ...move, type: e.target.value })}>
+                {MOVES.map((m) => (
+                  <option key={m.type} value={m.type}>
+                    {m.label} ({m.sign === 1 ? "Inflow +" : "Outflow −"})
+                  </option>
+                ))}
+              </select>
             </label>
-          ))}
-        </div>
-        <label className="block text-xs text-muted">
-          Coins (total ₹)
-          <input className="w-full" type="number" min={0} inputMode="decimal" value={coins} onChange={(e) => setCoins(e.target.value)} />
-        </label>
-        <div className="flex justify-between border-t border-line pt-2 text-base font-semibold">
-          <span>Total counted</span>
-          <span>{rs(counted)}</span>
-        </div>
-        <input className="w-full" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-        <button className="btn-primary w-full" disabled={busy || !anyCounted} onClick={() => saveCount()}>
-          Save count
-        </button>
+
+            <label className="block text-muted">
+              Amount (₹):
+              <input
+                className="w-full mt-1 font-mono text-sm"
+                type="number"
+                min={0}
+                placeholder="Enter amount"
+                value={move.amount}
+                onChange={(e) => setMove({ ...move, amount: e.target.value })}
+              />
+            </label>
+
+            <label className="block text-muted">
+              Narration / Purpose (Required):
+              <input
+                className="w-full mt-1"
+                placeholder="e.g. Petty cash for tea, Bank deposit slip #89"
+                value={move.note}
+                onChange={(e) => setMove({ ...move, note: e.target.value })}
+              />
+            </label>
+
+            <button
+              className="btn btn-primary w-full font-bold text-xs py-2 mt-2"
+              disabled={busy || !(Number(move.amount) > 0) || !move.note.trim()}
+              onClick={saveMove}
+            >
+              {busy ? "Saving..." : "Record Cash Movement"}
+            </button>
+          </div>
+        </section>
+
+        {/* Denomination Counter Card */}
+        <section className="card space-y-3">
+          <div className="flex justify-between items-center border-b border-line pb-2">
+            <div>
+              <h2 className="text-sm font-bold text-ink">🪙 Denomination Count & Close</h2>
+              <p className="text-[10px] text-muted">Count physical cash in drawer for EOD blind closing</p>
+            </div>
+            <span className="text-xs font-mono font-bold text-good">{rs(counted)}</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {NOTES.map((n) => (
+              <label key={n} className="text-xs text-muted">
+                ₹{n} ×
+                <input
+                  className="w-full mt-0.5 text-xs font-mono"
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={notes[n] ?? ""}
+                  onChange={(e) => setNotes({ ...notes, [n]: e.target.value })}
+                />
+              </label>
+            ))}
+          </div>
+
+          <label className="block text-xs text-muted">
+            Coins Total (₹):
+            <input
+              className="w-full mt-0.5 text-xs font-mono"
+              type="number"
+              min={0}
+              inputMode="decimal"
+              placeholder="0.00"
+              value={coins}
+              onChange={(e) => setCoins(e.target.value)}
+            />
+          </label>
+
+          <div className="flex justify-between border-t border-line pt-2 text-sm font-bold">
+            <span>Total Cash Counted:</span>
+            <span className="font-mono text-good">{rs(counted)}</span>
+          </div>
+
+          <input
+            className="w-full text-xs"
+            placeholder="Closing notes / handover remarks (optional)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+
+          <button
+            className="btn btn-primary w-full font-bold text-xs py-2"
+            disabled={busy || !anyCounted}
+            onClick={() => saveCount()}
+          >
+            {busy ? "Closing Session..." : "Save Count & Close Drawer"}
+          </button>
+        </section>
       </div>
 
+      {/* ── Unsynced Bills Warning Dialog ── */}
       {formError === "confirm-unsynced" ? (
-        <div className="card space-y-2 border-2 border-bad text-sm">
+        <div className="card space-y-2 border-2 border-bad text-sm bg-bad/5">
           <p className="font-semibold text-bad">
             {unsynced.pending > 0 && `${unsynced.pending} ${unsynced.pending === 1 ? "item is" : "items are"} still waiting to sync`}
             {unsynced.pending > 0 && unsynced.attention > 0 && " and "}
             {unsynced.attention > 0 && `${unsynced.attention} ${unsynced.attention === 1 ? "needs" : "need"} attention`} on this PC.
           </p>
-          <p>Those bills are not in the software&apos;s total yet. Wait for the header to show Synced ✓, or save anyway.</p>
-          <div className="flex justify-end gap-2">
-            <button className="btn" onClick={() => setFormError(null)}>
-              Wait
+          <p className="text-xs">Those bills are not in the software total yet. Wait for the header to show Synced ✓, or save anyway.</p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button className="btn text-xs" onClick={() => setFormError(null)}>
+              Wait for sync
             </button>
-            <button className="btn-danger" disabled={busy} onClick={() => saveCount(true)}>
-              Save anyway
+            <button className="btn-danger text-xs font-bold" disabled={busy} onClick={() => saveCount(true)}>
+              Save count anyway
             </button>
           </div>
         </div>
       ) : (
-        formError && <p className="text-sm text-bad">{formError}</p>
+        formError && <p className="text-xs text-bad bg-bad/10 p-2 rounded">{formError}</p>
       )}
 
-      {data.counts.map((c) => {
-        const diff = Number(c.difference);
-        return (
-          <div key={c.id} className="card space-y-1 text-sm">
-            <p className="font-semibold">Counted at {fmtTime(c.closedAt)}</p>
-            <div className="flex justify-between">
-              <span>Counted</span>
-              <span>{rs(c.actualCash)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Software (if every bill was cash)</span>
-              <span>{rs(c.expectedCash)}</span>
-            </div>
-            <div className={`flex justify-between font-semibold ${diff > 0 ? "text-bad" : ""}`}>
-              <span>{diff > 0 ? "Extra in drawer" : diff < 0 ? "Not in drawer — should be in bank (UPI)" : "Matched"}</span>
-              <span>{rs(Math.abs(diff))}</span>
-            </div>
-            {c.note && <p className="text-muted">Note: {c.note}</p>}
+      {/* ── SECTION 4: PAST COUNTED SESSIONS & DISCREPANCIES ── */}
+      {data.counts && data.counts.length > 0 && (
+        <section className="card space-y-3">
+          <div className="flex justify-between items-center border-b border-line pb-2">
+            <h2 className="text-sm font-bold text-ink">🕒 Today's Closed Drawer Sessions & Variances</h2>
+            <span className="text-xs text-muted">{data.counts.length} Closed Sessions</span>
           </div>
-        );
-      })}
 
+          <div className="space-y-2">
+            {data.counts.map((c) => {
+              const diff = Number(c.difference);
+              return (
+                <div key={c.id} className="p-2.5 rounded bg-surface border border-line text-xs flex flex-wrap justify-between items-center gap-2">
+                  <div>
+                    <span className="font-bold text-ink">Closed at {fmtTime(c.closedAt)}</span>
+                    {c.note && <span className="text-muted block text-[11px] mt-0.5">Note: {c.note}</span>}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <span className="text-muted block text-[10px]">Counted</span>
+                      <span className="font-mono font-semibold">{rs(c.actualCash)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[10px]">Expected</span>
+                      <span className="font-mono font-semibold">{rs(c.expectedCash)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[10px]">Difference</span>
+                      <span className={`font-mono font-bold ${diff === 0 ? "text-good" : "text-bad"}`}>
+                        {diff === 0 ? "✓ Matched" : diff > 0 ? `+${rs(diff)} (Extra)` : `−${rs(Math.abs(diff))} (Short)`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

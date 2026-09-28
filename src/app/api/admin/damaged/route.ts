@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
     let totalUnitsDamaged = 0;
     const productDamageCount: Record<string, { name: string; sku: string; qty: number; loss: number }> = {};
 
-    const formattedMovements = movements.map((m) => {
+    const formattedMovements = movements.map((m: any) => {
       const qty = Math.abs(Number(m.movementQty));
       const unitCost = Number(m.product?.wholesalePrice ?? 0);
       const lossVal = qty * unitCost;

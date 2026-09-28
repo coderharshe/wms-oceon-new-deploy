@@ -11,7 +11,13 @@ const LINKS = [
   { href: "/finance/upi", label: "UPI & Settlement" },
   { href: "/finance/receivables", label: "Receivables" },
   { href: "/finance/payables", label: "Payables" },
+  { href: "/finance/collections", label: "Collections" },
+  { href: "/finance/supplier-payments", label: "Supplier Payments" },
   { href: "/finance/expenses", label: "Expenses" },
+  { href: "/finance/refunds", label: "Refunds & Credit Notes" },
+  { href: "/finance/reconciliation", label: "Reconciliation" },
+  { href: "/finance/profitability", label: "Profitability" },
+  { href: "/finance/tax", label: "GST & Tax" },
   { href: "/finance/vouchers", label: "Vouchers" },
   { href: "/finance/reports", label: "Reports" },
 ];

@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
-// Minimal ERP theme: no gradients, no shadows-as-decoration, dense spacing scale.
-// Colors are functional (status/action), not brand decoration.
+// High-clarity ERP theme: crisp spacing, enlarged readable typography scale, functional contrast.
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
@@ -17,26 +16,29 @@ const config: Config = {
         line: "rgb(var(--c-line) / <alpha-value>)",
         muted: "rgb(var(--c-muted) / <alpha-value>)",
         accent: "rgb(var(--c-accent) / <alpha-value>)",
-        // Status colours are meaning, not decoration — a theme must not repaint
-        // "this order failed" into something calmer. Always used as a solid fill
-        // with white text, so they read on any background.
+        // Status colours are meaning, not decoration
         good: "#1a7f37",
         warn: "#a35a00",
         bad: "#b3261e",
       },
       fontSize: {
-        xs: ["11px", "14px"],
-        sm: ["12.5px", "16px"],
-        base: ["13.5px", "18px"],
-        lg: ["16px", "20px"],
-        xl: ["20px", "24px"],
+        xs: ["13px", "17px"],
+        sm: ["15px", "20px"],
+        base: ["17px", "24px"],
+        lg: ["19.5px", "26px"],
+        xl: ["23px", "29px"],
+        "2xl": ["27px", "34px"],
+        "3xl": ["33px", "40px"],
+      },
+      boxShadow: {
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
       },
       spacing: {
         "0.5": "2px",
         "1.5": "6px",
       },
       borderRadius: {
-        DEFAULT: "3px",
+        DEFAULT: "4px",
       },
     },
   },

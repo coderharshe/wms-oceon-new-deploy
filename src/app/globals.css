@@ -25,21 +25,21 @@
     @apply border-line;
   }
   table {
-    @apply w-full border-collapse text-sm;
+    @apply w-full border-collapse text-base;
   }
   th {
-    @apply border-b border-line bg-surface px-2 py-1 text-left font-semibold text-ink;
+    @apply border-b border-line bg-surface px-3 py-2 text-left text-sm font-bold text-ink tracking-wide;
   }
   td {
-    @apply border-b border-line px-2 py-1;
+    @apply border-b border-line px-3 py-2.5 text-sm;
   }
   input,
   select,
   textarea {
-    @apply rounded border border-line bg-paper px-2 py-1 text-sm focus:border-accent;
+    @apply rounded-lg border border-line bg-paper px-3 py-2 text-base focus:border-accent shadow-sm;
   }
   button {
-    @apply rounded;
+    @apply rounded-lg;
   }
 
   /* Keyboard-only billing needs the cursor to be findable across the room.
@@ -67,19 +67,25 @@
 @layer components {
   /* One shared action-button style: no per-page one-off button CSS. */
   .btn {
-    @apply rounded border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-surface-hi active:bg-line disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold hover:bg-surface-hi active:bg-line disabled:opacity-50 transition-colors shadow-sm;
   }
   .btn-primary {
-    @apply btn border-accent bg-accent text-white hover:bg-accent/90;
+    @apply btn border-accent bg-accent text-white hover:bg-accent/90 shadow-sm;
   }
   .btn-danger {
-    @apply btn border-bad bg-bad text-white hover:bg-bad/90;
+    @apply btn border-bad bg-bad text-white hover:bg-bad/90 shadow-sm;
   }
   .card {
-    @apply rounded border border-line bg-paper p-3;
+    @apply rounded-xl border border-line bg-paper p-4 sm:p-5 shadow-sm;
   }
   .badge {
-    @apply inline-block rounded px-1.5 py-0.5 text-xs font-medium;
+    @apply inline-block rounded-md px-2.5 py-1 text-xs font-bold tracking-wide;
+  }
+}
+
+@layer utilities {
+  .shadow-xs {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
 }
 
@@ -111,10 +117,12 @@
    inputs keep their real casing so an email or password reads back correctly. */
 @layer base {
   html {
-    font-size: 17px;
+    font-size: 20px;
   }
   body {
     text-transform: uppercase;
+    font-size: 1rem;
+    line-height: 1.5;
   }
   input,
   textarea {
@@ -124,27 +132,27 @@
      the root itself — a font-size on the wrapper would leave every one of
      them behind, and zoom would stretch min-h-screen into a scrollbar. */
   html:has(.finance-ui) {
-    font-size: 19px;
+    font-size: 21.5px;
   }
   html:has(.font-size-sm) {
-    font-size: 15px;
+    font-size: 18px;
   }
   html:has(.finance-ui:has(.font-size-sm)),
   html:has(.finance-ui.font-size-sm) {
-    font-size: 17px;
+    font-size: 19.5px;
   }
   html:has(.font-size-lg) {
-    font-size: 19px;
+    font-size: 23px;
   }
   html:has(.finance-ui:has(.font-size-lg)),
   html:has(.finance-ui.font-size-lg) {
-    font-size: 21px;
+    font-size: 24.5px;
   }
   html:has(.font-size-xl) {
-    font-size: 21px;
+    font-size: 25px;
   }
   html:has(.finance-ui:has(.font-size-xl)),
   html:has(.finance-ui.font-size-xl) {
-    font-size: 23px;
+    font-size: 27px;
   }
 }

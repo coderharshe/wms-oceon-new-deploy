@@ -26,10 +26,10 @@ export type UserPreferences = {
 };
 
 const FONT_SIZES = [
-  { id: "sm", label: "Small", desc: "15px compact for high density" },
-  { id: "standard", label: "Standard", desc: "17px default warehouse standard" },
-  { id: "lg", label: "Large", desc: "19px touch screen friendly" },
-  { id: "xl", label: "Extra Large", desc: "21px kiosk & far view" },
+  { id: "sm", label: "Compact", desc: "17px compact high-density view" },
+  { id: "standard", label: "Large (Standard)", desc: "19px default high-clarity view" },
+  { id: "lg", label: "Extra Large", desc: "21.5px counter & touch screen friendly" },
+  { id: "xl", label: "Jumbo / Kiosk", desc: "23.5px far distance & kiosk view" },
 ];
 
 export function ThemeStudioModal({

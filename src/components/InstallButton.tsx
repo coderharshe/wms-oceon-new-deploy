@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void> };
 
@@ -34,6 +34,8 @@ export default function InstallButton() {
   const [show, setShow] = useState(false);
   const [ready, setReady] = useState(false); // is a real install prompt available?
   const [hint, setHint] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -47,11 +49,61 @@ export default function InstallButton() {
     };
   }, []);
 
+  // Position calculation strictly clamped to viewport bounds
+  useEffect(() => {
+    if (!hint || !buttonRef.current) return;
+    const updatePos = () => {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = Math.min(320, window.innerWidth - 32);
+      let left = rect.left;
+      if (left + dropdownWidth > window.innerWidth - 16) {
+        left = window.innerWidth - dropdownWidth - 16;
+      }
+      if (left < 16) {
+        left = 16;
+      }
+      setPos({
+        top: rect.bottom + 8,
+        left,
+        width: dropdownWidth,
+      });
+    };
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [hint]);
+
+  // Click outside and Escape key to close hint
+  useEffect(() => {
+    if (!hint) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setHint(false);
+    }
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && !target.closest("#install-button-container") && !target.closest("#install-button-modal")) {
+        setHint(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [hint]);
+
   if (!show) return null;
 
   return (
-    <div className="relative">
+    <div id="install-button-container" className="relative inline-block">
       <button
+        ref={buttonRef}
         type="button"
         onClick={async () => {
           const e = deferred;
@@ -66,15 +118,20 @@ export default function InstallButton() {
           setReady(false);
           await e.prompt();
         }}
-        className="rounded border border-line px-2 py-1 text-sm hover:bg-surface-hi"
-        title="Install OCEON-WMS as an app on this device"
+        className="btn text-xs font-semibold py-1.5 px-3 hover:bg-surface-hi"
+        title="Install OCEON-WMS as a PWA app on this device"
       >
-        Install app
+        📥 <span className="hidden sm:inline">Install app</span>
       </button>
-      {hint && !ready && (
-        <div className="absolute right-0 z-10 mt-1 w-64 rounded border border-line bg-paper p-2 text-xs text-muted shadow">
+      {hint && !ready && pos && (
+        <div
+          id="install-button-modal"
+          style={{ position: "fixed", top: `${pos.top}px`, left: `${pos.left}px`, width: `${pos.width}px` }}
+          className="z-50 rounded-xl border-2 border-line bg-paper p-3.5 text-xs text-muted shadow-2xl ring-4 ring-black/10 animate-in fade-in zoom-in-95 duration-100"
+        >
+          <div className="font-bold text-ink mb-1 text-sm">Install Application</div>
           This browser doesn&apos;t offer a direct install button. Open its menu (⋮) and choose
-          <span className="font-medium"> Install app</span> or <span className="font-medium">Add to desktop</span>.
+          <span className="font-bold text-accent"> Install app</span> or <span className="font-bold text-accent">Add to desktop</span>.
         </div>
       )}
     </div>

@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   return NextResponse.json({
-    purchaseOrders: purchaseOrders.map((p) => ({
+    purchaseOrders: purchaseOrders.map((p: any) => ({
       id: p.id,
       poNumber: p.poNumber,
       supplier: p.supplier.name,
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       requestedBy: `${p.createdByUser.name} (${p.createdByUser.staffId})`,
       notes: p.notes,
       itemCount: p.items.length,
-      items: p.items.map((i) => ({
+      items: p.items.map((i: any) => ({
         product: i.product.name,
         sku: i.product.sku,
         qty: Number(i.quantity),
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         lineTotal: Number(i.lineTotal),
       })),
     })),
-    discountApprovals: discountApprovals.map((d) => ({
+    discountApprovals: discountApprovals.map((d: any) => ({
       id: d.id,
       orderNumber: d.order?.orderNumber ?? "Draft Bill",
       customer: d.order?.customer?.shopName ?? "Retail Walk-in",
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       createdAt: d.createdAt,
       requestedBy: `${d.requestedByUser.name} (${d.requestedByUser.staffId})`,
     })),
-    stockVariances: stockVariances.map((s) => ({
+    stockVariances: stockVariances.map((s: any) => ({
       id: s.id,
       product: s.product.name,
       sku: s.product.sku,
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
       createdAt: s.createdAt,
       requestedBy: `${s.requestedByUser.name} (${s.requestedByUser.staffId})`,
     })),
-    vouchers: vouchers.map((v) => ({
+    vouchers: vouchers.map((v: any) => ({
       id: v.id,
       voucherNo: v.voucherNo,
       type: v.type,

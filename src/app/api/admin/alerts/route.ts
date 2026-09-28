@@ -81,9 +81,9 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const oosItems = inventoryRows.filter((i) => Number(i.quantityOnHand) <= 0);
+  const oosItems = inventoryRows.filter((i: any) => Number(i.quantityOnHand) <= 0);
   const lowStockItems = inventoryRows.filter(
-    (i) => i.product.minStock != null && Number(i.quantityOnHand) > 0 && Number(i.quantityOnHand) <= Number(i.product.minStock)
+    (i: any) => i.product.minStock != null && Number(i.quantityOnHand) > 0 && Number(i.quantityOnHand) <= Number(i.product.minStock)
   );
 
   const totalPendingApprovals =
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       id: "inv-oos",
       category: "INVENTORY",
       title: `${oosItems.length} Products Completely Out of Stock (0 Qty)`,
-      message: `Critical SKUs: ${oosItems.slice(0, 5).map((i) => `${i.product.name} (${i.product.sku})`).join(", ")}${oosItems.length > 5 ? ` and ${oosItems.length - 5} more` : ""}.`,
+      message: `Critical SKUs: ${oosItems.slice(0, 5).map((i: any) => `${i.product.name} (${i.product.sku})`).join(", ")}${oosItems.length > 5 ? ` and ${oosItems.length - 5} more` : ""}.`,
       timestamp: now,
       actionUrl: "/procurement/requisitions",
     });
@@ -133,12 +133,12 @@ export async function GET(req: NextRequest) {
 
   // Warnings: Overdue supplier payables
   if (overduePayables.length > 0) {
-    const totalDue = overduePayables.reduce((s, p) => s + Number(p.total), 0);
+    const totalDue = overduePayables.reduce((s: number, p: any) => s + Number(p.total), 0);
     warningAlerts.push({
       id: "payables-overdue",
       category: "PURCHASE",
       title: `${overduePayables.length} Supplier Bills Overdue for Payment`,
-      message: `Total overdue payable amount: ₹${totalDue.toLocaleString("en-IN", { minimumFractionDigits: 2 })} across suppliers: ${[...new Set(overduePayables.map((p) => p.supplier.name))].slice(0, 4).join(", ")}.`,
+      message: `Total overdue payable amount: ₹${totalDue.toLocaleString("en-IN", { minimumFractionDigits: 2 })} across suppliers: ${[...new Set(overduePayables.map((p: any) => p.supplier.name))].slice(0, 4).join(", ")}.`,
       timestamp: now,
       actionUrl: "/finance/payables",
     });
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
 
   // Warnings: Overdue Customer Receivables
   if (overdueReceivables.length > 0) {
-    const totalRec = overdueReceivables.reduce((s, p) => s + (Number(p.amountDue) - Number(p.amountPaid)), 0);
+    const totalRec = overdueReceivables.reduce((s: number, p: any) => s + (Number(p.amountDue) - Number(p.amountPaid)), 0);
     warningAlerts.push({
       id: "receivables-overdue",
       category: "SALES",
@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
       id: "inv-low",
       category: "INVENTORY",
       title: `${lowStockItems.length} Products Below Minimum Reorder Level`,
-      message: `Items needing procurement: ${lowStockItems.slice(0, 5).map((i) => i.product.name).join(", ")}.`,
+      message: `Items needing procurement: ${lowStockItems.slice(0, 5).map((i: any) => i.product.name).join(", ")}.`,
       timestamp: now,
       actionUrl: "/procurement/requisitions",
     });
@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
       id: "po-delayed",
       category: "PROCUREMENT",
       title: `${delayedPos.length} Purchase Orders Past Expected Delivery Date`,
-      message: `POs delayed: ${delayedPos.map((p) => `${p.poNumber} (${p.supplier.name})`).join(", ")}.`,
+      message: `POs delayed: ${delayedPos.map((p: any) => `${p.poNumber} (${p.supplier.name})`).join(", ")}.`,
       timestamp: now,
       actionUrl: "/procurement/orders",
     });

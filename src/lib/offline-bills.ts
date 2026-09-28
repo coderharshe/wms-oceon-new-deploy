@@ -32,6 +32,21 @@ export type BillDisplay = {
   discountTotal: number;
   taxTotal: number;
   total: number;
+  paymentMethod?: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
+  paymentDetails?: {
+    amountReceived?: number;
+    changeGiven?: number;
+    upiReference?: string;
+    bankReference?: string;
+    bankName?: string;
+    chequeNumber?: string;
+    chequeBank?: string;
+    chequeDueDate?: string;
+    notes?: string;
+  };
+  invoiceNumber?: string;
+  employeeName?: string;
+  employeeStaffId?: string;
 };
 export type SyncState = "pending" | "synced" | "attention";
 export type LocalBill = {

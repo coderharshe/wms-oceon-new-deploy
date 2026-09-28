@@ -78,6 +78,8 @@ export function buildInvoiceHtml(args: {
     )
     .join("");
 
+  const coName = (!args.businessName || args.businessName === "Store" || args.businessName === "Hub") ? "OCEON" : args.businessName;
+
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${esc(args.billNumber)}</title>
 <style>
@@ -138,7 +140,7 @@ export function buildInvoiceHtml(args: {
 </style></head>
 <body>
   <h1>ESTIMATE</h1>
-  <div class="co">TARESH GOLD FOODS PVT. LTD.</div>
+  <div class="co">${esc(coName)}</div>
   <div class="row"><span>Customer: ${esc(args.customerName)}</span><span>Bill No. ${esc(args.billNumber)}</span></div>
   <div class="row"><span>${args.customerMobile ? `Mobile: ${esc(args.customerMobile)}` : ""}</span><span>Date: ${displayDate} &nbsp; Time: ${args.time}</span></div>
 

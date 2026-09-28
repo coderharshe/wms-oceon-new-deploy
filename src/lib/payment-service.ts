@@ -241,6 +241,62 @@ export async function failUpiPayment(tx: Tx, args: { transactionId: string; orde
   publish(`order:${args.orderId}`, "payment:failed", { transactionId: args.transactionId });
 }
 
+/** Direct Confirmed UPI Counter Payment */
+export async function recordUpiPaymentDirect(
+  tx: Tx,
+  args: {
+    billId: string;
+    amount: Decimal;
+    userId: string;
+    warehouseId: string;
+    orderId: string;
+    upiReference?: string;
+    notes?: string;
+    clickedAt?: Date;
+    clientRequestId?: string;
+  }
+) {
+  if (args.clientRequestId) await claimIdempotencyKey(tx, args.clientRequestId);
+  const [payment] = await tx.$queryRaw<{ id: string; amountDue: string }[]>`
+    SELECT id, "amountDue" FROM "Payment" WHERE "billId" = ${args.billId} FOR UPDATE
+  `;
+  if (!payment) throw new Error("Bill has no payment record");
+  const priorPaid = await sumConfirmedPayments(tx, payment.id);
+  const remainingDue = new Decimal(payment.amountDue).sub(priorPaid);
+  if (remainingDue.lte(0)) throw new PaymentError("Bill is already fully paid");
+  const applied = Decimal.min(args.amount, remainingDue);
+
+  const transaction = await tx.paymentTransaction.create({
+    data: {
+      paymentId: payment.id,
+      type: "PAYMENT",
+      method: "UPI",
+      amount: applied,
+      amountReceived: args.amount,
+      upiReference: args.upiReference,
+      notes: args.notes,
+      status: "CONFIRMED",
+      recordedByUserId: args.userId,
+      clickedAt: args.clickedAt,
+    },
+  });
+
+  await afterLedgerChange(tx, args.billId, args.warehouseId, args.orderId);
+
+  await writeAudit(
+    {
+      userId: args.userId,
+      warehouseId: args.warehouseId,
+      action: "PAYMENT_RECORDED",
+      entityType: "PaymentTransaction",
+      entityId: transaction.id,
+      newValue: { method: "UPI", amount: applied.toString(), upiReference: args.upiReference },
+    },
+    tx
+  );
+  return { transaction, change: new Decimal(0) };
+}
+
 /** Direct Bank Transfer (NEFT / RTGS / IMPS) */
 export async function recordBankTransferPayment(
   tx: Tx,

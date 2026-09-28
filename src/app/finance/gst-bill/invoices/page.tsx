@@ -63,11 +63,11 @@ export default function GstInvoiceRegisterPage() {
     reload();
   }
 
-  if (loading) return <div className="mx-auto max-w-5xl space-y-3"><SkeletonCard lines={3} /><SkeletonCard lines={6} /></div>;
+  if (loading) return <div className="w-full space-y-3"><SkeletonCard lines={3} /><SkeletonCard lines={6} /></div>;
   if (error && !data) return <ErrorRetry message={error} onRetry={reload} />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-3">
+    <div className="w-full space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Past GST invoices</h1>
         <Link className="btn" href="/finance/gst-bill">New GST invoice</Link>
