@@ -327,9 +327,8 @@ export default function InventoryOutwardAndReturnsPage() {
     } else if (customerId) {
       const cust = customers.find((c) => c.id === customerId);
       if (cust) {
-        resolvedCustomerName = `${cust.shopName}${cust.ownerName ? ` (${cust.ownerName})` : ""}${
-          cust.mobile ? ` - ${cust.mobile}` : ""
-        }`;
+        resolvedCustomerName = `${cust.shopName}${cust.ownerName ? ` (${cust.ownerName})` : ""}${cust.mobile ? ` - ${cust.mobile}` : ""
+          }`;
       }
     }
 
@@ -346,11 +345,10 @@ export default function InventoryOutwardAndReturnsPage() {
       customerId: !isCashCustomer && customerId ? customerId : undefined,
       customerName: resolvedCustomerName || undefined,
       orderReference: orderReference.trim() || undefined,
-      reason: `${reason.trim()}${
-        isCustomerReturn && totalRefundValue > 0
+      reason: `${reason.trim()}${isCustomerReturn && totalRefundValue > 0
           ? ` | Total Return Value: ₹${totalRefundValue.toFixed(2)}`
           : ""
-      }`,
+        }`,
       items: items.map((it) => ({
         productId: it.productId,
         quantity: Number(it.quantity),
@@ -426,7 +424,7 @@ export default function InventoryOutwardAndReturnsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-ink">
-            Inventory Issue & Customer Returns Log
+            Inventory Issue & Customer Returns
           </h1>
           <p className="text-xs text-muted mt-0.5">
             Record customer returns with order rate validation or deduct damaged, expired, and dispatched outward items.
@@ -479,51 +477,46 @@ export default function InventoryOutwardAndReturnsPage() {
           <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => setTypeFilter("ALL")}
-              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                typeFilter === "ALL"
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${typeFilter === "ALL"
                   ? "bg-accent text-white"
                   : "bg-surface text-ink hover:bg-surface-hi border border-line"
-              }`}
+                }`}
             >
               All Movements
             </button>
             <button
               onClick={() => setTypeFilter("CUSTOMER_RETURN")}
-              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                typeFilter === "CUSTOMER_RETURN"
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${typeFilter === "CUSTOMER_RETURN"
                   ? "bg-emerald-700 text-white"
                   : "bg-surface text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border border-line"
-              }`}
+                }`}
             >
               📥 Customer Returns
             </button>
             <button
               onClick={() => setTypeFilter("DAMAGE")}
-              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                typeFilter === "DAMAGE"
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${typeFilter === "DAMAGE"
                   ? "bg-rose-700 text-white"
                   : "bg-surface text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border border-line"
-              }`}
+                }`}
             >
               ⚠️ Damaged Goods
             </button>
             <button
               onClick={() => setTypeFilter("EXPIRY")}
-              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                typeFilter === "EXPIRY"
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${typeFilter === "EXPIRY"
                   ? "bg-amber-700 text-white"
                   : "bg-surface text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 border border-line"
-              }`}
+                }`}
             >
               ⏳ Expired Goods
             </button>
             <button
               onClick={() => setTypeFilter("SUPPLIER_RETURN")}
-              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                typeFilter === "SUPPLIER_RETURN"
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${typeFilter === "SUPPLIER_RETURN"
                   ? "bg-purple-700 text-white"
                   : "bg-surface text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20 border border-line"
-              }`}
+                }`}
             >
               ↩️ Supplier Returns
             </button>
@@ -680,11 +673,10 @@ export default function InventoryOutwardAndReturnsPage() {
                                     setSelectedOrderId(ord.id);
                                     setOrderReference(billRef);
                                   }}
-                                  className={`p-2 rounded-md border text-xs cursor-pointer transition-all ${
-                                    isSelected
+                                  className={`p-2 rounded-md border text-xs cursor-pointer transition-all ${isSelected
                                       ? "bg-emerald-100/70 dark:bg-emerald-950/50 border-emerald-500 ring-1 ring-emerald-500/50"
                                       : "bg-surface-2/60 hover:bg-surface-2 border-line"
-                                  }`}
+                                    }`}
                                 >
                                   <div className="flex items-center justify-between font-mono font-bold text-ink">
                                     <span className="text-accent">{billRef}</span>
@@ -1072,18 +1064,17 @@ export default function InventoryOutwardAndReturnsPage() {
                 <button
                   type="submit"
                   form="movement-form"
-                  className={`btn font-semibold text-xs px-4 py-1.5 text-white ${
-                    modalMode === "INWARD_RETURN"
+                  className={`btn font-semibold text-xs px-4 py-1.5 text-white ${modalMode === "INWARD_RETURN"
                       ? "bg-emerald-700 hover:bg-emerald-800"
                       : "btn-primary"
-                  }`}
+                    }`}
                   disabled={saving || items.length === 0}
                 >
                   {saving
                     ? "Processing…"
                     : modalMode === "INWARD_RETURN"
-                    ? `✓ Confirm Inward Return (${items.length} items)`
-                    : `✓ Confirm Outward Deduction (${items.length} items)`}
+                      ? `✓ Confirm Inward Return (${items.length} items)`
+                      : `✓ Confirm Outward Deduction (${items.length} items)`}
                 </button>
               </div>
             </div>

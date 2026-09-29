@@ -57,7 +57,7 @@ export default function InventoryReportsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold">Inventory Reports & Critical Health Alerts</h1>
+          <h1 className="text-lg font-bold">Inventory Reports & Alerts</h1>
           <p className="text-xs text-muted">Real-time stock valuation, low-stock alerts, out-of-stock monitoring, and audit log</p>
         </div>
       </div>
