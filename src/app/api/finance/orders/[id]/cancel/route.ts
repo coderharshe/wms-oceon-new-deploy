@@ -3,11 +3,10 @@ import { z } from "zod";
 import { Decimal } from "@prisma/client/runtime/library";
 import { requireRole, isErrorResponse, assertWarehouseAccess } from "@/lib/guard";
 import { isWorkersRuntime } from "@/lib/cf-env";
+import { toBaseQty } from "@/lib/units";
 
-// Cancellable up to the point Finance hands the order to QC — once QC has
-// it, the goods are being physically checked and this isn't the right undo
-// path anymore.
-const CANCELLABLE = ["DRAFT", "BILLED", "PAYMENT_PENDING", "PAID"];
+// Cancellable statuses: DRAFT, BILLED, PAYMENT_PENDING, PAID, READY_FOR_QC, COMPLETED.
+const CANCELLABLE = ["DRAFT", "BILLED", "PAYMENT_PENDING", "PAID", "READY_FOR_QC", "COMPLETED"];
 const ACTIVE_SESSION = ["IN_PROGRESS", "CHANGES_REQUIRED"];
 
 // `refund` says what happened to money already collected, asked in the
@@ -25,12 +24,11 @@ class CancelConflictError extends Error {}
 /** Money was already collected and no reason was given for reversing it. */
 class ReasonRequiredError extends Error {}
 
-// Reverses whatever was committed: releases any reserved stock, and if money
-// was already collected, routes it through the same refund-resolve flow
-// Finance already uses for QC-driven refunds (a PaymentAdjustment record with
-// newTotal 0 — Finance settles it from the order page like any other refund).
+// Reverses whatever was committed: releases any reserved stock (and restores on-hand
+// inventory if the order was already completed/deducted), and if money
+// was already collected, routes it through the refund-resolve flow.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
 
@@ -43,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     if (isWorkersRuntime()) {
       const { getDrizzleDb } = await import("@/lib/drizzle-db");
-      const { order, bill, billVersion, payment, paymentAdjustment, qcSession } = await import("@/generated/drizzle/schema");
+      const { order, orderItem, bill, billVersion, billItem, payment, paymentAdjustment, qcSession, inventory, inventoryMovement, productUnit } = await import("@/generated/drizzle/schema");
       const { eq, and, inArray, isNull, desc } = await import("drizzle-orm");
       const { releaseOrderReservationsDrizzle } = await import("@/lib/drizzle-inventory");
       const { applyBillRevisionAdjustmentDrizzle, resolvePaymentAdjustmentDrizzle } = await import("@/lib/drizzle-payment-service");
@@ -57,10 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (forbidden) return forbidden;
 
       const updated = await db.transaction(async (tx) => {
-        // Lock and re-read the order INSIDE the transaction: the QC-start route
-        // locks the same row, so without this a cancel can land while QC is
-        // starting and leave a CANCELLED order with a live session that later
-        // deducts stock.
+        // Lock and re-read the order INSIDE the transaction
         const [ord] = await tx.select().from(order).where(eq(order.id, ord0.id)).for("update");
         if (!CANCELLABLE.includes(ord!.status)) {
           throw new CancelConflictError(`Order is in status ${ord!.status}, cannot cancel from here`);
@@ -71,28 +66,126 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           .where(and(eq(qcSession.orderId, ord!.id), inArray(qcSession.status, ACTIVE_SESSION as any)));
         if (activeQc) throw new CancelConflictError("QC is working on this order — release the QC session before cancelling");
 
+        // Release any reservations still active
         await releaseOrderReservationsDrizzle(tx, ord!.id);
 
         const [b] = await tx.select().from(bill).where(eq(bill.orderId, ord!.id));
+
+        // If the order was COMPLETED, stock was permanently deducted from onHand.
+        // Return all line items back to quantityOnHand and record movement.
+        if (ord!.status === "COMPLETED") {
+          let linesToRestore: { productId: string; unitId: string; quantity: string }[] = [];
+          if (b) {
+            const [currentVer] = await tx
+              .select()
+              .from(billVersion)
+              .where(and(eq(billVersion.billId, b.id), eq(billVersion.versionNumber, b.currentVersion)));
+            if (currentVer) {
+              const vItems = await tx
+                .select()
+                .from(billItem)
+                .where(eq(billItem.billVersionId, currentVer.id));
+              linesToRestore = vItems.map((i) => ({ productId: i.productId, unitId: i.unitId, quantity: i.quantity }));
+            }
+          }
+          if (linesToRestore.length === 0) {
+            const oItems = await tx.select().from(orderItem).where(eq(orderItem.orderId, ord!.id));
+            linesToRestore = oItems.map((i) => ({ productId: i.productId, unitId: i.unitId, quantity: i.quantity }));
+          }
+
+          for (const item of linesToRestore) {
+            const pUnits = await tx.select().from(productUnit).where(eq(productUnit.productId, item.productId));
+            const baseQty = toBaseQty(
+              pUnits.map((u) => ({ unitId: u.unitId, factorToBase: u.factorToBase, isBaseUnit: u.isBaseUnit })),
+              item.unitId,
+              item.quantity
+            );
+
+            const [inv] = await tx
+              .select()
+              .from(inventory)
+              .where(and(eq(inventory.productId, item.productId), eq(inventory.warehouseId, ord!.warehouseId)));
+            if (inv) {
+              const before = new Decimal(inv.quantityOnHand);
+              const after = before.add(baseQty);
+              await tx
+                .update(inventory)
+                .set({ quantityOnHand: after.toString() })
+                .where(eq(inventory.id, inv.id));
+
+              await tx.insert(inventoryMovement).values({
+                id: crypto.randomUUID(),
+                productId: item.productId,
+                warehouseId: ord!.warehouseId,
+                beforeQty: before.toString(),
+                movementQty: baseQty.toString(),
+                afterQty: after.toString(),
+                movementType: "RETURN",
+                referenceType: "ORDER",
+                referenceId: ord!.id,
+                userId: session.sub,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          }
+        }
+
         if (b) {
           const [pay] = await tx.select().from(payment).where(eq(payment.billId, b.id));
           if (pay && new Decimal(pay.amountPaid).gt(0)) {
             // Money already collected must never be reversed unexplained.
             if (!reason) throw new ReasonRequiredError("A reason is required to cancel an order that has been paid");
-            const [currentVersion] = await tx.select().from(billVersion).where(and(eq(billVersion.billId, b.id), eq(billVersion.versionNumber, b.currentVersion)));
-            await applyBillRevisionAdjustmentDrizzle(tx, { billId: b.id, previousTotal: new Decimal(currentVersion!.total), newTotal: new Decimal(0), warehouseId: ord!.warehouseId, orderId: ord!.id });
+            const [currentVersion] = await tx
+              .select()
+              .from(billVersion)
+              .where(and(eq(billVersion.billId, b.id), eq(billVersion.versionNumber, b.currentVersion)));
+            if (currentVersion) {
+              await applyBillRevisionAdjustmentDrizzle(tx, {
+                billId: b.id,
+                previousTotal: new Decimal(currentVersion.total),
+                newTotal: new Decimal(0),
+                warehouseId: ord!.warehouseId,
+                orderId: ord!.id,
+              });
+            }
             if (resolution) {
-              const [adj] = await tx.select({ id: paymentAdjustment.id }).from(paymentAdjustment)
+              const [adj] = await tx
+                .select({ id: paymentAdjustment.id })
+                .from(paymentAdjustment)
                 .where(and(eq(paymentAdjustment.billId, b.id), isNull(paymentAdjustment.resolutionType)))
-                .orderBy(desc(paymentAdjustment.createdAt)).limit(1);
-              // amountPaid, not the bill total: a part-paid bill gives back what was paid.
-              if (adj) await resolvePaymentAdjustmentDrizzle(tx, { adjustmentId: adj.id, resolutionType: resolution, userId: session.sub, notes: reason ?? undefined, amount: new Decimal(pay.amountPaid) });
+                .orderBy(desc(paymentAdjustment.createdAt))
+                .limit(1);
+              if (adj) {
+                await resolvePaymentAdjustmentDrizzle(tx, {
+                  adjustmentId: adj.id,
+                  resolutionType: resolution,
+                  userId: session.sub,
+                  notes: reason ?? undefined,
+                  amount: new Decimal(pay.amountPaid),
+                });
+              }
             }
           }
         }
 
-        const [result] = await tx.update(order).set({ status: "CANCELLED", updatedAt: new Date().toISOString() }).where(eq(order.id, ord!.id)).returning();
-        await writeAuditDrizzle({ userId: session.sub, role: session.role, warehouseId: ord!.warehouseId, action: "ORDER_CANCELLED", entityType: "Order", entityId: ord!.id, newValue: { refund: parsed.data.refund }, reason }, tx);
+        const [result] = await tx
+          .update(order)
+          .set({ status: "CANCELLED", updatedAt: new Date().toISOString() })
+          .where(eq(order.id, ord!.id))
+          .returning();
+        await writeAuditDrizzle(
+          {
+            userId: session.sub,
+            role: session.role,
+            warehouseId: ord!.warehouseId,
+            action: "ORDER_CANCELLED",
+            entityType: "Order",
+            entityId: ord!.id,
+            newValue: { refund: parsed.data.refund },
+            reason,
+          },
+          tx
+        );
         return result;
       });
 
@@ -113,7 +206,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (forbidden) return forbidden;
 
     const updated = await db.$transaction(async (tx) => {
-      // Row lock — same reasoning as the Drizzle branch above.
+      // Row lock
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${ord0.id} FOR UPDATE`;
       const ord = await tx.order.findUniqueOrThrow({ where: { id: ord0.id } });
       if (!CANCELLABLE.includes(ord.status)) {
@@ -122,22 +215,112 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const activeQc = await tx.qcSession.findFirst({ where: { orderId: ord.id, status: { in: ACTIVE_SESSION as any } } });
       if (activeQc) throw new CancelConflictError("QC is working on this order — release the QC session before cancelling");
 
+      // Release any active reservations
       await releaseOrderReservations(tx, ord.id);
 
-      const bill = await tx.bill.findUnique({ where: { orderId: ord.id }, include: { payment: true, versions: true } });
+      const bill = await tx.bill.findUnique({
+        where: { orderId: ord.id },
+        include: {
+          payment: true,
+          versions: {
+            include: {
+              items: true,
+            },
+          },
+        },
+      });
+
+      // If the order was COMPLETED, stock was permanently deducted from onHand.
+      // Return all line items back to quantityOnHand and record movement.
+      if (ord.status === "COMPLETED") {
+        let linesToRestore: { productId: string; unitId: string; quantity: any }[] = [];
+        if (bill) {
+          const currentVer = bill.versions.find((v) => v.versionNumber === bill.currentVersion);
+          if (currentVer) {
+            linesToRestore = currentVer.items.map((i) => ({ productId: i.productId, unitId: i.unitId, quantity: i.quantity }));
+          }
+        }
+        if (linesToRestore.length === 0) {
+          const oItems = await tx.orderItem.findMany({ where: { orderId: ord.id } });
+          linesToRestore = oItems.map((i) => ({ productId: i.productId, unitId: i.unitId, quantity: i.quantity }));
+        }
+
+        for (const item of linesToRestore) {
+          const pUnits = await tx.productUnit.findMany({ where: { productId: item.productId } });
+          const baseQty = toBaseQty(
+            pUnits.map((u) => ({ unitId: u.unitId, factorToBase: u.factorToBase, isBaseUnit: u.isBaseUnit })),
+            item.unitId,
+            item.quantity
+          );
+
+          const inv = await tx.inventory.findUnique({
+            where: { productId_warehouseId: { productId: item.productId, warehouseId: ord.warehouseId } },
+          });
+          if (inv) {
+            const before = inv.quantityOnHand;
+            const after = before.add(baseQty);
+            await tx.inventory.update({
+              where: { id: inv.id },
+              data: { quantityOnHand: after },
+            });
+            await tx.inventoryMovement.create({
+              data: {
+                productId: item.productId,
+                warehouseId: ord.warehouseId,
+                beforeQty: before,
+                movementQty: baseQty,
+                afterQty: after,
+                movementType: "RETURN",
+                referenceType: "ORDER",
+                referenceId: ord.id,
+                userId: session.sub,
+              },
+            });
+          }
+        }
+      }
+
       if (bill?.payment && new Decimal(bill.payment.amountPaid).gt(0)) {
         // Money already collected must never be reversed unexplained.
         if (!reason) throw new ReasonRequiredError("A reason is required to cancel an order that has been paid");
-        const currentVersion = bill.versions.find((v) => v.versionNumber === bill.currentVersion)!;
-        await applyBillRevisionAdjustment(tx, { billId: bill.id, previousTotal: new Decimal(currentVersion.total), newTotal: new Decimal(0), warehouseId: ord.warehouseId, orderId: ord.id });
+        const currentVersion = bill.versions.find((v) => v.versionNumber === bill.currentVersion);
+        if (currentVersion) {
+          await applyBillRevisionAdjustment(tx, {
+            billId: bill.id,
+            previousTotal: new Decimal(currentVersion.total),
+            newTotal: new Decimal(0),
+            warehouseId: ord.warehouseId,
+            orderId: ord.id,
+          });
+        }
         if (resolution) {
           const adj = await tx.paymentAdjustment.findFirst({ where: { billId: bill.id, resolutionType: null }, orderBy: { createdAt: "desc" } });
-          if (adj) await resolvePaymentAdjustment(tx, { adjustmentId: adj.id, resolutionType: resolution, userId: session.sub, notes: reason ?? undefined, amount: new Decimal(bill.payment.amountPaid) });
+          if (adj) {
+            await resolvePaymentAdjustment(tx, {
+              adjustmentId: adj.id,
+              resolutionType: resolution,
+              userId: session.sub,
+              notes: reason ?? undefined,
+              amount: new Decimal(bill.payment.amountPaid),
+            });
+          }
         }
       }
 
       const result = await tx.order.update({ where: { id: ord.id }, data: { status: "CANCELLED" } });
-      await writeAudit({ userId: session.sub, role: session.role, warehouseId: ord.warehouseId, action: "ORDER_CANCELLED", entityType: "Order", entityId: ord.id, newValue: { refund: parsed.data.refund }, reason }, tx);
+      await writeAudit(
+        {
+          userId: session.sub,
+          role: session.role,
+          warehouseId: ord.warehouseId,
+          action: "ORDER_CANCELLED",
+          entityType: "Order",
+          entityId: ord.id,
+          newValue: { refund: parsed.data.refund },
+          reason,
+        },
+        tx
+      );
       return result;
     });
 

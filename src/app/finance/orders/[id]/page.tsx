@@ -536,7 +536,7 @@ export default function OrderDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="badge bg-line">{order.status}</span>
+          <span className={`badge ${order.status === "CANCELLED" ? "bg-rose-600 text-white font-bold" : "bg-line"}`}>{order.status}</span>
           {bill && <span className="badge bg-line">{bill.paymentStatus}</span>}
           {bill && (
             <button className="btn" disabled={busy} onClick={viewInvoice}>
@@ -548,14 +548,27 @@ export default function OrderDetailPage() {
               Print Bill
             </button>
           )}
-          {canCancel && (
-            <button className="btn-danger" disabled={busy} onClick={() => setCancelling(true)}>
-              Cancel Order
-            </button>
-          )}
           {cancelling && <CancelOrderDialog orderId={id} paid={paid} onClose={() => setCancelling(false)} onDone={load} />}
         </div>
       </div>
+
+      {order.status === "CANCELLED" && (
+        <div className="rounded-lg border-2 border-rose-500 bg-rose-50 p-4 text-rose-900 shadow-sm dark:bg-rose-950/40 dark:border-rose-700 dark:text-rose-200">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-rose-600 text-white text-lg font-bold">
+              ✕
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-rose-800 dark:text-rose-300">
+                THIS BILL IS CANCELLED
+              </h2>
+              <p className="text-xs text-rose-700 dark:text-rose-300/80">
+                All items from this bill have been removed and their quantities have been restored back into warehouse inventory.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="card">
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -568,17 +581,27 @@ export default function OrderDetailPage() {
             )}
           </h2>
           {bill && order.status !== "CANCELLED" && (
-            <ModifyBill
-              orderId={order.id}
-              sellingMode={order.sellingMode}
-              lines={currentVersion?.items ?? order.items}
-              onSaved={load}
-              // Offline the saved copy is all there is; the edit carries the
-              // version it was made on, so a stale base is refused on sync.
-              disabled={busy || (stale && !loadError)}
-              expectedVersion={bill.currentVersion}
-              queueOffline
-            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-danger text-sm font-medium"
+                disabled={busy}
+                onClick={() => setCancelling(true)}
+              >
+                Cancel Bill
+              </button>
+              <ModifyBill
+                orderId={order.id}
+                sellingMode={order.sellingMode}
+                lines={currentVersion?.items ?? order.items}
+                onSaved={load}
+                // Offline the saved copy is all there is; the edit carries the
+                // version it was made on, so a stale base is refused on sync.
+                disabled={busy || (stale && !loadError)}
+                expectedVersion={bill.currentVersion}
+                queueOffline
+              />
+            </div>
           )}
         </div>
 
@@ -594,7 +617,7 @@ export default function OrderDetailPage() {
           </thead>
           <tbody>
             {(currentVersion?.items ?? order.items).filter(isActiveLine).map((it) => (
-              <tr key={it.id}>
+              <tr key={it.id} className={order.status === "CANCELLED" ? "opacity-60 line-through" : ""}>
                 <td>{it.product.name}</td>
                 <td>{fmtQty(it.quantity)}</td>
                 <td>₹{Number(it.unitPrice).toFixed(2)}</td>
@@ -606,7 +629,13 @@ export default function OrderDetailPage() {
             ))}
           </tbody>
         </table>
-        <div className="mt-2 text-right text-base font-semibold">Total: ₹{displayTotal.toFixed(2)}</div>
+        <div className="mt-2 text-right text-base font-semibold">
+          {order.status === "CANCELLED" ? (
+            <span className="text-bad">Total: ₹0.00 (Cancelled — Original Total: ₹{displayTotal.toFixed(2)})</span>
+          ) : (
+            <span>Total: ₹{displayTotal.toFixed(2)}</span>
+          )}
+        </div>
 
         {/* Kept out of the table above and off the printed bill — these are
             not goods the customer is getting. They stay on screen because

@@ -126,9 +126,7 @@ export default function BillingCustomersPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-ink">Customer Directory</h1>
-          <p className="text-xs text-muted">
-            Manage wholesale & retail client profiles, credit terms, and ledger dues
-          </p>
+
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -346,11 +344,10 @@ export default function BillingCustomersPage() {
                       {/* Type Badge */}
                       <td className="px-3 py-2.5">
                         <span
-                          className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
-                            c.type === "WHOLESALE"
+                          className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${c.type === "WHOLESALE"
                               ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                               : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                          }`}
+                            }`}
                         >
                           {c.type}
                         </span>
@@ -364,13 +361,12 @@ export default function BillingCustomersPage() {
                       {/* Outstanding Dues */}
                       <td className="px-3 py-2.5 text-right font-mono">
                         <span
-                          className={`font-semibold ${
-                            outstanding > 0
+                          className={`font-semibold ${outstanding > 0
                               ? isOverLimit
                                 ? "text-bad font-bold"
                                 : "text-amber-600 dark:text-amber-400"
                               : "text-muted"
-                          }`}
+                            }`}
                         >
                           ₹{outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </span>
@@ -390,11 +386,10 @@ export default function BillingCustomersPage() {
                       {/* Status */}
                       <td className="px-3 py-2.5 text-center">
                         <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                            c.status === "ACTIVE"
+                          className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${c.status === "ACTIVE"
                               ? "bg-good/10 text-good"
                               : "bg-bad/10 text-bad"
-                          }`}
+                            }`}
                         >
                           {c.status}
                         </span>

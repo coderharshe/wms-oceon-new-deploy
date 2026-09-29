@@ -111,7 +111,6 @@ export function AddCustomerModal({
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div>
             <h2 className="text-base font-bold text-ink">Add New Customer</h2>
-            <p className="text-xs text-muted">Create customer account with distinct shop name & customer profile</p>
           </div>
           <button
             type="button"
