@@ -46,6 +46,8 @@ export function AddProductModal({
     taxPercent: "0",
     minStock: "",
     maxStock: "",
+    mfgDate: "",
+    expiryDate: "",
   });
 
   const [skuTouched, setSkuTouched] = useState(false);
@@ -152,6 +154,8 @@ export function AddProductModal({
       taxPercent: Number(form.taxPercent) || 0,
       minStock: form.minStock !== "" ? Number(form.minStock) : undefined,
       maxStock: form.maxStock !== "" ? Number(form.maxStock) : undefined,
+      mfgDate: form.mfgDate || undefined,
+      expiryDate: form.expiryDate || undefined,
       saleUnits,
     };
 
@@ -433,7 +437,42 @@ export function AddProductModal({
             </div>
           </div>
 
-          {/* Section 4: Secondary Packaging Units (Boxes, Peti, Cartons) */}
+          {/* Section 4: Manufacturing (MFD) & Expiry (EXP) Dates */}
+          <div className="space-y-3 bg-surface-2/40 p-3 rounded-lg border border-line">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+              <span>📅</span> Manufacturing (MFD) & Expiry Date
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink">
+                  Manufacturing Date (MFD)
+                </label>
+                <input
+                  type="date"
+                  className="input w-full text-xs font-mono"
+                  value={form.mfgDate}
+                  onChange={(e) => setForm({ ...form, mfgDate: e.target.value })}
+                />
+                <p className="text-[10px] text-muted mt-0.5">Date of production / packaging</p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink">
+                  Expiry Date (EXP)
+                </label>
+                <input
+                  type="date"
+                  className="input w-full text-xs font-mono font-bold text-amber-700 dark:text-amber-300"
+                  value={form.expiryDate}
+                  onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+                />
+                <p className="text-[10px] text-muted mt-0.5">Used for Near-Expiry & Dead/Expired stock monitoring</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Secondary Packaging Units (Boxes, Peti, Cartons) */}
           <div className="space-y-3 bg-surface-2/40 p-3 rounded-lg border border-line">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">

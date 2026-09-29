@@ -655,6 +655,8 @@ export const product = pgTable("Product", {
 	taxPercent: numeric({ precision: 5, scale:  2 }).default('0').notNull(),
 	minStock: numeric({ precision: 14, scale:  3 }),
 	maxStock: numeric({ precision: 14, scale:  3 }),
+	mfgDate: timestamp({ precision: 3, mode: 'string' }),
+	expiryDate: timestamp({ precision: 3, mode: 'string' }),
 	batchTracked: boolean().default(false).notNull(),
 	expiryTracked: boolean().default(false).notNull(),
 	active: boolean().default(true).notNull(),

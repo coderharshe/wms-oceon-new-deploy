@@ -19,3 +19,4 @@ extract_docs.py
 vikas.pdf
 hsncodemaster.xls
 *.tsbuildinfo
+.env.production

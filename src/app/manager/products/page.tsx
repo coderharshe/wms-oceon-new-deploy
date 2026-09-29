@@ -19,6 +19,8 @@ type Product = {
   barcode: string | null;
   category: string | null;
   brand: string | null;
+  mfgDate?: string | null;
+  expiryDate?: string | null;
   wholesalePrice: string;
   retailPrice: string;
   taxPercent: string;
@@ -82,7 +84,7 @@ export default function ManagerProductsPage() {
         </button>
       </div>
       {loading ? (
-        <SkeletonTable rows={6} cols={8} />
+        <SkeletonTable rows={6} cols={9} />
       ) : (
         <div className="card">
           <table>
@@ -92,6 +94,7 @@ export default function ManagerProductsPage() {
                 <th>SKU</th>
                 <th>Name</th>
                 <th>Base unit</th>
+                <th>MFD / Expiry</th>
                 <th>Wholesale</th>
                 <th>Retail</th>
                 <th>Tax</th>
@@ -100,40 +103,67 @@ export default function ManagerProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      {p.imageKey && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={`/api/files/${p.imageKey}`} alt="" className="h-8 w-8 rounded object-cover" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="w-32 text-xs"
-                        aria-label={`Photo for ${p.name}`}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) uploadImage(p.id, file);
-                        }}
-                      />
-                    </div>
-                  </td>
-                  <td><Highlight text={p.sku} q={q} /></td>
-                  <td><Highlight text={p.name} q={q} /></td>
-                  <td>{p.baseUnit.symbol}</td>
-                  <td>₹{Number(p.wholesalePrice).toFixed(2)}</td>
-                  <td>₹{Number(p.retailPrice).toFixed(2)}</td>
-                  <td>{p.taxPercent}%</td>
-                  <td>{p.active ? "Active" : "Inactive"}</td>
-                  <td>
-                    <button className="btn" onClick={() => setEditing(p)}>
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {list.map((p) => {
+                const isExpired = p.expiryDate && new Date(p.expiryDate).getTime() < Date.now();
+                const isNearExpiry = p.expiryDate && !isExpired && new Date(p.expiryDate).getTime() < Date.now() + 60 * 24 * 60 * 60 * 1000;
+
+                return (
+                  <tr key={p.id}>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {p.imageKey && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={`/api/files/${p.imageKey}`} alt="" className="h-8 w-8 rounded object-cover" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="w-32 text-xs"
+                          aria-label={`Photo for ${p.name}`}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadImage(p.id, file);
+                          }}
+                        />
+                      </div>
+                    </td>
+                    <td><Highlight text={p.sku} q={q} /></td>
+                    <td><Highlight text={p.name} q={q} /></td>
+                    <td>{p.baseUnit.symbol}</td>
+                    <td>
+                      <div className="text-xs space-y-0.5">
+                        {p.mfgDate && (
+                          <div className="text-[11px] text-muted">
+                            MFD: <span className="font-mono text-ink">{p.mfgDate.split("T")[0]}</span>
+                          </div>
+                        )}
+                        {p.expiryDate ? (
+                          <div className="text-[11px]">
+                            {isExpired ? (
+                              <span className="text-rose-600 font-bold">EXP: {p.expiryDate.split("T")[0]} (Expired)</span>
+                            ) : isNearExpiry ? (
+                              <span className="text-orange-600 font-medium">EXP: {p.expiryDate.split("T")[0]} (Near Expiry)</span>
+                            ) : (
+                              <span className="text-emerald-700">EXP: {p.expiryDate.split("T")[0]}</span>
+                            )}
+                          </div>
+                        ) : (
+                          !p.mfgDate && <span className="text-[11px] text-muted/60 italic">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>₹{Number(p.wholesalePrice).toFixed(2)}</td>
+                    <td>₹{Number(p.retailPrice).toFixed(2)}</td>
+                    <td>{p.taxPercent}%</td>
+                    <td>{p.active ? "Active" : "Inactive"}</td>
+                    <td>
+                      <button className="btn" onClick={() => setEditing(p)}>
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

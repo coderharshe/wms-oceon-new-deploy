@@ -54,6 +54,8 @@ const schema = z.object({
   taxPercent: z.number().min(0).max(100).default(0),
   minStock: z.number().optional(),
   maxStock: z.number().optional(),
+  mfgDate: z.string().nullable().optional(),
+  expiryDate: z.string().nullable().optional(),
   saleUnits: z
     .array(
       z.object({
@@ -148,6 +150,8 @@ async function createProduct(
           taxPercent: data.taxPercent.toString(),
           minStock: data.minStock?.toString(),
           maxStock: data.maxStock?.toString(),
+          mfgDate: data.mfgDate ? new Date(data.mfgDate).toISOString() : null,
+          expiryDate: data.expiryDate ? new Date(data.expiryDate).toISOString() : null,
           ...(review ?? {}),
         })
         .returning();
@@ -177,7 +181,13 @@ async function createProduct(
 
   const db = (await import("@/lib/db")).getDb();
   const product = await db.product.create({
-    data: { ...data, ...(review ?? {}), saleUnits: { create: saleUnits } },
+    data: {
+      ...data,
+      mfgDate: data.mfgDate ? new Date(data.mfgDate) : null,
+      expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+      ...(review ?? {}),
+      saleUnits: { create: saleUnits },
+    },
     include: { baseUnit: true, saleUnits: { include: { unit: true } } },
   });
   await (await import("@/lib/audit")).writeAudit({ userId: session.sub, role: session.role, action: "PRODUCT_CREATED", entityType: "Product", entityId: product.id, newValue: { sku: product.sku, name: product.name } });

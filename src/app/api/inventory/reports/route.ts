@@ -13,14 +13,20 @@ export async function GET(req: NextRequest) {
     const where: any = {};
     if (warehouseId) where.warehouseId = warehouseId;
 
+    // 1. Fetch all active products
+    const allProducts = await db.product.findMany({
+      where: { active: true },
+      include: {
+        baseUnit: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    // 2. Fetch inventory records
     const inventoryRows = await db.inventory.findMany({
       where,
       include: {
-        product: {
-          include: {
-            baseUnit: true,
-          },
-        },
+        warehouse: true,
       },
     });
 
@@ -34,51 +40,60 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Map inventory quantity by productId
+    const productStockMap = new Map<string, number>();
+    for (const row of inventoryRows) {
+      const q = Number(row.quantityOnHand || 0);
+      productStockMap.set(row.productId, (productStockMap.get(row.productId) || 0) + q);
+    }
+
     let totalValuation = 0;
     let totalItems = 0;
     const lowStockList = [];
     const oosList = [];
 
-    for (const row of inventoryRows) {
-      const q = Number(row.quantityOnHand);
-      const price = Number(row.product.wholesalePrice);
-      const min = Number(row.product.minStock || 0);
+    for (const p of allProducts) {
+      const q = productStockMap.get(p.id) || 0;
+      const price = Number(p.wholesalePrice || 0);
+      const min = Number(p.minStock || 0);
 
-      totalValuation += q * price;
-      totalItems += q;
+      if (q > 0) {
+        totalValuation += q * price;
+        totalItems += q;
 
-      if (q <= 0) {
+        if (min > 0 && q <= min) {
+          lowStockList.push({
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            unit: p.baseUnit?.symbol || "units",
+            quantity: q,
+            minStock: min,
+            shortage: Math.max(0, min - q),
+          });
+        }
+      } else {
         oosList.push({
-          id: row.id,
-          name: row.product.name,
-          sku: row.product.sku,
-          unit: row.product.baseUnit.symbol,
-          quantity: q,
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          unit: p.baseUnit?.symbol || "units",
+          quantity: 0,
           minStock: min,
-        });
-      } else if (min > 0 && q < min) {
-        lowStockList.push({
-          id: row.id,
-          name: row.product.name,
-          sku: row.product.sku,
-          unit: row.product.baseUnit.symbol,
-          quantity: q,
-          minStock: min,
-          shortage: min - q,
         });
       }
     }
 
     return NextResponse.json({
       summary: {
-        totalSkus: inventoryRows.length,
+        totalSkus: allProducts.length,
         totalItems,
         totalValuation,
         lowStockCount: lowStockList.length,
         oosCount: oosList.length,
       },
-      lowStockList,
-      oosList,
+      lowStockList: lowStockList.slice(0, 100),
+      oosList: oosList.slice(0, 100),
       recentMovements: movements.map((m) => ({
         id: m.id,
         productName: m.product.name,

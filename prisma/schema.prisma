@@ -188,6 +188,8 @@ model Product {
   taxPercent     Decimal  @default(0) @db.Decimal(5, 2)
   minStock       Decimal? @db.Decimal(14, 3)
   maxStock       Decimal? @db.Decimal(14, 3)
+  mfgDate        DateTime? @db.Date
+  expiryDate     DateTime? @db.Date
   batchTracked   Boolean  @default(false)
   expiryTracked  Boolean  @default(false)
   active         Boolean  @default(true)

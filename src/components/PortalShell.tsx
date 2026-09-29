@@ -46,7 +46,7 @@ export default function PortalShell({
               <img
                 src="/logo.png"
                 alt="Oceon Logo"
-                className="h-[25px] w-auto object-contain shrink-0"
+                className="h-[22px] w-auto object-contain shrink-0"
               />
               <span className="hidden md:inline-block text-xs font-semibold text-muted">
                 · {title}

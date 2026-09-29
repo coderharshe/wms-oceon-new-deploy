@@ -33,6 +33,7 @@ export async function GET() {
     yesterdaysOrders,
     pendingQc,
     completedToday,
+    allProducts,
     inventory,
     staffCount,
     lockedOrders,
@@ -46,9 +47,13 @@ export async function GET() {
     db.order.count({ where: { warehouseId, createdAt: { gte: startOfYesterday, lte: endOfYesterday } } }),
     db.order.count({ where: { warehouseId, status: { in: ["READY_FOR_QC", "QC_IN_PROGRESS"] } } }),
     db.order.count({ where: { warehouseId, status: "COMPLETED", updatedAt: { gte: startOfToday } } }),
+    db.product.findMany({
+      where: { active: true },
+      select: { id: true, name: true, sku: true, minStock: true, wholesalePrice: true },
+    }),
     db.inventory.findMany({
       where: { warehouseId },
-      include: { product: { select: { name: true, sku: true, minStock: true, wholesalePrice: true } } },
+      select: { productId: true, quantityOnHand: true },
     }),
     db.user.count({ where: { warehouseId, active: true } }),
     db.order.findMany({
@@ -78,20 +83,32 @@ export async function GET() {
   const salesToday = todaysBills.reduce((s, b) => s + Number(b.versions[0]?.total ?? 0), 0);
   const salesYesterday = yesterdaysBills.reduce((s, b) => s + Number(b.versions[0]?.total ?? 0), 0);
 
-  const inventoryValue = inventory.reduce(
-    (s, i) => s + Number(i.quantityOnHand) * Number(i.product.wholesalePrice),
-    0
-  );
+  const invMap = new Map<string, number>();
+  for (const inv of inventory) {
+    invMap.set(inv.productId, Number(inv.quantityOnHand || 0));
+  }
 
-  const lowStock = inventory.flatMap((i) => {
-    if (i.product.minStock == null) return [];
-    const onHand = Number(i.quantityOnHand);
-    const minStock = Number(i.product.minStock);
-    const level = stockLevel(onHand, minStock);
-    return level === "ok" ? [] : [{ product: i.product.name, sku: i.product.sku, onHand, minStock, level }];
-  });
+  let inventoryValue = 0;
+  let oosCount = 0;
+  const lowStock: Array<{ product: string; sku: string; onHand: number; minStock: number; level: StockLevel }> = [];
 
-  const oosCount = inventory.filter((i) => Number(i.quantityOnHand) <= 0).length;
+  for (const p of allProducts) {
+    const onHand = invMap.get(p.id) || 0;
+    const minStock = p.minStock != null ? Number(p.minStock) : 0;
+    const price = Number(p.wholesalePrice || 0);
+
+    if (onHand > 0) {
+      inventoryValue += onHand * price;
+      if (minStock > 0) {
+        const level = stockLevel(onHand, minStock);
+        if (level !== "ok") {
+          lowStock.push({ product: p.name, sku: p.sku, onHand, minStock, level });
+        }
+      }
+    } else {
+      oosCount++;
+    }
+  }
 
   const activeQcLocks = lockedOrders.flatMap((o) =>
     o.qcSessions.map((s) => ({

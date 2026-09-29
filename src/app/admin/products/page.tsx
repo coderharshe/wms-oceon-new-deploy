@@ -21,6 +21,8 @@ type Product = {
   barcode: string | null;
   category: string | null;
   brand: string | null;
+  mfgDate?: string | null;
+  expiryDate?: string | null;
   wholesalePrice: string;
   retailPrice: string;
   taxPercent: string;
@@ -43,6 +45,8 @@ const emptyForm = {
   retailPrice: "",
   taxPercent: "0",
   minStock: "",
+  mfgDate: "",
+  expiryDate: "",
 };
 
 // Turns a saved product's units into printable stickers — skipping units
@@ -129,6 +133,8 @@ export default function ProductsPage() {
         retailPrice: Number(form.retailPrice),
         taxPercent: Number(form.taxPercent),
         minStock: form.minStock ? Number(form.minStock) : undefined,
+        mfgDate: form.mfgDate || undefined,
+        expiryDate: form.expiryDate || undefined,
         saleUnits,
       }),
     });
@@ -259,6 +265,24 @@ export default function ProductsPage() {
             <label className="mb-1 block text-xs text-muted">Min stock</label>
             <input type="number" className="w-20" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
           </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Mfg Date (MFD)</label>
+            <input
+              type="date"
+              className="text-xs"
+              value={form.mfgDate}
+              onChange={(e) => setForm({ ...form, mfgDate: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Expiry Date (EXP)</label>
+            <input
+              type="date"
+              className="text-xs"
+              value={form.expiryDate}
+              onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+            />
+          </div>
         </div>
 
         <div>
@@ -307,7 +331,7 @@ export default function ProductsPage() {
       </div>
 
       {loading ? (
-        <SkeletonTable rows={6} cols={8} />
+        <SkeletonTable rows={6} cols={9} />
       ) : (
       <div className="card">
         <input className="mb-2 w-64" placeholder="Search SKU / name / barcode…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -318,6 +342,7 @@ export default function ProductsPage() {
               <th>SKU</th>
               <th>Name</th>
               <th>Base unit</th>
+              <th>MFD / Expiry</th>
               <th>Wholesale</th>
               <th>Retail</th>
               <th>Tax</th>
@@ -326,60 +351,87 @@ export default function ProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {list.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <div className="flex items-center gap-2">
-                    {p.imageKey && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={`/api/files/${p.imageKey}`} alt="" className="h-8 w-8 rounded object-cover" />
-                    )}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="w-32 text-xs"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadImage(p.id, file);
-                      }}
-                    />
-                  </div>
-                </td>
-                <td><Highlight text={p.sku} q={q} /></td>
-                <td><Highlight text={p.name} q={q} /></td>
-                <td>
-                  <div className="flex flex-wrap gap-1 items-center">
-                    <span className="badge bg-surface-2 text-ink font-semibold">{p.baseUnit.symbol}</span>
-                    {p.saleUnits
-                      .filter((su) => !su.isBaseUnit && Number(su.factorToBase) !== 1)
-                      .map((su) => (
-                        <span key={su.unitId} className="badge bg-surface-hi text-muted text-[10px]" title={`1 ${su.unit.symbol} = ${Number(su.factorToBase)} ${p.baseUnit.symbol}`}>
-                          {su.unit.symbol} (×{Number(su.factorToBase)})
-                        </span>
-                      ))}
-                  </div>
-                </td>
-                <td>₹{Number(p.wholesalePrice).toFixed(2)}</td>
-                <td>₹{Number(p.retailPrice).toFixed(2)}</td>
-                <td>{p.taxPercent}%</td>
-                <td>{p.active ? "Active" : "Inactive"}</td>
-                <td>
-                  <div className="flex gap-1">
-                    <button className="btn" onClick={() => setEditing(p)}>
-                      Edit
-                    </button>
-                    <button
-                      className="btn"
-                      disabled={!p.saleUnits.some((su) => su.barcode)}
-                      title={p.saleUnits.some((su) => su.barcode) ? "Print barcode labels" : "No unit has a barcode yet"}
-                      onClick={() => setPrinting(labelsForProduct(p))}
-                    >
-                      Labels
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {list.map((p) => {
+              const isExpired = p.expiryDate && new Date(p.expiryDate).getTime() < Date.now();
+              const isNearExpiry = p.expiryDate && !isExpired && new Date(p.expiryDate).getTime() < Date.now() + 60 * 24 * 60 * 60 * 1000;
+
+              return (
+                <tr key={p.id}>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      {p.imageKey && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`/api/files/${p.imageKey}`} alt="" className="h-8 w-8 rounded object-cover" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="w-32 text-xs"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadImage(p.id, file);
+                        }}
+                      />
+                    </div>
+                  </td>
+                  <td><Highlight text={p.sku} q={q} /></td>
+                  <td><Highlight text={p.name} q={q} /></td>
+                  <td>
+                    <div className="flex flex-wrap gap-1 items-center">
+                      <span className="badge bg-surface-2 text-ink font-semibold">{p.baseUnit.symbol}</span>
+                      {p.saleUnits
+                        .filter((su) => !su.isBaseUnit && Number(su.factorToBase) !== 1)
+                        .map((su) => (
+                          <span key={su.unitId} className="badge bg-surface-hi text-muted text-[10px]" title={`1 ${su.unit.symbol} = ${Number(su.factorToBase)} ${p.baseUnit.symbol}`}>
+                            {su.unit.symbol} (×{Number(su.factorToBase)})
+                          </span>
+                        ))}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="text-xs space-y-0.5">
+                      {p.mfgDate && (
+                        <div className="text-[11px] text-muted">
+                          MFD: <span className="font-mono text-ink">{p.mfgDate.split("T")[0]}</span>
+                        </div>
+                      )}
+                      {p.expiryDate ? (
+                        <div className="text-[11px]">
+                          {isExpired ? (
+                            <span className="text-rose-600 font-bold">EXP: {p.expiryDate.split("T")[0]} (Expired)</span>
+                          ) : isNearExpiry ? (
+                            <span className="text-orange-600 font-medium">EXP: {p.expiryDate.split("T")[0]} (Near Expiry)</span>
+                          ) : (
+                            <span className="text-emerald-700">EXP: {p.expiryDate.split("T")[0]}</span>
+                          )}
+                        </div>
+                      ) : (
+                        !p.mfgDate && <span className="text-[11px] text-muted/60 italic">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>₹{Number(p.wholesalePrice).toFixed(2)}</td>
+                  <td>₹{Number(p.retailPrice).toFixed(2)}</td>
+                  <td>{p.taxPercent}%</td>
+                  <td>{p.active ? "Active" : "Inactive"}</td>
+                  <td>
+                    <div className="flex gap-1">
+                      <button className="btn" onClick={() => setEditing(p)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn"
+                        disabled={!p.saleUnits.some((su) => su.barcode)}
+                        title={p.saleUnits.some((su) => su.barcode) ? "Print barcode labels" : "No unit has a barcode yet"}
+                        onClick={() => setPrinting(labelsForProduct(p))}
+                      >
+                        Labels
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

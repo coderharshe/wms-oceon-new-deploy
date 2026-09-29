@@ -291,7 +291,7 @@ export default function InventoryDashboardPage() {
             >
               <span>⏳ Near-Expiry Stock</span>
               <span className="badge text-[10px] bg-black/20 text-white px-1.5 py-0.2">
-                {nearExpiryList.length}
+                {summary.nearExpiryCount}
               </span>
             </button>
             <button
@@ -304,7 +304,7 @@ export default function InventoryDashboardPage() {
             >
               <span>☠️ Expired Stock</span>
               <span className="badge text-[10px] bg-black/20 text-white px-1.5 py-0.2">
-                {expiredList.length}
+                {summary.expiredCount}
               </span>
             </button>
             <button
@@ -317,7 +317,7 @@ export default function InventoryDashboardPage() {
             >
               <span>⚠️ Low Stock</span>
               <span className="badge text-[10px] bg-black/20 text-white px-1.5 py-0.2">
-                {lowStockList.length}
+                {summary.lowStockCount}
               </span>
             </button>
             <button
@@ -330,7 +330,7 @@ export default function InventoryDashboardPage() {
             >
               <span>🚫 Out of Stock</span>
               <span className="badge text-[10px] bg-black/20 text-white px-1.5 py-0.2">
-                {oosList.length}
+                {summary.oosCount}
               </span>
             </button>
           </div>

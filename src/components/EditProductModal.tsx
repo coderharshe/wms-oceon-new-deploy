@@ -20,6 +20,8 @@ export type EditableProduct = {
   taxPercent: string | number;
   minStock?: string | number | null;
   maxStock?: string | number | null;
+  mfgDate?: string | Date | null;
+  expiryDate?: string | Date | null;
   active: boolean;
   baseUnit?: { id?: string; symbol: string; name?: string } | null;
   saleUnits?: {
@@ -63,6 +65,9 @@ export function EditProductModal({
     product.baseUnit?.symbol ||
     "Unit";
 
+  const initialMfg = product.mfgDate ? new Date(product.mfgDate).toISOString().split("T")[0] : "";
+  const initialExp = product.expiryDate ? new Date(product.expiryDate).toISOString().split("T")[0] : "";
+
   const [form, setForm] = useState({
     sku: product.sku || "",
     name: product.name || "",
@@ -74,6 +79,8 @@ export function EditProductModal({
     taxPercent: String(product.taxPercent ?? "0"),
     minStock: product.minStock != null ? String(product.minStock) : "",
     maxStock: product.maxStock != null ? String(product.maxStock) : "",
+    mfgDate: initialMfg,
+    expiryDate: initialExp,
     active: product.active ?? true,
   });
 
@@ -231,6 +238,8 @@ export function EditProductModal({
         taxPercent: Number(form.taxPercent),
         minStock: form.minStock.trim() === "" ? null : Number(form.minStock),
         maxStock: form.maxStock.trim() === "" ? null : Number(form.maxStock),
+        mfgDate: (form.mfgDate || "").trim() === "" ? null : form.mfgDate,
+        expiryDate: (form.expiryDate || "").trim() === "" ? null : form.expiryDate,
         active: form.active,
       }),
     });
@@ -391,6 +400,40 @@ export function EditProductModal({
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
               Active Item
             </label>
+          </div>
+
+          {/* Manufacturing Date & Expiry Date */}
+          <div className="p-2.5 rounded bg-surface-2 border border-line space-y-2">
+            <h3 className="text-xs font-bold text-ink flex items-center gap-1.5">
+              <span>📅</span> Manufacturing (MFD) & Expiry Date
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-muted mb-0.5">
+                  Manufacturing Date (MFD)
+                </label>
+                <input
+                  type="date"
+                  className="w-full py-1.5 px-2 rounded border border-line bg-surface text-ink text-xs font-mono"
+                  value={form.mfgDate}
+                  onChange={(e) => setForm({ ...form, mfgDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-muted mb-0.5">
+                  Expiry Date (EXP)
+                </label>
+                <input
+                  type="date"
+                  className="w-full py-1.5 px-2 rounded border border-line bg-surface text-amber-700 dark:text-amber-300 font-bold text-xs font-mono"
+                  value={form.expiryDate}
+                  onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted">
+              Used to calculate Near-Expiry alerts (&lt;60 days) and Dead/Expired stock monitoring.
+            </p>
           </div>
 
           {/* Barcode Field */}

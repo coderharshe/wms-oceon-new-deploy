@@ -17,6 +17,8 @@ export type LedgerItem = {
   name: string;
   category: string;
   brand: string | null;
+  mfgDate?: string | null;
+  expiryDate?: string | null;
   active: boolean;
   baseUnit: {
     id: string;
@@ -35,7 +37,7 @@ export type LedgerItem = {
   wholesaleValuation: number;
   retailValuation: number;
   costValuation: number;
-  status: "OUT_OF_STOCK" | "LOW_STOCK" | "DEAD_STOCK" | "OVERSTOCKED" | "HEALTHY";
+  status: "OUT_OF_STOCK" | "EXPIRED" | "NEAR_EXPIRY" | "LOW_STOCK" | "DEAD_STOCK" | "OVERSTOCKED" | "HEALTHY";
   lastMovementDate: string;
   lastMovementType: string;
   daysSinceLastMovement: number;
@@ -70,6 +72,9 @@ type LedgerResponse = {
     outOfStockCount: number;
     deadStockCount: number;
     deadStockLockedCapital: number;
+    expiredCount?: number;
+    expiredLockedCapital?: number;
+    nearExpiryCount?: number;
     overstockedCount: number;
     healthyCount: number;
     deadStockThresholdDays: number;
@@ -267,16 +272,52 @@ export function InventoryLedgerView({
         <div className="space-y-4">
           {/* KPI Cards Summary */}
           {loading && !data ? (
-            <SkeletonStats count={5} className="grid grid-cols-2 sm:grid-cols-5 gap-3" />
+            <SkeletonStats count={6} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" />
           ) : summary ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* Total Valuation */}
               <div className="card bg-gradient-to-br from-surface to-surface-2 border-line flex flex-col justify-center">
                 <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">
                   Total Stock Valuation
                 </div>
-                <div className="text-xl font-bold text-ink mt-1 font-mono">
+                <div className="text-lg font-bold text-ink mt-1 font-mono">
                   ₹{summary.totalWholesaleValuation.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              {/* Expired Warning */}
+              <div
+                onClick={() => setStatusFilter((prev) => (prev === "EXPIRED" ? "ALL" : "EXPIRED"))}
+                className={`card cursor-pointer transition-all hover:scale-[1.01] flex flex-col justify-center ${
+                  statusFilter === "EXPIRED"
+                    ? "border-rose-600 bg-rose-50/50 dark:bg-rose-950/20 ring-2 ring-rose-600/20"
+                    : "border-line bg-surface"
+                }`}
+              >
+                <div className="text-[11px] font-semibold text-rose-800 dark:text-rose-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>☠️ Expired</span>
+                  {statusFilter === "EXPIRED" && <span className="text-[10px] font-bold">ACTIVE</span>}
+                </div>
+                <div className="text-2xl font-bold text-rose-700 dark:text-rose-300 mt-1 font-mono">
+                  {summary.expiredCount ?? 0}
+                </div>
+              </div>
+
+              {/* Near Expiry Warning */}
+              <div
+                onClick={() => setStatusFilter((prev) => (prev === "NEAR_EXPIRY" ? "ALL" : "NEAR_EXPIRY"))}
+                className={`card cursor-pointer transition-all hover:scale-[1.01] flex flex-col justify-center ${
+                  statusFilter === "NEAR_EXPIRY"
+                    ? "border-orange-500 bg-orange-50/50 dark:bg-orange-950/20 ring-2 ring-orange-500/20"
+                    : "border-line bg-surface"
+                }`}
+              >
+                <div className="text-[11px] font-semibold text-orange-800 dark:text-orange-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>⏳ Near Expiry</span>
+                  {statusFilter === "NEAR_EXPIRY" && <span className="text-[10px] font-bold">ACTIVE</span>}
+                </div>
+                <div className="text-2xl font-bold text-orange-700 dark:text-orange-300 mt-1 font-mono">
+                  {summary.nearExpiryCount ?? 0}
                 </div>
               </div>
 
@@ -308,7 +349,7 @@ export function InventoryLedgerView({
                 }`}
               >
                 <div className="text-[11px] font-semibold text-purple-800 dark:text-purple-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>⏳ Dead Stock ({deadStockDays}d+)</span>
+                  <span>💤 Dead Stock</span>
                   {statusFilter === "DEAD_STOCK" && <span className="text-[10px] font-bold">ACTIVE</span>}
                 </div>
                 <div className="text-2xl font-bold text-purple-700 dark:text-purple-300 mt-1 font-mono">
@@ -331,24 +372,6 @@ export function InventoryLedgerView({
                 </div>
                 <div className="text-2xl font-bold text-rose-700 dark:text-rose-300 mt-1 font-mono">
                   {summary.outOfStockCount}
-                </div>
-              </div>
-
-              {/* Total Healthy SKUs */}
-              <div
-                onClick={() => setStatusFilter((prev) => (prev === "HEALTHY" ? "ALL" : "HEALTHY"))}
-                className={`card cursor-pointer transition-all hover:scale-[1.01] flex flex-col justify-center ${
-                  statusFilter === "HEALTHY"
-                    ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20"
-                    : "border-line bg-surface"
-                }`}
-              >
-                <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>✅ Healthy Stock</span>
-                  {statusFilter === "HEALTHY" && <span className="text-[10px] font-bold">ACTIVE</span>}
-                </div>
-                <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-1 font-mono">
-                  {summary.healthyCount}
                 </div>
               </div>
             </div>
@@ -455,230 +478,287 @@ export function InventoryLedgerView({
         </div>
       </div>
 
-      {/* Stock Health Status Filter Pills */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-line pb-2 text-xs">
-        <span className="text-[11px] font-bold text-muted uppercase mr-1">Status Filter:</span>
-        <button
-          onClick={() => setStatusFilter("ALL")}
-          className={`px-2.5 py-1 rounded-full font-medium transition-all ${
-            statusFilter === "ALL"
-              ? "bg-ink text-surface shadow-xs font-bold"
-              : "bg-surface-2 text-muted hover:text-ink"
-          }`}
-        >
-          All Items ({items.length})
-        </button>
-        <button
-          onClick={() => setStatusFilter("LOW_STOCK")}
-          className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
-            statusFilter === "LOW_STOCK"
-              ? "bg-amber-600 text-white font-bold shadow-xs"
-              : "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:opacity-80"
-          }`}
-        >
-          ⚠️ Low Stock ({summary?.lowStockCount ?? 0})
-        </button>
-        <button
-          onClick={() => setStatusFilter("DEAD_STOCK")}
-          className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
-            statusFilter === "DEAD_STOCK"
-              ? "bg-purple-600 text-white font-bold shadow-xs"
-              : "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 hover:opacity-80"
-          }`}
-        >
-          ⏳ Dead Stock ({summary?.deadStockCount ?? 0})
-        </button>
-        <button
-          onClick={() => setStatusFilter("OUT_OF_STOCK")}
-          className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
-            statusFilter === "OUT_OF_STOCK"
-              ? "bg-rose-600 text-white font-bold shadow-xs"
-              : "bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 hover:opacity-80"
-          }`}
-        >
-          🚫 Out of Stock ({summary?.outOfStockCount ?? 0})
-        </button>
-        <button
-          onClick={() => setStatusFilter("OVERSTOCKED")}
-          className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
-            statusFilter === "OVERSTOCKED"
-              ? "bg-blue-600 text-white font-bold shadow-xs"
-              : "bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 hover:opacity-80"
-          }`}
-        >
-          📦 Overstocked ({summary?.overstockedCount ?? 0})
-        </button>
-        <button
-          onClick={() => setStatusFilter("HEALTHY")}
-          className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
-            statusFilter === "HEALTHY"
-              ? "bg-emerald-600 text-white font-bold shadow-xs"
-              : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:opacity-80"
-          }`}
-        >
-          ✅ Healthy ({summary?.healthyCount ?? 0})
-        </button>
+          {/* Stock Health Status Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line pb-2 text-xs">
+            <span className="text-[11px] font-bold text-muted uppercase mr-1">Status Filter:</span>
+            <button
+              onClick={() => setStatusFilter("ALL")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all ${
+                statusFilter === "ALL"
+                  ? "bg-ink text-surface shadow-xs font-bold"
+                  : "bg-surface-2 text-muted hover:text-ink"
+              }`}
+            >
+              All Items ({items.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter("EXPIRED")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "EXPIRED"
+                  ? "bg-rose-700 text-white font-bold shadow-xs"
+                  : "bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 hover:opacity-80"
+              }`}
+            >
+              ☠️ Expired ({summary?.expiredCount ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter("NEAR_EXPIRY")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "NEAR_EXPIRY"
+                  ? "bg-orange-600 text-white font-bold shadow-xs"
+                  : "bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300 hover:opacity-80"
+              }`}
+            >
+              ⏳ Near Expiry ({summary?.nearExpiryCount ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter("LOW_STOCK")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "LOW_STOCK"
+                  ? "bg-amber-600 text-white font-bold shadow-xs"
+                  : "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:opacity-80"
+              }`}
+            >
+              ⚠️ Low Stock ({summary?.lowStockCount ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter("DEAD_STOCK")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "DEAD_STOCK"
+                  ? "bg-purple-600 text-white font-bold shadow-xs"
+                  : "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 hover:opacity-80"
+              }`}
+            >
+              💤 Dead Stock ({summary?.deadStockCount ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter("OUT_OF_STOCK")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "OUT_OF_STOCK"
+                  ? "bg-rose-600 text-white font-bold shadow-xs"
+                  : "bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 hover:opacity-80"
+              }`}
+            >
+              🚫 Out of Stock ({summary?.outOfStockCount ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter("OVERSTOCKED")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "OVERSTOCKED"
+                  ? "bg-blue-600 text-white font-bold shadow-xs"
+                  : "bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 hover:opacity-80"
+              }`}
+            >
+              📦 Overstocked ({summary?.overstockedCount ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter("HEALTHY")}
+              className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "HEALTHY"
+                  ? "bg-emerald-600 text-white font-bold shadow-xs"
+                  : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:opacity-80"
+              }`}
+            >
+              ✅ Healthy ({summary?.healthyCount ?? 0})
+            </button>
 
-        <div className="ml-auto text-xs text-muted font-medium">
-          Showing {filteredItems.length} of {items.length} SKUs
-        </div>
-      </div>
+            <div className="ml-auto text-xs text-muted font-medium">
+              Showing {filteredItems.length} of {items.length} SKUs
+            </div>
+          </div>
 
-      {error && <ErrorRetry message={error} onRetry={reload} />}
+          {error && <ErrorRetry message={error} onRetry={reload} />}
 
-      {/* Main Ledger Table */}
-      {loading && !data ? (
-        <SkeletonTable rows={10} cols={10} />
-      ) : (
-        <div className="card overflow-x-auto p-0 border border-line shadow-xs">
-          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead>
-              <tr className="bg-[#0284c7] text-white font-bold border-b border-[#0369a1]">
-                <th
-                  onClick={() => handleSort("name")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors"
-                >
-                  Product Name {sortBy === "name" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("sku")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors font-mono"
-                >
-                  SKU / Barcode {sortBy === "sku" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th className="py-2.5 px-3">Category</th>
-                <th
-                  onClick={() => handleSort("status")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-center"
-                >
-                  Stock Health {sortBy === "status" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("onHand")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right"
-                >
-                  On Hand {sortBy === "onHand" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th className="py-2.5 px-3 text-right">Avail / Reserved</th>
-                <th className="py-2.5 px-3 text-right">Min / Max</th>
-                <th
-                  onClick={() => handleSort("wholesalePrice")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right"
-                >
-                  Wholesale ₹ {sortBy === "wholesalePrice" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("retailPrice")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right"
-                >
-                  Retail ₹ {sortBy === "retailPrice" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("wholesaleValuation")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right font-bold"
-                >
-                  Valuation ₹ {sortBy === "wholesaleValuation" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("daysSinceLastMovement")}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors"
-                >
-                  Last Movement {sortBy === "daysSinceLastMovement" && (sortDir === "asc" ? "↑" : "↓")}
-                </th>
-                <th className="py-2.5 px-3 text-center">Hubs</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line/60 bg-surface">
-              {filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={13} className="text-center py-10 text-xs text-muted">
-                    No inventory records match the selected filters or search query.
-                  </td>
-                </tr>
-              ) : (
-                filteredItems.map((item) => {
-                  const isExpanded = expandedRowId === item.id;
-                  const isDeadStock = item.status === "DEAD_STOCK";
-                  const isLowStock = item.status === "LOW_STOCK";
-                  const isOOS = item.status === "OUT_OF_STOCK";
-
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`hover:bg-surface-2/60 transition-colors ${
-                        isOOS
-                          ? "bg-rose-500/5"
-                          : isLowStock
-                          ? "bg-amber-500/5"
-                          : isDeadStock
-                          ? "bg-purple-500/5"
-                          : ""
-                      }`}
+          {/* Main Ledger Table */}
+          {loading && !data ? (
+            <SkeletonTable rows={10} cols={10} />
+          ) : (
+            <div className="card overflow-x-auto p-0 border border-line shadow-xs">
+              <table className="w-full text-left text-xs whitespace-nowrap">
+                <thead>
+                  <tr className="bg-[#0284c7] text-white font-bold border-b border-[#0369a1]">
+                    <th
+                      onClick={() => handleSort("name")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors"
                     >
-                      {/* Product Name */}
-                      <td className="py-2.5 px-3">
-                        <div className="font-semibold text-ink flex items-center gap-1.5">
-                          {item.name}
-                          {!item.active && (
-                            <span className="badge text-[9px] bg-muted/20 text-muted">Inactive</span>
-                          )}
-                        </div>
-                        {item.brand && (
-                          <div className="text-[10px] text-muted font-medium">Brand: {item.brand}</div>
-                        )}
+                      Product Name {sortBy === "name" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("sku")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors font-mono"
+                    >
+                      SKU / Barcode {sortBy === "sku" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th
+                      onClick={() => handleSort("status")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-center"
+                    >
+                      Stock Health {sortBy === "status" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("onHand")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right"
+                    >
+                      On Hand {sortBy === "onHand" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th className="py-2.5 px-3 text-right">Avail / Reserved</th>
+                    <th className="py-2.5 px-3 text-right">Min / Max</th>
+                    <th
+                      onClick={() => handleSort("wholesalePrice")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right"
+                    >
+                      Wholesale ₹ {sortBy === "wholesalePrice" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("retailPrice")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right"
+                    >
+                      Retail ₹ {sortBy === "retailPrice" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("wholesaleValuation")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors text-right font-bold"
+                    >
+                      Valuation ₹ {sortBy === "wholesaleValuation" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("daysSinceLastMovement")}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-[#0369a1] transition-colors"
+                    >
+                      Last Movement {sortBy === "daysSinceLastMovement" && (sortDir === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th className="py-2.5 px-3 text-center">Hubs</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line/60 bg-surface">
+                  {filteredItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={13} className="text-center py-10 text-xs text-muted">
+                        No inventory records match the selected filters or search query.
                       </td>
+                    </tr>
+                  ) : (
+                    filteredItems.map((item) => {
+                      const isExpanded = expandedRowId === item.id;
+                      const isDeadStock = item.status === "DEAD_STOCK";
+                      const isLowStock = item.status === "LOW_STOCK";
+                      const isOOS = item.status === "OUT_OF_STOCK";
+                      const isExpired = item.status === "EXPIRED";
+                      const isNearExpiry = item.status === "NEAR_EXPIRY";
 
-                      {/* SKU / Barcode */}
-                      <td className="py-2.5 px-3 font-mono">
-                        <div className="font-bold text-ink text-[11px]">{item.sku}</div>
-                        {item.barcode ? (
-                          <div className="text-[10px] text-muted flex items-center gap-1" title="Barcode">
-                            <span>|||</span> {item.barcode}
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-muted/60 italic">No barcode</div>
-                        )}
-                      </td>
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-surface-2/60 transition-colors ${
+                            isExpired
+                              ? "bg-rose-500/10"
+                              : isNearExpiry
+                              ? "bg-orange-500/10"
+                              : isOOS
+                              ? "bg-rose-500/5"
+                              : isLowStock
+                              ? "bg-amber-500/5"
+                              : isDeadStock
+                              ? "bg-purple-500/5"
+                              : ""
+                          }`}
+                        >
+                          {/* Product Name */}
+                          <td className="py-2.5 px-3">
+                            <div className="font-semibold text-ink flex items-center gap-1.5">
+                              {item.name}
+                              {!item.active && (
+                                <span className="badge text-[9px] bg-muted/20 text-muted">Inactive</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted">
+                              {item.brand && <span>Brand: {item.brand}</span>}
+                              {item.mfgDate && (
+                                <span>
+                                  MFD: <strong className="text-ink font-mono">{item.mfgDate}</strong>
+                                </span>
+                              )}
+                              {item.expiryDate && (
+                                <span>
+                                  EXP:{" "}
+                                  <strong
+                                    className={`font-mono ${
+                                      isExpired
+                                        ? "text-rose-600 font-bold"
+                                        : isNearExpiry
+                                        ? "text-orange-600 font-bold"
+                                        : "text-ink"
+                                    }`}
+                                  >
+                                    {item.expiryDate}
+                                  </strong>
+                                </span>
+                              )}
+                            </div>
+                          </td>
 
-                      {/* Category */}
-                      <td className="py-2.5 px-3 text-muted font-medium">
-                        <span className="badge text-[10px] bg-surface-2 text-ink border border-line">
-                          {item.category}
-                        </span>
-                      </td>
+                          {/* SKU / Barcode */}
+                          <td className="py-2.5 px-3 font-mono">
+                            <div className="font-bold text-ink text-[11px]">{item.sku}</div>
+                            {item.barcode ? (
+                              <div className="text-[10px] text-muted flex items-center gap-1" title="Barcode">
+                                <span>|||</span> {item.barcode}
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-muted/60 italic">No barcode</div>
+                            )}
+                          </td>
 
-                      {/* Status Badge */}
-                      <td className="py-2.5 px-3 text-center">
-                        {item.status === "OUT_OF_STOCK" && (
-                          <span className="badge text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-                            🚫 Out of Stock
-                          </span>
-                        )}
-                        {item.status === "LOW_STOCK" && (
-                          <span className="badge text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-                            ⚠️ Low ({item.onHand}/{item.minStock})
-                          </span>
-                        )}
-                        {item.status === "DEAD_STOCK" && (
-                          <span
-                            className="badge text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
-                            title={`No movement in ${item.daysSinceLastMovement} days`}
-                          >
-                            ⏳ Dead ({item.daysSinceLastMovement}d idle)
-                          </span>
-                        )}
-                        {item.status === "OVERSTOCKED" && (
-                          <span className="badge text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                            📦 Overstocked ({item.onHand}/{item.maxStock})
-                          </span>
-                        )}
-                        {item.status === "HEALTHY" && (
-                          <span className="badge text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                            ✅ Healthy
-                          </span>
-                        )}
-                      </td>
+                          {/* Category */}
+                          <td className="py-2.5 px-3 text-muted font-medium">
+                            <span className="badge text-[10px] bg-surface-2 text-ink border border-line">
+                              {item.category}
+                            </span>
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="py-2.5 px-3 text-center">
+                            {item.status === "EXPIRED" && (
+                              <span className="badge text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                ☠️ Expired
+                              </span>
+                            )}
+                            {item.status === "NEAR_EXPIRY" && (
+                              <span className="badge text-[10px] font-bold bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300">
+                                ⏳ Near Expiry
+                              </span>
+                            )}
+                            {item.status === "OUT_OF_STOCK" && (
+                              <span className="badge text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                🚫 Out of Stock
+                              </span>
+                            )}
+                            {item.status === "LOW_STOCK" && (
+                              <span className="badge text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                                ⚠️ Low ({item.onHand}/{item.minStock})
+                              </span>
+                            )}
+                            {item.status === "DEAD_STOCK" && (
+                              <span
+                                className="badge text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
+                                title={`No movement in ${item.daysSinceLastMovement} days`}
+                              >
+                                💤 Dead ({item.daysSinceLastMovement}d idle)
+                              </span>
+                            )}
+                            {item.status === "OVERSTOCKED" && (
+                              <span className="badge text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                                📦 Overstocked ({item.onHand}/{item.maxStock})
+                              </span>
+                            )}
+                            {item.status === "HEALTHY" && (
+                              <span className="badge text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                ✅ Healthy
+                              </span>
+                            )}
+                          </td>
 
                       {/* Quantity On Hand */}
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-ink">

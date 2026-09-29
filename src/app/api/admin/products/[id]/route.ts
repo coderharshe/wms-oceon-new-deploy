@@ -20,6 +20,8 @@ const schema = z.object({
   taxPercent: z.number().min(0).max(100).optional(),
   minStock: z.number().nullable().optional(),
   maxStock: z.number().nullable().optional(),
+  mfgDate: z.string().nullable().optional(),
+  expiryDate: z.string().nullable().optional(),
   active: z.boolean().optional(),
 });
 
@@ -55,7 +57,7 @@ async function patchProduct(
     const { eq } = await import("drizzle-orm");
     const { writeAuditDrizzle } = await import("@/lib/drizzle-audit");
     const db = getDrizzleDb();
-    const { wholesalePrice, retailPrice, taxPercent, minStock, maxStock, ...rest } = parsed.data;
+    const { wholesalePrice, retailPrice, taxPercent, minStock, maxStock, mfgDate, expiryDate, ...rest } = parsed.data;
     const [before] = await db.select().from(product).where(eq(product.id, id));
     const [updated] = await db
       .update(product)
@@ -66,6 +68,8 @@ async function patchProduct(
         ...(taxPercent !== undefined ? { taxPercent: taxPercent.toString() } : {}),
         ...(minStock !== undefined ? { minStock: minStock?.toString() ?? null } : {}),
         ...(maxStock !== undefined ? { maxStock: maxStock?.toString() ?? null } : {}),
+        ...(mfgDate !== undefined ? { mfgDate: mfgDate ? new Date(mfgDate).toISOString() : null } : {}),
+        ...(expiryDate !== undefined ? { expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null } : {}),
       })
       .where(eq(product.id, id))
       .returning();
@@ -83,7 +87,13 @@ async function patchProduct(
 
   const db = (await import("@/lib/db")).getDb();
   const before = await db.product.findUnique({ where: { id } });
-  const product = await db.product.update({ where: { id }, data: parsed.data });
+  const { mfgDate, expiryDate, ...otherData } = parsed.data;
+  const updatePayload: any = {
+    ...otherData,
+    ...(mfgDate !== undefined ? { mfgDate: mfgDate ? new Date(mfgDate) : null } : {}),
+    ...(expiryDate !== undefined ? { expiryDate: expiryDate ? new Date(expiryDate) : null } : {}),
+  };
+  const product = await db.product.update({ where: { id }, data: updatePayload });
   await (await import("@/lib/audit")).writeAudit({
     userId: session.sub,
     role: session.role,

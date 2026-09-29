@@ -76,10 +76,14 @@ export async function GET(req: NextRequest) {
   let outOfStockCount = 0;
   let deadStockCount = 0;
   let deadStockLockedCapital = 0;
+  let expiredCount = 0;
+  let expiredLockedCapital = 0;
+  let nearExpiryCount = 0;
   let overstockedCount = 0;
   let healthyCount = 0;
 
   const now = Date.now();
+  const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
 
   const items = products.map((p) => {
     totalSkus++;
@@ -139,12 +143,24 @@ export async function GET(req: NextRequest) {
       Math.floor((now - new Date(lastMovementDate).getTime()) / (1000 * 60 * 60 * 24))
     );
 
+    // Expiry check
+    const expMs = p.expiryDate ? new Date(p.expiryDate).getTime() : null;
+    const isExpired = expMs !== null && expMs < now;
+    const isNearExpiry = expMs !== null && !isExpired && expMs <= now + sixtyDaysMs;
+
     // Determine stock status
-    let status: "OUT_OF_STOCK" | "LOW_STOCK" | "DEAD_STOCK" | "OVERSTOCKED" | "HEALTHY";
+    let status: "OUT_OF_STOCK" | "EXPIRED" | "NEAR_EXPIRY" | "LOW_STOCK" | "DEAD_STOCK" | "OVERSTOCKED" | "HEALTHY";
 
     if (onHand <= 0) {
       status = "OUT_OF_STOCK";
       outOfStockCount++;
+    } else if (isExpired) {
+      status = "EXPIRED";
+      expiredCount++;
+      expiredLockedCapital += costValuation;
+    } else if (isNearExpiry) {
+      status = "NEAR_EXPIRY";
+      nearExpiryCount++;
     } else if (minStock != null && onHand <= minStock) {
       status = "LOW_STOCK";
       lowStockCount++;
@@ -167,6 +183,8 @@ export async function GET(req: NextRequest) {
       name: p.name,
       category: p.category || "General",
       brand: p.brand || null,
+      mfgDate: p.mfgDate ? p.mfgDate.toISOString().split("T")[0] : null,
+      expiryDate: p.expiryDate ? p.expiryDate.toISOString().split("T")[0] : null,
       active: p.active,
       baseUnit: {
         id: p.baseUnit.id,
@@ -216,6 +234,9 @@ export async function GET(req: NextRequest) {
       outOfStockCount,
       deadStockCount,
       deadStockLockedCapital,
+      expiredCount,
+      expiredLockedCapital,
+      nearExpiryCount,
       overstockedCount,
       healthyCount,
       deadStockThresholdDays,
