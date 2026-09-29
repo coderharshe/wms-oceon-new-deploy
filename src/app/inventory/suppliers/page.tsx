@@ -323,9 +323,8 @@ export default function InventorySuppliersPage() {
             <button
               key={tab.id}
               onClick={() => setTabFilter(tab.id as any)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
-                tabFilter === tab.id ? "bg-surface text-accent shadow-xs border border-line" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1 rounded text-xs font-semibold transition-all ${tabFilter === tab.id ? "bg-surface text-accent shadow-xs border border-line" : "text-muted hover:text-ink"
+                }`}
             >
               {tab.label}
             </button>
