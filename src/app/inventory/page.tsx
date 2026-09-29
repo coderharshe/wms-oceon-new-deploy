@@ -608,41 +608,7 @@ export default function InventoryDashboardPage() {
           </div>
         )}
       </div>
-
-      {/* Operational Quick Links & Permissions */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <section className="card space-y-2">
-          <h2 className="text-sm font-semibold">Inventory Operations</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <Link href="/inventory/ledger" className="rounded border border-line p-3 hover:bg-surface-hi transition-colors">
-              <div className="font-semibold text-sm">📑 Inventory Ledger</div>
-              <div className="text-xs text-muted">Complete stock counts, dead stock & valuation</div>
-            </Link>
-            <Link href="/inventory/grn" className="rounded border border-line p-3 hover:bg-surface-hi transition-colors">
-              <div className="font-semibold text-sm">📥 Inward / GRN</div>
-              <div className="text-xs text-muted">Physical check & stock entry against PO</div>
-            </Link>
-            <Link href="/inventory/outward" className="rounded border border-line p-3 hover:bg-surface-hi transition-colors">
-              <div className="font-semibold text-sm">📤 Stock Issue / Outward</div>
-              <div className="text-xs text-muted">Dispatch, damage, return with mandatory reason</div>
-            </Link>
-            <Link href="/inventory/count" className="rounded border border-line p-3 hover:bg-surface-hi transition-colors">
-              <div className="font-semibold text-sm">🔎 Physical Stock Count</div>
-              <div className="text-xs text-muted">System vs physical audit & variance adjustments</div>
-            </Link>
-          </div>
-        </section>
-
-        <section className="card space-y-2">
-          <h2 className="text-sm font-semibold">Inventory Permissions</h2>
-          <ul className="text-xs space-y-1.5 text-muted">
-            <li>✅ <strong>CAN:</strong> Receive stock, count stock, report damage, physical count, view expiry.</li>
-            <li>❌ <strong>CANNOT:</strong> Change selling or purchase prices.</li>
-            <li>❌ <strong>CANNOT:</strong> Make arbitrary unapproved stock adjustments.</li>
-            <li>❌ <strong>CANNOT:</strong> Delete inventory history or financial transactions.</li>
-          </ul>
-        </section>
-      </div>
     </div>
   );
 }
+
