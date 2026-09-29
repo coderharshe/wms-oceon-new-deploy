@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonTable } from "@/components/Skeleton";
@@ -35,6 +35,14 @@ export default function PhysicalCountPage() {
   const [countMap, setCountMap] = useState<Record<string, { physical: string; notes: string }>>({});
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (!searchQuery.trim()) return products;
+    const q = searchQuery.toLowerCase().trim();
+    return products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+  }, [products, searchQuery]);
 
   function handleCountChange(productId: string, val: string) {
     setCountMap({
@@ -105,8 +113,7 @@ export default function PhysicalCountPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold">Physical Inventory Count & Variance Audit</h1>
-          <p className="text-xs text-muted">Periodic inventory audits, physical count verification, and difference approval requests</p>
+          <h1 className="text-lg font-bold">Physical Inventory Audit</h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -127,72 +134,100 @@ export default function PhysicalCountPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
-          <h2 className="text-sm font-semibold border-b border-line pb-1">Shelf Inventory Audit Entry</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-2">
+            <h2 className="text-sm font-semibold">Shelf Inventory Audit Entry</h2>
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                placeholder="Search SKU or product name…"
+                className="w-full text-xs py-1 pl-7 pr-6 rounded border border-line bg-surface text-ink focus:outline-hidden focus:border-accent"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <span className="absolute left-2 top-1.5 text-muted text-xs">🔍</span>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1 text-muted hover:text-ink text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
           {pLoading && <SkeletonTable rows={8} cols={5} />}
           {pError && <ErrorRetry message={pError} onRetry={reloadProducts} />}
 
           {products && (
-            <div className="card overflow-x-auto max-h-[70vh]">
+            <div className="card overflow-x-auto max-h-[65vh] border border-line">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-line text-muted sticky top-0 bg-paper">
-                    <th className="py-2">Product SKU</th>
-                    <th className="py-2">System Inventory</th>
-                    <th className="py-2">Physical Count</th>
-                    <th className="py-2">Live Variance</th>
-                    <th className="py-2">Variance Remarks</th>
+                  <tr className="border-b border-line text-muted sticky top-0 bg-surface-2 z-10">
+                    <th className="py-2 px-2">Product SKU</th>
+                    <th className="py-2 px-2">System Inventory</th>
+                    <th className="py-2 px-2">Physical Count</th>
+                    <th className="py-2 px-2">Live Variance</th>
+                    <th className="py-2 px-2">Variance Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p) => {
-                    const system = Number(p.available ?? p.inventory?.[0]?.quantityOnHand ?? 0);
-                    const unitSym = p.baseUnit?.symbol || "Units";
-                    const physicalStr = countMap[p.id]?.physical ?? "";
-                    const physical = physicalStr !== "" ? parseFloat(physicalStr) : null;
-                    const variance = physical !== null ? physical - system : null;
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6 text-muted text-xs">
+                        No products match &quot;{searchQuery}&quot;
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProducts.map((p) => {
+                      const system = Number(p.available ?? p.inventory?.[0]?.quantityOnHand ?? 0);
+                      const unitSym = p.baseUnit?.symbol || "Units";
+                      const physicalStr = countMap[p.id]?.physical ?? "";
+                      const physical = physicalStr !== "" ? parseFloat(physicalStr) : null;
+                      const variance = physical !== null ? physical - system : null;
 
-                    return (
-                      <tr key={p.id} className="border-b border-line/50">
-                        <td className="py-2 font-medium">
-                          <div>{p.name}</div>
-                          <div className="text-[10px] text-muted">{p.sku}</div>
-                        </td>
-                        <td className="py-2 font-semibold">
-                          {system.toFixed(2)} {unitSym}
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="Count"
-                            className="w-24 text-xs font-bold"
-                            value={physicalStr}
-                            onChange={(e) => handleCountChange(p.id, e.target.value)}
-                          />
-                        </td>
-                        <td className="py-2">
-                          {variance !== null ? (
-                            <span className={`badge text-xs font-bold ${
-                              variance === 0 ? "bg-good/10 text-good" : variance > 0 ? "bg-accent/10 text-accent" : "bg-bad text-white"
-                            }`}>
-                              {variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)} {unitSym}
-                            </span>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            placeholder="Reason for diff…"
-                            className="w-full text-xs"
-                            value={countMap[p.id]?.notes ?? ""}
-                            onChange={(e) => handleNotesChange(p.id, e.target.value)}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr key={p.id} className="border-b border-line/50">
+                          <td className="py-2 font-medium">
+                            <div>{p.name}</div>
+                            <div className="text-[10px] text-muted">{p.sku}</div>
+                          </td>
+                          <td className="py-2 font-semibold">
+                            {system.toFixed(2)} {unitSym}
+                          </td>
+                          <td className="py-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="Count"
+                              className="w-24 text-xs font-bold"
+                              value={physicalStr}
+                              onChange={(e) => handleCountChange(p.id, e.target.value)}
+                            />
+                          </td>
+                          <td className="py-2">
+                            {variance !== null ? (
+                              <span className={`badge text-xs font-bold ${variance === 0 ? "bg-good/10 text-good" : variance > 0 ? "bg-accent/10 text-accent" : "bg-bad text-white"
+                                }`}>
+                                {variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)} {unitSym}
+                              </span>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                          <td className="py-2">
+                            <input
+                              type="text"
+                              placeholder="Reason for diff…"
+                              className="w-full text-xs"
+                              value={countMap[p.id]?.notes ?? ""}
+                              onChange={(e) => handleNotesChange(p.id, e.target.value)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -215,9 +250,8 @@ export default function PhysicalCountPage() {
                   <div key={a.id} className="card space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-ink">{a.product.name}</span>
-                      <span className={`badge text-[10px] font-semibold ${
-                        a.status === "PENDING" ? "bg-warn text-white" : a.status === "APPROVED" ? "bg-good text-white" : "bg-bad text-white"
-                      }`}>
+                      <span className={`badge text-[10px] font-semibold ${a.status === "PENDING" ? "bg-warn text-white" : a.status === "APPROVED" ? "bg-good text-white" : "bg-bad text-white"
+                        }`}>
                         {a.status}
                       </span>
                     </div>

@@ -160,11 +160,37 @@ export default function InventoryPurchaseOrdersPage() {
     }
   }, [isCreatingPO, products]);
 
-  // Quick Supplier Creator Modal inside PO form
+  // Quick Supplier Creator Modal inside PO form — declared here so keyboard effects below can reference it
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [newSupName, setNewSupName] = useState("");
   const [newSupPhone, setNewSupPhone] = useState("");
   const [newSupGstin, setNewSupGstin] = useState("");
+
+  // Lock body scroll + Escape to close modals + F2 to open new PO
+  useEffect(() => {
+    const anyModal = isCreatingPO || viewingPO !== null || showNewSupplier;
+    document.body.style.overflow = anyModal ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [isCreatingPO, viewingPO, showNewSupplier]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (showNewSupplier) { setShowNewSupplier(false); return; }
+        if (isCreatingPO) { setIsCreatingPO(false); return; }
+        if (viewingPO) { setViewingPO(null); return; }
+      }
+      if (e.key === "F2" && !isCreatingPO && !viewingPO) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA" && !target.isContentEditable) {
+          e.preventDefault();
+          setIsCreatingPO(true);
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isCreatingPO, viewingPO, showNewSupplier]);
 
   async function handleCreateSupplier() {
     if (!newSupName.trim()) return;
@@ -343,9 +369,7 @@ export default function InventoryPurchaseOrdersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-ink">Purchase Orders (PO)</h1>
-          <p className="text-xs text-muted mt-0.5">
-            Create purchase orders, procure stock from suppliers, and track inward delivery into Hubs.
-          </p>
+
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -380,11 +404,10 @@ export default function InventoryPurchaseOrdersPage() {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
-                statusFilter === tab.id
+              className={`px-3 py-1 rounded text-xs font-semibold transition-all ${statusFilter === tab.id
                   ? "bg-accent text-white shadow-xs"
                   : "text-muted hover:text-ink"
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -682,9 +705,9 @@ export default function InventoryPurchaseOrdersPage() {
                         const currentProduct = products.find((p) => p.id === item.productId);
                         const availableUnits = currentProduct
                           ? [
-                              ...(currentProduct.baseUnit ? [currentProduct.baseUnit] : []),
-                              ...(currentProduct.saleUnits || []).map((su) => su.unit).filter(Boolean),
-                            ]
+                            ...(currentProduct.baseUnit ? [currentProduct.baseUnit] : []),
+                            ...(currentProduct.saleUnits || []).map((su) => su.unit).filter(Boolean),
+                          ]
                           : [];
 
                         const lineSub = item.quantity * item.purchaseRate - item.schemeDiscount;

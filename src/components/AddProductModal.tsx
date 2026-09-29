@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ErrorNote } from "@/components/ErrorNote";
 import { readError, type ApiError } from "@/lib/read-error";
 import { useApiGet } from "@/lib/useApiGet";
@@ -33,6 +33,14 @@ export function AddProductModal({
 }) {
   const { data: unitsData } = useApiGet<SystemUnit[]>("/api/admin/units");
   const allUnits = unitsData ?? [];
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
 
   const [form, setForm] = useState({
     sku: skuFromName(initialName),

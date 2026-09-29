@@ -47,12 +47,20 @@ export async function GET(req: NextRequest) {
   }
 }
 
-const movementSchema = z.object({
+const movementItemSchema = z.object({
   productId: z.string().min(1, "Product is required"),
-  warehouseId: z.string().optional(),
   quantity: z.number().positive("Quantity must be greater than 0"),
+  notes: z.string().optional(),
+});
+
+const movementSchema = z.object({
+  productId: z.string().optional(),
+  quantity: z.number().positive().optional(),
+  items: z.array(movementItemSchema).optional(),
+  warehouseId: z.string().optional(),
   movementType: z.enum(["DAMAGE", "EXPIRY", "RETURN", "TRANSFER_OUT", "TRANSFER_IN"]),
   direction: z.enum(["OUTWARD", "INWARD"]).default("OUTWARD"),
+  customerId: z.string().optional(),
   customerName: z.string().optional(),
   orderReference: z.string().optional(),
   reason: z.string().min(3, "Mandatory reason explaining the movement"),
@@ -67,8 +75,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { productId, quantity, movementType, direction, customerName, orderReference, reason } =
-    parsed.data;
+  const {
+    items: inputItems,
+    productId,
+    quantity,
+    movementType,
+    direction,
+    customerName,
+    orderReference,
+    reason,
+  } = parsed.data;
+
+  const rawItems =
+    inputItems && inputItems.length > 0
+      ? inputItems
+      : productId && quantity
+      ? [{ productId, quantity, notes: undefined }]
+      : [];
+
+  if (rawItems.length === 0) {
+    return NextResponse.json({ error: "At least one product item is required" }, { status: 400 });
+  }
 
   const warehouseId =
     session.role === "ADMIN" && parsed.data.warehouseId
@@ -82,22 +109,27 @@ export async function POST(req: NextRequest) {
   const db = getDb();
 
   try {
-    const inv = await db.inventory.findUnique({
-      where: { productId_warehouseId: { productId, warehouseId } },
-    });
-
-    const currentQty = inv ? Number(inv.quantityOnHand) : 0;
     const isInward = direction === "INWARD";
-    const delta = isInward ? quantity : -quantity;
-    const afterQty = currentQty + delta;
 
-    if (!isInward && afterQty < 0) {
-      return NextResponse.json(
-        {
-          error: `Insufficient stock to issue outward. Current on-hand is ${currentQty}, attempted to deduct ${quantity}.`,
-        },
-        { status: 400 }
-      );
+    // 1. Pre-validate stock availability for all outward items
+    if (!isInward) {
+      for (const item of rawItems) {
+        const inv = await db.inventory.findUnique({
+          where: { productId_warehouseId: { productId: item.productId, warehouseId } },
+          include: { product: { select: { name: true, sku: true } } },
+        });
+
+        const currentQty = inv ? Number(inv.quantityOnHand) : 0;
+        if (currentQty < item.quantity) {
+          const prodLabel = inv?.product ? `${inv.product.name} (${inv.product.sku})` : item.productId;
+          return NextResponse.json(
+            {
+              error: `Insufficient stock for ${prodLabel}. Current on-hand is ${currentQty}, attempted to deduct ${item.quantity}.`,
+            },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const referenceType = isInward
@@ -106,7 +138,7 @@ export async function POST(req: NextRequest) {
       ? "SUPPLIER_RETURN"
       : "OUTWARD_DISPATCH";
 
-    const refNotes = [
+    const baseRefNotes = [
       customerName ? `Customer: ${customerName}` : "",
       orderReference ? `Ref: ${orderReference}` : "",
       reason,
@@ -114,47 +146,78 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join(" | ");
 
-    const move = await db.$transaction(async (tx) => {
-      await tx.inventory.upsert({
-        where: { productId_warehouseId: { productId, warehouseId } },
-        update: { quantityOnHand: afterQty },
-        create: { productId, warehouseId, quantityOnHand: afterQty },
-      });
+    // 2. Perform atomic updates for all items
+    const createdMovements = await db.$transaction(async (tx) => {
+      const results = [];
 
-      return await tx.inventoryMovement.create({
-        data: {
-          productId,
-          warehouseId,
-          beforeQty: currentQty,
-          movementQty: delta,
-          afterQty,
+      for (const item of rawItems) {
+        const inv = await tx.inventory.findUnique({
+          where: { productId_warehouseId: { productId: item.productId, warehouseId } },
+        });
+
+        const currentQty = inv ? Number(inv.quantityOnHand) : 0;
+        const delta = isInward ? item.quantity : -item.quantity;
+        const afterQty = currentQty + delta;
+
+        if (!isInward && afterQty < 0) {
+          throw new Error(`Insufficient stock for product ${item.productId}`);
+        }
+
+        await tx.inventory.upsert({
+          where: { productId_warehouseId: { productId: item.productId, warehouseId } },
+          update: { quantityOnHand: afterQty },
+          create: { productId: item.productId, warehouseId, quantityOnHand: afterQty },
+        });
+
+        const itemRefNotes = item.notes ? `${baseRefNotes} (Item note: ${item.notes})` : baseRefNotes;
+
+        const move = await tx.inventoryMovement.create({
+          data: {
+            productId: item.productId,
+            warehouseId,
+            beforeQty: currentQty,
+            movementQty: delta,
+            afterQty,
+            movementType,
+            referenceType,
+            referenceId: itemRefNotes,
+            userId: session.sub,
+          },
+        });
+
+        results.push(move);
+      }
+
+      return results;
+    });
+
+    // 3. Write audit log
+    for (const move of createdMovements) {
+      await writeAudit({
+        userId: session.sub,
+        role: session.role,
+        warehouseId,
+        action: `${direction}_${movementType}`,
+        entityType: "InventoryMovement",
+        entityId: move.id,
+        reason: baseRefNotes,
+        oldValue: { onHand: Number(move.beforeQty) },
+        newValue: {
+          onHand: Number(move.afterQty),
+          delta: Number(move.movementQty),
+          direction,
           movementType,
-          referenceType,
-          referenceId: refNotes,
-          userId: session.sub,
+          customerName: customerName || null,
         },
       });
-    });
+    }
 
-    await writeAudit({
-      userId: session.sub,
-      role: session.role,
-      warehouseId,
-      action: `${direction}_${movementType}`,
-      entityType: "InventoryMovement",
-      entityId: move.id,
-      reason: refNotes,
-      oldValue: { onHand: currentQty },
-      newValue: {
-        onHand: afterQty,
-        delta,
-        direction,
-        movementType,
-        customerName: customerName || null,
-      },
+    return NextResponse.json({
+      success: true,
+      count: createdMovements.length,
+      movement: createdMovements[0],
+      movements: createdMovements,
     });
-
-    return NextResponse.json({ success: true, movement: move });
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || "Failed to process inventory movement" },

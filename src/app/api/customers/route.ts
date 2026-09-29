@@ -13,7 +13,7 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const limitParam = Number(req.nextUrl.searchParams.get("limit"));

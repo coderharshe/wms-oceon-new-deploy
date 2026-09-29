@@ -49,7 +49,7 @@ export default function PortalShell({
                 className="h-[18px] w-auto object-contain shrink-0"
               />
               <span className="hidden md:inline-block text-xs font-semibold text-muted">
-                · {title}
+                · <span className="font-bold">{title}</span>
               </span>
             </div>
 

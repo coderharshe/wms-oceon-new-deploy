@@ -174,9 +174,10 @@ async function duplicateBill(clientRequestId: string, warehouseId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "QC"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "QC", "INVENTORY"]);
   if (isErrorResponse(session)) return session;
 
+  const customerId = req.nextUrl.searchParams.get("customerId") ?? undefined;
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
   const paymentStatus = req.nextUrl.searchParams.get("paymentStatus") ?? undefined;
   const sellingMode = req.nextUrl.searchParams.get("sellingMode") ?? undefined;
@@ -193,6 +194,7 @@ export async function GET(req: NextRequest) {
 
     const conditions = [];
     if (warehouseId) conditions.push(eq(order.warehouseId, warehouseId));
+    if (customerId) conditions.push(eq(order.customerId, customerId));
     if (status) conditions.push(eq(order.status, status as any));
     if (sellingMode) conditions.push(eq(order.sellingMode, sellingMode as any));
     if (since) conditions.push(gte(order.createdAt, since.toISOString()));
@@ -241,6 +243,7 @@ export async function GET(req: NextRequest) {
   const orders = await db.order.findMany({
     where: {
       ...(warehouseId ? { warehouseId } : {}),
+      ...(customerId ? { customerId } : {}),
       ...(status ? { status: status as any } : {}),
       ...(sellingMode ? { sellingMode: sellingMode as any } : {}),
       ...(paymentStatus ? { bill: { paymentStatus: paymentStatus as any } } : {}),
@@ -261,7 +264,16 @@ export async function GET(req: NextRequest) {
     },
     include: {
       customer: true,
-      items: { include: { product: true } },
+      items: {
+        include: {
+          product: {
+            include: {
+              baseUnit: true,
+            },
+          },
+          unit: true,
+        },
+      },
       bill: {
         include: {
           payment: {
