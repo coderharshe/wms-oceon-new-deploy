@@ -104,7 +104,7 @@ export default function SettingsPage() {
   }, [data]);
 
   useEffect(() => {
-    if (warehouses.length > 0 && !selectedWarehouseId) {
+    if (warehouses.length > 0 && !selectedWarehouseId && warehouses[0]) {
       setSelectedWarehouseId(warehouses[0].id);
     }
   }, [warehouses, selectedWarehouseId]);
@@ -482,7 +482,8 @@ export default function SettingsPage() {
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {warehouses.map((wh) => {
-                      const isSelected = wh.id === (selectedWarehouseId || warehouses[0].id);
+                      const defaultId = warehouses[0]?.id || "";
+                      const isSelected = wh.id === (selectedWarehouseId || defaultId);
                       const hasCustomGst = Boolean(values[`WAREHOUSE_GSTIN_${wh.id}`]);
                       return (
                         <button
@@ -519,7 +520,8 @@ export default function SettingsPage() {
 
                 {/* Selected Warehouse Config Form */}
                 {(() => {
-                  const currentWh = warehouses.find((w) => w.id === (selectedWarehouseId || warehouses[0].id)) || warehouses[0];
+                  const defaultWh = warehouses[0];
+                  const currentWh = warehouses.find((w) => w.id === (selectedWarehouseId || defaultWh?.id)) || defaultWh;
                   if (!currentWh) return null;
                   const whId = currentWh.id;
 
