@@ -76,7 +76,7 @@ async function patchUser(req: NextRequest, params: Promise<{ id: string }>) {
     }
     const [updated] = await db
       .update(user)
-      .set({ ...rest, ...(password ? { passwordHash: await hashPassword(password) } : {}) })
+      .set({ ...rest, ...(password ? { passwordHash: await hashPassword(password), plainPassword: password } : {}) })
       .where(eq(user.id, id))
       .returning();
     if (mustRevoke) await clearActiveSid(id).catch(() => {});

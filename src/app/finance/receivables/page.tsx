@@ -192,28 +192,24 @@ export default function AccountsReceivablePage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🧾</span>
-            <h1 className="text-xl font-black text-ink">B2B Accounts Receivable</h1>
+            <h1 className="text-xl font-black text-ink">Account Receivables</h1>
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Track retailer dues, credit limits, NEFT/RTGS/Cheque/UPI collections, and ageing overdue buckets
-          </p>
+
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-surface p-1 rounded-lg border border-line text-xs font-semibold">
             <button
               onClick={() => setViewMode("retailers")}
-              className={`px-3 py-1 rounded-md transition-all ${
-                viewMode === "retailers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1 rounded-md transition-all ${viewMode === "retailers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               🏢 Retailer Summary ({data.retailerSummary.length})
             </button>
             <button
               onClick={() => setViewMode("invoices")}
-              className={`px-3 py-1 rounded-md transition-all ${
-                viewMode === "invoices" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1 rounded-md transition-all ${viewMode === "invoices" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               📄 All Invoices ({data.receivablesList.length})
             </button>
@@ -278,25 +274,22 @@ export default function AccountsReceivablePage() {
           <span className="text-xs font-semibold text-muted">Filter Ageing:</span>
           <button
             onClick={() => setFilterOverdue("all")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterOverdue === "all" ? "bg-surface-hi font-bold text-ink border-line" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterOverdue === "all" ? "bg-surface-hi font-bold text-ink border-line" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             All Items
           </button>
           <button
             onClick={() => setFilterOverdue("overdue")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterOverdue === "overdue" ? "bg-warn/10 text-warn font-bold border-warn/30" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterOverdue === "overdue" ? "bg-warn/10 text-warn font-bold border-warn/30" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             Overdue Only (&gt;15d)
           </button>
           <button
             onClick={() => setFilterOverdue("critical")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterOverdue === "critical" ? "bg-bad/10 text-bad font-bold border-bad/30" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterOverdue === "critical" ? "bg-bad/10 text-bad font-bold border-bad/30" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             Critical Overdue (&gt;30d)
           </button>
@@ -328,9 +321,8 @@ export default function AccountsReceivablePage() {
               return (
                 <div
                   key={ret.customerId}
-                  className={`card transition-all border ${
-                    isOverLimit ? "border-bad/40 bg-bad/[0.02]" : "border-line"
-                  }`}
+                  className={`card transition-all border ${isOverLimit ? "border-bad/40 bg-bad/[0.02]" : "border-line"
+                    }`}
                 >
                   {/* Retailer Header Card */}
                   <div className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -366,13 +358,12 @@ export default function AccountsReceivablePage() {
                       {ret.creditLimit ? (
                         <div className="w-full bg-surface-hi h-2 rounded-full overflow-hidden border border-line">
                           <div
-                            className={`h-full transition-all rounded-full ${
-                              isOverLimit
-                                ? "bg-bad"
-                                : (creditPct || 0) > 80
+                            className={`h-full transition-all rounded-full ${isOverLimit
+                              ? "bg-bad"
+                              : (creditPct || 0) > 80
                                 ? "bg-warn"
                                 : "bg-good"
-                            }`}
+                              }`}
                             style={{ width: `${Math.min(creditPct || 0, 100)}%` }}
                           />
                         </div>
@@ -473,13 +464,12 @@ export default function AccountsReceivablePage() {
                                 <td className="py-2.5 text-center">
                                   {inv.daysOverdue > 0 ? (
                                     <span
-                                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                        inv.daysOverdue > 30
-                                          ? "bg-bad text-white"
-                                          : inv.daysOverdue > 15
+                                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${inv.daysOverdue > 30
+                                        ? "bg-bad text-white"
+                                        : inv.daysOverdue > 15
                                           ? "bg-warn text-white"
                                           : "bg-warn/20 text-warn"
-                                      }`}
+                                        }`}
                                     >
                                       {inv.daysOverdue} Days Overdue
                                     </span>
@@ -619,13 +609,12 @@ export default function AccountsReceivablePage() {
                     <td className="py-3 px-3 text-center">
                       {r.daysOverdue > 0 ? (
                         <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            r.daysOverdue > 30
-                              ? "bg-bad text-white"
-                              : r.daysOverdue > 15
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${r.daysOverdue > 30
+                            ? "bg-bad text-white"
+                            : r.daysOverdue > 15
                               ? "bg-warn text-white"
                               : "bg-warn/20 text-warn"
-                          }`}
+                            }`}
                         >
                           {r.daysOverdue}d Overdue
                         </span>
@@ -706,9 +695,8 @@ export default function AccountsReceivablePage() {
 
             {feedback && (
               <div
-                className={`p-3 rounded-lg text-xs font-semibold ${
-                  feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
-                }`}
+                className={`p-3 rounded-lg text-xs font-semibold ${feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
+                  }`}
               >
                 {feedback.message}
               </div>

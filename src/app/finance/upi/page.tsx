@@ -258,12 +258,10 @@ export default function UpiDigitalPaymentsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black tracking-tight text-ink">4️⃣ 📱 UPI & Digital Payments Management</h1>
-            <span className="badge bg-good/10 text-good font-bold">Dedicated Gateway Clearing</span>
+            <h1 className="text-xl font-black tracking-tight text-ink">UPI & Digital Payments</h1>
+
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Distinct Digital Payment Channel Tracking, MDR Fee Reconciliation, T+1 Bank Settlements & Discrepancy Audits
-          </p>
+
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -306,46 +304,15 @@ export default function UpiDigitalPaymentsPage() {
         />
       </div>
 
-      {/* ── UPI CHANNELS / VPA CARDS ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface p-2 rounded border border-line">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-muted uppercase mr-1">UPI Channels:</span>
-          <button
-            onClick={() => setSelectedUpiAccount("ALL")}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-              selectedUpiAccount === "ALL" ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
-            }`}
-          >
-            📱 All Digital Channels ({data.entries.length} txs)
-          </button>
-
-          {data.upiAccounts.map((acc) => (
-            <button
-              key={acc.id}
-              onClick={() => setSelectedUpiAccount(acc.id)}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                selectedUpiAccount === acc.id ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
-              }`}
-            >
-              <span>{acc.name}</span>
-              <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${selectedUpiAccount === acc.id ? "bg-white/20 text-white" : "bg-surface text-muted"}`}>
-                {acc.vpa}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* ── FORMULA & CLEARING ENGINE BANNER (NEVER MERGE BLINDLY WITH BANK) ── */}
       <section className="card space-y-4 border-l-4 border-l-good">
         <div className="flex flex-wrap justify-between items-center border-b border-line pb-2 gap-2">
           <div>
             <h2 className="text-sm font-black text-ink uppercase tracking-tight">
-              UPI Gateway Clearing & Settlement Equation
+              UPI Settlements
             </h2>
-            <p className="text-[11px] text-muted">
-              UPI payments sit in intermediate gateway clearing until settled with bank credits (T+0 / T+1)
-            </p>
+
           </div>
 
           <div className="text-right">
@@ -390,20 +357,15 @@ export default function UpiDigitalPaymentsPage() {
           </div>
         </div>
 
-        <div className="bg-surface-hi p-2 rounded border border-line flex flex-wrap justify-between items-center text-xs font-semibold">
-          <span>
-            🧮 Formula: Gross Inflow ({rs(s.totalGrossCollected)}) − Refunds ({rs(s.totalGrossRefunded)}) − MDR Charges ({rs(s.totalChargesDeducted)}) − Settled to Bank ({rs(s.totalSettledToBank)})
-          </span>
-          <span className="text-warn font-mono text-sm font-black">= In-Transit: {rs(s.pendingInTransit)}</span>
-        </div>
+
       </section>
 
       {/* ── SECTION: INTERACTIVE UPI DIGITAL LEDGER TABLE ── */}
       <section className="card space-y-3">
         <div className="flex flex-wrap justify-between items-center border-b border-line pb-2 gap-2">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-black text-ink">📜 Digital Payment Ledger ({filteredEntries.length} transactions)</h2>
-            <span className="badge bg-surface-hi text-[10px]">Real-time Digital Audit</span>
+            <h2 className="text-sm font-black text-ink">📜 Digital Payment Ledger ({filteredEntries.length} trans.)</h2>
+
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -418,9 +380,8 @@ export default function UpiDigitalPaymentsPage() {
                 <button
                   key={t.id}
                   onClick={() => setStatusFilter(t.id)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                    statusFilter === t.id ? "bg-accent text-white" : "text-muted hover:text-ink"
-                  }`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold ${statusFilter === t.id ? "bg-accent text-white" : "text-muted hover:text-ink"
+                    }`}
                 >
                   {t.label}
                 </button>
@@ -498,23 +459,22 @@ export default function UpiDigitalPaymentsPage() {
                     <td className="py-2 font-mono text-[11px] text-muted">{tx.settlementDate || "In Queue (T+1)"}</td>
                     <td className="py-2 text-center">
                       <span
-                        className={`badge text-[10px] font-bold ${
-                          tx.status === "SETTLED"
-                            ? "bg-good/15 text-good"
-                            : tx.status === "PENDING"
+                        className={`badge text-[10px] font-bold ${tx.status === "SETTLED"
+                          ? "bg-good/15 text-good"
+                          : tx.status === "PENDING"
                             ? "bg-warn/15 text-warn"
                             : tx.status === "REFUNDED"
-                            ? "bg-bad/15 text-bad"
-                            : "bg-bad/25 text-bad"
-                        }`}
+                              ? "bg-bad/15 text-bad"
+                              : "bg-bad/25 text-bad"
+                          }`}
                       >
                         {tx.status === "SETTLED"
                           ? "✓ Settled"
                           : tx.status === "PENDING"
-                          ? "⏳ In-Transit"
-                          : tx.status === "REFUNDED"
-                          ? "🔄 Refunded"
-                          : "⚠️ Discrepancy"}
+                            ? "⏳ In-Transit"
+                            : tx.status === "REFUNDED"
+                              ? "🔄 Refunded"
+                              : "⚠️ Discrepancy"}
                       </span>
                     </td>
                   </tr>

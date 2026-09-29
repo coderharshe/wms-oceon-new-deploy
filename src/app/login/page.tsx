@@ -234,12 +234,13 @@ function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="card w-80 space-y-4 p-6 shadow-xl border border-line">
-      <div className="text-center pb-1">
-        <div className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-surface font-black text-xl shadow-md">
-          O
-        </div>
-        <h1 className="text-xl font-extrabold tracking-tight text-ink">OCEON-WMS</h1>
-        <p className="text-xs text-muted mt-0.5">Enterprise Warehouse & Billing System</p>
+      <div className="text-center pb-2">
+        <img
+          src="/logo.png"
+          alt="Oceon"
+          className="mx-auto mb-2 h-20 w-auto object-contain"
+        />
+        <p className="text-xs text-muted">Enterprise Warehouse & Billing System</p>
       </div>
 
       <div>

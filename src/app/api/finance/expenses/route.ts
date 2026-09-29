@@ -5,6 +5,9 @@ import { getDb } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { getSetting, setSetting } from "@/lib/settings";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export type ExpenseCategoryDef = {
   key: string;
   label: string;
@@ -218,6 +221,8 @@ export async function GET(req: NextRequest) {
       let explicitCategory: string | null = null;
       let explicitMode: string | null = null;
 
+      let adjustmentInfo: string | null = null;
+
       const parts = exp.description.split("|").map((p) => p.trim());
       for (const p of parts) {
         if (p.toLowerCase().startsWith("category:")) {
@@ -232,6 +237,8 @@ export async function GET(req: NextRequest) {
           account = p.slice(8).trim();
         } else if (p.toLowerCase().startsWith("notes:")) {
           notes = p.slice(6).trim();
+        } else if (p.toLowerCase().startsWith("adjusted:") || p.toLowerCase().startsWith("adjustment:")) {
+          adjustmentInfo = p.slice(p.indexOf(":") + 1).trim();
         }
       }
 
@@ -271,6 +278,8 @@ export async function GET(req: NextRequest) {
         notes,
         attachmentKey: exp.attachmentKey,
         isApproved: !!exp.approvedByUserId,
+        isAdjusted: Boolean(adjustmentInfo),
+        adjustmentInfo,
         createdByUser: exp.createdByUser ? { name: exp.createdByUser.name, staffId: exp.createdByUser.staffId } : null,
         approvedByUser: exp.approvedByUser ? { name: exp.approvedByUser.name, staffId: exp.approvedByUser.staffId } : null,
         warehouse: exp.warehouse?.name || "Main Warehouse",
@@ -301,7 +310,7 @@ export async function GET(req: NextRequest) {
 }
 
 const expenseActionSchema = z.object({
-  action: z.enum(["RECORD", "APPROVE", "ADD_CATEGORY", "DELETE_CATEGORY"]).optional().default("RECORD"),
+  action: z.enum(["RECORD", "APPROVE", "ADJUST", "ADD_CATEGORY", "DELETE_CATEGORY"]).optional().default("RECORD"),
   expenseId: z.string().optional(),
   warehouseId: z.string().optional(),
   amount: z.number().positive().optional(),
@@ -317,6 +326,7 @@ const expenseActionSchema = z.object({
   vendor: z.string().optional(),
   invoiceProof: z.string().optional(),
   notes: z.string().optional(),
+  adjustmentReason: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -374,6 +384,136 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ success: true, expense });
+    }
+
+    // ──────────────────────── ACTION: ADJUST RECORDED EXPENSE ────────────────────────
+    if (data.action === "ADJUST") {
+      if (!data.expenseId) {
+        return NextResponse.json({ error: "expenseId is required for adjustment" }, { status: 400 });
+      }
+      if (!data.adjustmentReason || !data.adjustmentReason.trim()) {
+        return NextResponse.json({ error: "A valid reason for the adjustment is required" }, { status: 400 });
+      }
+
+      const existingExpense = await db.expense.findUnique({
+        where: { id: data.expenseId },
+        include: { createdByUser: true },
+      });
+
+      if (!existingExpense) {
+        return NextResponse.json({ error: "Expense record not found" }, { status: 404 });
+      }
+
+      const oldAmount = Number(existingExpense.amount);
+      const newAmount = data.amount || oldAmount;
+
+      let finalCategoryKey = data.category || (existingExpense.category as string);
+      let isCustomCategory = false;
+
+      if (data.customCategoryName && data.customCategoryName.trim()) {
+        const icon = data.customCategoryIcon?.trim() || "⚡";
+        const customCat = await saveCustomCategory(data.customCategoryName.trim(), icon);
+        finalCategoryKey = customCat.key;
+        isCustomCategory = true;
+      } else if (data.category) {
+        const customCats = await getCustomCategories();
+        if (customCats.some((c) => c.key === data.category)) {
+          isCustomCategory = true;
+        }
+      }
+
+      if (data.customPaymentMode && data.customPaymentMode.trim()) {
+        await saveCustomPaymentMode(data.customPaymentMode.trim());
+      }
+      if (data.customAccount && data.customAccount.trim()) {
+        await saveCustomBankAccount(data.customAccount.trim());
+      }
+
+      let prismaCategory: "RENT" | "ELECTRICITY" | "SALARY" | "TRANSPORT" | "PACKAGING" | "MARKETING" | "SOFTWARE" | "MAINTENANCE" | "MISCELLANEOUS" = existingExpense.category;
+      if (finalCategoryKey === "RENT") prismaCategory = "RENT";
+      else if (finalCategoryKey === "ELECTRICITY") prismaCategory = "ELECTRICITY";
+      else if (finalCategoryKey === "SALARY") prismaCategory = "SALARY";
+      else if (finalCategoryKey === "TRANSPORT" || finalCategoryKey === "DELIVERY") prismaCategory = "TRANSPORT";
+      else if (finalCategoryKey === "PACKAGING") prismaCategory = "PACKAGING";
+      else if (finalCategoryKey === "MARKETING") prismaCategory = "MARKETING";
+      else if (finalCategoryKey === "SOFTWARE") prismaCategory = "SOFTWARE";
+      else if (finalCategoryKey === "REPAIRS") prismaCategory = "MAINTENANCE";
+      else if (finalCategoryKey) prismaCategory = "MISCELLANEOUS";
+
+      const rawMode = data.paymentMode || existingExpense.paymentMode;
+      const customModeStr = data.customPaymentMode?.trim();
+      const finalPaymentModeStr = customModeStr || rawMode;
+      let prismaPaymentMode: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT" = existingExpense.paymentMode;
+      if (rawMode === "CASH") prismaPaymentMode = "CASH";
+      else if (rawMode === "UPI") prismaPaymentMode = "UPI";
+      else if (rawMode === "CHEQUE") prismaPaymentMode = "CHEQUE";
+      else prismaPaymentMode = "BANK_TRANSFER";
+
+      const rawAccount = data.account?.trim() || "";
+      const customAccStr = data.customAccount?.trim();
+      const finalAccountStr = customAccStr || rawAccount || (prismaPaymentMode === "CASH" ? "Cash Drawer" : "Operating Bank Account");
+      const vendorStr = data.vendor?.trim() || "General Vendor";
+      const invoiceProofStr = data.invoiceProof?.trim() || "—";
+      const notesStr = data.notes?.trim() || "";
+
+      const nowFormatted = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+      const adjustStamp = `${nowFormatted} by ${session.name || session.staffId} (${session.role}): ₹${oldAmount} → ₹${newAmount} | Reason: ${data.adjustmentReason.trim()}`;
+
+      const tags: string[] = [];
+      if (isCustomCategory) tags.push(`Category: ${finalCategoryKey}`);
+      if (customModeStr) tags.push(`Mode: ${customModeStr}`);
+      tags.push(`Vendor: ${vendorStr}`);
+      tags.push(`Invoice: ${invoiceProofStr}`);
+      tags.push(`Account: ${finalAccountStr}`);
+      if (notesStr) tags.push(`Notes: ${notesStr}`);
+      tags.push(`Adjusted: [${adjustStamp}]`);
+
+      const compositeDescription = tags.join(" | ");
+
+      const updatedExpense = await db.expense.update({
+        where: { id: data.expenseId },
+        data: {
+          amount: newAmount,
+          category: prismaCategory,
+          date: data.date ? new Date(data.date) : existingExpense.date,
+          paymentMode: prismaPaymentMode,
+          description: compositeDescription,
+          attachmentKey: data.invoiceProof || existingExpense.attachmentKey,
+        },
+      });
+
+      // Write full audit record
+      await writeAudit({
+        userId: session.sub,
+        role: session.role,
+        warehouseId: existingExpense.warehouseId,
+        action: "EXPENSE_ADJUSTED",
+        entityType: "Expense",
+        entityId: existingExpense.id,
+        oldValue: {
+          amount: oldAmount,
+          category: existingExpense.category,
+          date: existingExpense.date,
+          paymentMode: existingExpense.paymentMode,
+          description: existingExpense.description,
+        },
+        newValue: {
+          amount: newAmount,
+          category: finalCategoryKey,
+          date: data.date || existingExpense.date,
+          paymentMode: prismaPaymentMode,
+          vendor: vendorStr,
+          account: finalAccountStr,
+          reason: data.adjustmentReason.trim(),
+          adjustedBy: session.sub,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        expense: updatedExpense,
+        adjustmentStamp: adjustStamp,
+      });
     }
 
     // ──────────────────────── ACTION: RECORD EXPENSE ────────────────────────

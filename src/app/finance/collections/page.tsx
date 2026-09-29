@@ -129,52 +129,45 @@ export default function CollectionsPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">💵</span>
-            <h1 className="text-xl font-black text-ink">Overall Collections Monitor</h1>
+            <h1 className="text-xl font-black text-ink">Collections</h1>
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Real-time tracking of Cash, Bank, UPI, B2B dues recovery, Staff collection leaderboard & Retailer contributions
-          </p>
+
         </div>
 
         {/* Date Presets */}
         <div className="flex flex-wrap items-center gap-1.5 bg-surface p-1 rounded-lg border border-line text-xs font-semibold">
           <button
             onClick={() => setRange("today")}
-            className={`px-3 py-1 rounded transition-colors ${
-              range === "today" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
-            }`}
+            className={`px-3 py-1 rounded transition-colors ${range === "today" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
+              }`}
           >
             Today
           </button>
           <button
             onClick={() => setRange("yesterday")}
-            className={`px-3 py-1 rounded transition-colors ${
-              range === "yesterday" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
-            }`}
+            className={`px-3 py-1 rounded transition-colors ${range === "yesterday" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
+              }`}
           >
             Yesterday
           </button>
           <button
             onClick={() => setRange("7d")}
-            className={`px-3 py-1 rounded transition-colors ${
-              range === "7d" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
-            }`}
+            className={`px-3 py-1 rounded transition-colors ${range === "7d" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
+              }`}
           >
             Last 7 Days
           </button>
           <button
             onClick={() => setRange("thisMonth")}
-            className={`px-3 py-1 rounded transition-colors ${
-              range === "thisMonth" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
-            }`}
+            className={`px-3 py-1 rounded transition-colors ${range === "thisMonth" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
+              }`}
           >
             This Month
           </button>
           <button
             onClick={() => setRange("30d")}
-            className={`px-3 py-1 rounded transition-colors ${
-              range === "30d" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
-            }`}
+            className={`px-3 py-1 rounded transition-colors ${range === "30d" ? "bg-accent text-white font-bold" : "text-muted hover:text-ink"
+              }`}
           >
             Last 30 Days
           </button>
@@ -261,25 +254,22 @@ export default function CollectionsPage() {
           <div className="flex bg-surface-hi p-1 rounded-lg border border-line text-xs font-semibold">
             <button
               onClick={() => setActiveTab("employees")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "employees" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "employees" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               👥 Collection by Employee ({data.collectionByEmployee.length})
             </button>
             <button
               onClick={() => setActiveTab("retailers")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "retailers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "retailers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               🏢 Collection by Retailer ({data.collectionByRetailer.length})
             </button>
             <button
               onClick={() => setActiveTab("transactions")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "transactions" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "transactions" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               📋 All Transactions ({data.recentCollections.length})
             </button>
@@ -316,7 +306,7 @@ export default function CollectionsPage() {
         <div className="card overflow-x-auto p-0 border border-line">
           <div className="p-4 border-b border-line bg-surface-hi/50 flex justify-between items-center">
             <div>
-              <h2 className="text-sm font-bold text-ink">Staff & Collector Performance Leaderboard</h2>
+              <h2 className="text-sm font-bold text-ink">Staff Leaderboard</h2>
               <p className="text-[11px] text-muted">Breakdown of collections deposited and handled by each employee</p>
             </div>
             <div className="text-xs font-semibold text-muted">
@@ -406,8 +396,8 @@ export default function CollectionsPage() {
         <div className="card overflow-x-auto p-0 border border-line">
           <div className="p-4 border-b border-line bg-surface-hi/50 flex justify-between items-center">
             <div>
-              <h2 className="text-sm font-bold text-ink">Retailer-wise Collection Breakdown</h2>
-              <p className="text-[11px] text-muted">Receipts received from B2B customer shops and remaining balances</p>
+              <h2 className="text-sm font-bold text-ink">Retailer-wise Collection</h2>
+
             </div>
             <div className="text-xs font-semibold text-muted">
               Total Contributing Retailers: <strong className="text-ink">{filteredRetailers.length}</strong>
@@ -553,15 +543,14 @@ export default function CollectionsPage() {
                     </td>
                     <td className="py-3 px-3">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                          tx.method === "CASH"
-                            ? "bg-emerald-500/15 text-emerald-600"
-                            : tx.method === "BANK_TRANSFER"
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${tx.method === "CASH"
+                          ? "bg-emerald-500/15 text-emerald-600"
+                          : tx.method === "BANK_TRANSFER"
                             ? "bg-sky-500/15 text-sky-600"
                             : tx.method === "UPI"
-                            ? "bg-purple-500/15 text-purple-600"
-                            : "bg-amber-500/15 text-amber-600"
-                        }`}
+                              ? "bg-purple-500/15 text-purple-600"
+                              : "bg-amber-500/15 text-amber-600"
+                          }`}
                       >
                         {tx.method === "BANK_TRANSFER" ? "NEFT / RTGS" : tx.method}
                       </span>

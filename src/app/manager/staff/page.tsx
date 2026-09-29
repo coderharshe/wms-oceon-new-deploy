@@ -541,7 +541,7 @@ export default function ManagerStaffPage() {
                   ) : (
                     filteredUsers.map((u) => {
                       const isRevealed = showAllPasswords || revealedIds.has(u.id);
-                      const pwd = u.plainPassword || "password123";
+                      const pwd = u.plainPassword || "—";
                       const isCopied = copiedId === u.id;
 
                       return (

@@ -62,11 +62,7 @@ type TodayCashData = {
 };
 
 const NOTES = [500, 200, 100, 50, 20, 10];
-const MOVES = [
-  { type: "BANK_DEPOSIT", label: "Deposited in bank", sign: -1 },
-  { type: "WITHDRAWAL", label: "Paid out (expense / owner)", sign: -1 },
-  { type: "OTHER_RECEIPT", label: "Cash put in (other receipt)", sign: 1 },
-] as const;
+
 
 const rs = (x: number | string) => `₹${Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -87,7 +83,7 @@ export default function CashManagementPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [coins, setCoins] = useState("");
   const [note, setNote] = useState("");
-  const [move, setMove] = useState<{ type: string; amount: string; note: string }>({ type: "BANK_DEPOSIT", amount: "", note: "" });
+
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ledgerExpanded, setLedgerExpanded] = useState(true);
@@ -131,11 +127,7 @@ export default function CashManagementPage() {
     }
   }
 
-  async function saveMove() {
-    if (await post("/api/finance/cash/transactions", { type: move.type, amount: Number(move.amount), note: move.note })) {
-      setMove({ ...move, amount: "", note: "" });
-    }
-  }
+
 
   if (loading) {
     return (
@@ -390,182 +382,132 @@ export default function CashManagementPage() {
         )}
       </section>
 
-      {/* ── SECTION 3: QUICK CASH ACTIONS & DENOMINATION EOD COUNT ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Quick Action Movement Card */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <h2 className="text-sm font-bold text-ink">⚡ Quick Cash Movement</h2>
-            <span className="text-[10px] text-muted">Drawer Inflow / Outflow</span>
+      {/* ── SECTION 3: DENOMINATION EOD COUNT ── */}
+      <section className="card space-y-3">
+        <div className="flex justify-between items-center border-b border-line pb-2">
+          <div>
+            <h2 className="text-sm font-bold text-ink">🪙 Denomination Count & Close</h2>
+            <p className="text-[10px] text-muted">Count physical cash in drawer for EOD blind closing</p>
           </div>
+          <span className="text-xs font-mono font-bold text-good">{rs(counted)}</span>
+        </div>
 
-          <div className="space-y-2 text-xs">
-            <label className="block text-muted">
-              Movement Action:
-              <select className="w-full mt-1" value={move.type} onChange={(e) => setMove({ ...move, type: e.target.value })}>
-                {MOVES.map((m) => (
-                  <option key={m.type} value={m.type}>
-                    {m.label} ({m.sign === 1 ? "Inflow +" : "Outflow −"})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block text-muted">
-              Amount (₹):
+        <div className="grid grid-cols-3 gap-2">
+          {NOTES.map((n) => (
+            <label key={n} className="text-xs text-muted">
+              ₹{n} ×
               <input
-                className="w-full mt-1 font-mono text-sm"
+                className="w-full mt-0.5 text-xs font-mono"
                 type="number"
                 min={0}
-                placeholder="Enter amount"
-                value={move.amount}
-                onChange={(e) => setMove({ ...move, amount: e.target.value })}
+                inputMode="numeric"
+                placeholder="0"
+                value={notes[n] ?? ""}
+                onChange={(e) => setNotes({ ...notes, [n]: e.target.value })}
               />
             </label>
+          ))}
+        </div>
 
-            <label className="block text-muted">
-              Narration / Purpose (Required):
-              <input
-                className="w-full mt-1"
-                placeholder="e.g. Petty cash for tea, Bank deposit slip #89"
-                value={move.note}
-                onChange={(e) => setMove({ ...move, note: e.target.value })}
-              />
-            </label>
-
-            <button
-              className="btn btn-primary w-full font-bold text-xs py-2 mt-2"
-              disabled={busy || !(Number(move.amount) > 0) || !move.note.trim()}
-              onClick={saveMove}
-            >
-              {busy ? "Saving..." : "Record Cash Movement"}
-            </button>
-          </div>
-        </section>
-
-        {/* Denomination Counter Card */}
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <div>
-              <h2 className="text-sm font-bold text-ink">🪙 Denomination Count & Close</h2>
-              <p className="text-[10px] text-muted">Count physical cash in drawer for EOD blind closing</p>
-            </div>
-            <span className="text-xs font-mono font-bold text-good">{rs(counted)}</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {NOTES.map((n) => (
-              <label key={n} className="text-xs text-muted">
-                ₹{n} ×
-                <input
-                  className="w-full mt-0.5 text-xs font-mono"
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  placeholder="0"
-                  value={notes[n] ?? ""}
-                  onChange={(e) => setNotes({ ...notes, [n]: e.target.value })}
-                />
-              </label>
-            ))}
-          </div>
-
-          <label className="block text-xs text-muted">
-            Coins Total (₹):
-            <input
-              className="w-full mt-0.5 text-xs font-mono"
-              type="number"
-              min={0}
-              inputMode="decimal"
-              placeholder="0.00"
-              value={coins}
-              onChange={(e) => setCoins(e.target.value)}
-            />
-          </label>
-
-          <div className="flex justify-between border-t border-line pt-2 text-sm font-bold">
-            <span>Total Cash Counted:</span>
-            <span className="font-mono text-good">{rs(counted)}</span>
-          </div>
-
+        <label className="block text-xs text-muted">
+          Coins Total (₹):
           <input
-            className="w-full text-xs"
-            placeholder="Closing notes / handover remarks (optional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
+            className="w-full mt-0.5 text-xs font-mono"
+            type="number"
+            min={0}
+            inputMode="decimal"
+            placeholder="0.00"
+            value={coins}
+            onChange={(e) => setCoins(e.target.value)}
           />
+        </label>
 
-          <button
-            className="btn btn-primary w-full font-bold text-xs py-2"
-            disabled={busy || !anyCounted}
-            onClick={() => saveCount()}
-          >
-            {busy ? "Closing Session..." : "Save Count & Close Drawer"}
-          </button>
-        </section>
-      </div>
+        <div className="flex justify-between border-t border-line pt-2 text-sm font-bold">
+          <span>Total Cash Counted:</span>
+          <span className="font-mono text-good">{rs(counted)}</span>
+        </div>
+
+        <input
+          className="w-full text-xs"
+          placeholder="Closing notes / handover remarks (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+
+        <button
+          className="btn btn-primary w-full font-bold text-xs py-2"
+          disabled={busy || !anyCounted}
+          onClick={() => saveCount()}
+        >
+          {busy ? "Closing Session..." : "Save Count & Close Drawer"}
+        </button>
+      </section>
 
       {/* ── Unsynced Bills Warning Dialog ── */}
-      {formError === "confirm-unsynced" ? (
-        <div className="card space-y-2 border-2 border-bad text-sm bg-bad/5">
-          <p className="font-semibold text-bad">
-            {unsynced.pending > 0 && `${unsynced.pending} ${unsynced.pending === 1 ? "item is" : "items are"} still waiting to sync`}
-            {unsynced.pending > 0 && unsynced.attention > 0 && " and "}
-            {unsynced.attention > 0 && `${unsynced.attention} ${unsynced.attention === 1 ? "needs" : "need"} attention`} on this PC.
-          </p>
-          <p className="text-xs">Those bills are not in the software total yet. Wait for the header to show Synced ✓, or save anyway.</p>
-          <div className="flex justify-end gap-2 pt-1">
-            <button className="btn text-xs" onClick={() => setFormError(null)}>
-              Wait for sync
-            </button>
-            <button className="btn-danger text-xs font-bold" disabled={busy} onClick={() => saveCount(true)}>
-              Save count anyway
-            </button>
+      {
+        formError === "confirm-unsynced" ? (
+          <div className="card space-y-2 border-2 border-bad text-sm bg-bad/5">
+            <p className="font-semibold text-bad">
+              {unsynced.pending > 0 && `${unsynced.pending} ${unsynced.pending === 1 ? "item is" : "items are"} still waiting to sync`}
+              {unsynced.pending > 0 && unsynced.attention > 0 && " and "}
+              {unsynced.attention > 0 && `${unsynced.attention} ${unsynced.attention === 1 ? "needs" : "need"} attention`} on this PC.
+            </p>
+            <p className="text-xs">Those bills are not in the software total yet. Wait for the header to show Synced ✓, or save anyway.</p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button className="btn text-xs" onClick={() => setFormError(null)}>
+                Wait for sync
+              </button>
+              <button className="btn-danger text-xs font-bold" disabled={busy} onClick={() => saveCount(true)}>
+                Save count anyway
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        formError && <p className="text-xs text-bad bg-bad/10 p-2 rounded">{formError}</p>
-      )}
+        ) : (
+          formError && <p className="text-xs text-bad bg-bad/10 p-2 rounded">{formError}</p>
+        )
+      }
 
       {/* ── SECTION 4: PAST COUNTED SESSIONS & DISCREPANCIES ── */}
-      {data.counts && data.counts.length > 0 && (
-        <section className="card space-y-3">
-          <div className="flex justify-between items-center border-b border-line pb-2">
-            <h2 className="text-sm font-bold text-ink">🕒 Today's Closed Drawer Sessions & Variances</h2>
-            <span className="text-xs text-muted">{data.counts.length} Closed Sessions</span>
-          </div>
+      {
+        data.counts && data.counts.length > 0 && (
+          <section className="card space-y-3">
+            <div className="flex justify-between items-center border-b border-line pb-2">
+              <h2 className="text-sm font-bold text-ink">🕒 Today's Closed Drawer Sessions & Variances</h2>
+              <span className="text-xs text-muted">{data.counts.length} Closed Sessions</span>
+            </div>
 
-          <div className="space-y-2">
-            {data.counts.map((c) => {
-              const diff = Number(c.difference);
-              return (
-                <div key={c.id} className="p-2.5 rounded bg-surface border border-line text-xs flex flex-wrap justify-between items-center gap-2">
-                  <div>
-                    <span className="font-bold text-ink">Closed at {fmtTime(c.closedAt)}</span>
-                    {c.note && <span className="text-muted block text-[11px] mt-0.5">Note: {c.note}</span>}
+            <div className="space-y-2">
+              {data.counts.map((c) => {
+                const diff = Number(c.difference);
+                return (
+                  <div key={c.id} className="p-2.5 rounded bg-surface border border-line text-xs flex flex-wrap justify-between items-center gap-2">
+                    <div>
+                      <span className="font-bold text-ink">Closed at {fmtTime(c.closedAt)}</span>
+                      {c.note && <span className="text-muted block text-[11px] mt-0.5">Note: {c.note}</span>}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <span className="text-muted block text-[10px]">Counted</span>
+                        <span className="font-mono font-semibold">{rs(c.actualCash)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block text-[10px]">Expected</span>
+                        <span className="font-mono font-semibold">{rs(c.expectedCash)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block text-[10px]">Difference</span>
+                        <span className={`font-mono font-bold ${diff === 0 ? "text-good" : "text-bad"}`}>
+                          {diff === 0 ? "✓ Matched" : diff > 0 ? `+${rs(diff)} (Extra)` : `−${rs(Math.abs(diff))} (Short)`}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <span className="text-muted block text-[10px]">Counted</span>
-                      <span className="font-mono font-semibold">{rs(c.actualCash)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted block text-[10px]">Expected</span>
-                      <span className="font-mono font-semibold">{rs(c.expectedCash)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted block text-[10px]">Difference</span>
-                      <span className={`font-mono font-bold ${diff === 0 ? "text-good" : "text-bad"}`}>
-                        {diff === 0 ? "✓ Matched" : diff > 0 ? `+${rs(diff)} (Extra)` : `−${rs(Math.abs(diff))} (Short)`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                );
+              })}
+            </div>
+          </section>
+        )
+      }
     </div>
   );
 }

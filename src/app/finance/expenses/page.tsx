@@ -20,6 +20,8 @@ type ExpenseItem = {
   notes: string;
   attachmentKey: string | null;
   isApproved: boolean;
+  isAdjusted?: boolean;
+  adjustmentInfo?: string | null;
   createdByUser: { name: string; staffId: string } | null;
   approvedByUser: { name: string; staffId: string } | null;
   warehouse: string;
@@ -96,6 +98,25 @@ export default function ExpensesPage() {
   const [newCatIcon, setNewCatIcon] = useState("⚡");
   const [categoryModalError, setCategoryModalError] = useState<string | null>(null);
 
+  // Adjust Expense Modal State
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustingExpense, setAdjustingExpense] = useState<ExpenseItem | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustCategory, setAdjustCategory] = useState("RENT");
+  const [adjustCustomCategoryName, setAdjustCustomCategoryName] = useState("");
+  const [adjustCustomCategoryIcon, setAdjustCustomCategoryIcon] = useState("⚡");
+  const [adjustDate, setAdjustDate] = useState("");
+  const [adjustVendor, setAdjustVendor] = useState("");
+  const [adjustInvoiceProof, setAdjustInvoiceProof] = useState("");
+  const [adjustPaymentMode, setAdjustPaymentMode] = useState("BANK_TRANSFER");
+  const [adjustCustomPaymentMode, setAdjustCustomPaymentMode] = useState("");
+  const [adjustAccount, setAdjustAccount] = useState("");
+  const [adjustCustomAccount, setAdjustCustomAccount] = useState("");
+  const [adjustNotes, setAdjustNotes] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustSaving, setAdjustSaving] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -121,7 +142,8 @@ export default function ExpensesPage() {
       (exp.createdByUser && exp.createdByUser.name.toLowerCase().includes(q.toLowerCase())) ||
       exp.account.toLowerCase().includes(q.toLowerCase()) ||
       exp.displayCategory.toLowerCase().includes(q.toLowerCase()) ||
-      (exp.displayPaymentMode && exp.displayPaymentMode.toLowerCase().includes(q.toLowerCase()));
+      (exp.displayPaymentMode && exp.displayPaymentMode.toLowerCase().includes(q.toLowerCase())) ||
+      (exp.adjustmentInfo && exp.adjustmentInfo.toLowerCase().includes(q.toLowerCase()));
 
     return matchesSearch;
   });
@@ -208,6 +230,137 @@ export default function ExpensesPage() {
     }
   };
 
+  const handleOpenAdjustModal = (exp: ExpenseItem) => {
+    setAdjustingExpense(exp);
+    setAdjustAmount(exp.amount.toString());
+
+    // Check if category matches standard/custom or needs custom
+    const existingCat = categoriesList.find((c) => c.key === exp.displayCategory || c.key === exp.category);
+    if (existingCat) {
+      setAdjustCategory(existingCat.key);
+      setAdjustCustomCategoryName("");
+    } else {
+      setAdjustCategory("__NEW_CUSTOM__");
+      setAdjustCustomCategoryName(exp.displayCategory || exp.category);
+    }
+    setAdjustCustomCategoryIcon("⚡");
+
+    setAdjustDate(exp.date);
+    setAdjustVendor(exp.vendor === "General Vendor" ? "" : exp.vendor);
+    setAdjustInvoiceProof(exp.invoiceProof === "—" ? "" : exp.invoiceProof);
+
+    // Payment mode & account
+    if (["CASH", "UPI", "BANK_TRANSFER", "CHEQUE"].includes(exp.paymentMode)) {
+      setAdjustPaymentMode(exp.paymentMode);
+      setAdjustCustomPaymentMode("");
+    } else {
+      setAdjustPaymentMode("__CUSTOM_MODE__");
+      setAdjustCustomPaymentMode(exp.displayPaymentMode || exp.paymentMode);
+    }
+
+    const matchedAccount = userAccounts.find((a) => a.name === exp.account);
+    if (matchedAccount) {
+      setAdjustAccount(matchedAccount.name);
+      setAdjustCustomAccount("");
+    } else if (exp.account && exp.account !== "Cash Drawer" && exp.account !== "Cash") {
+      setAdjustAccount("__CUSTOM_ACCOUNT__");
+      setAdjustCustomAccount(exp.account);
+    } else {
+      setAdjustAccount(userAccounts[0]?.name || "");
+      setAdjustCustomAccount("");
+    }
+
+    setAdjustNotes(exp.notes || "");
+    setAdjustReason("");
+    setAdjustError(null);
+    setShowAdjustModal(true);
+  };
+
+  const handleSaveAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingExpense) return;
+
+    const amt = parseFloat(adjustAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setAdjustError("Please enter a valid adjusted amount");
+      return;
+    }
+
+    if (!adjustVendor.trim()) {
+      setAdjustError("Please enter the vendor / recipient name");
+      return;
+    }
+
+    if (!adjustReason.trim()) {
+      setAdjustError("Please enter a detailed Reason for this Adjustment (Audit Requirement)");
+      return;
+    }
+
+    if (adjustCategory === "__NEW_CUSTOM__" && !adjustCustomCategoryName.trim()) {
+      setAdjustError("Please specify the custom category name");
+      return;
+    }
+
+    if (adjustPaymentMode === "__CUSTOM_MODE__" && !adjustCustomPaymentMode.trim()) {
+      setAdjustError("Please specify the custom payment mode");
+      return;
+    }
+
+    if (adjustPaymentMode !== "CASH" && adjustAccount === "__CUSTOM_ACCOUNT__" && !adjustCustomAccount.trim()) {
+      setAdjustError("Please specify the custom debited account");
+      return;
+    }
+
+    setAdjustSaving(true);
+    setAdjustError(null);
+
+    try {
+      const isNewCustomCat = adjustCategory === "__NEW_CUSTOM__";
+      const isCustomMode = adjustPaymentMode === "__CUSTOM_MODE__";
+      const isCustomAcc = adjustAccount === "__CUSTOM_ACCOUNT__";
+
+      const selectedAccName = isCustomAcc
+        ? adjustCustomAccount.trim()
+        : adjustAccount || userAccounts[0]?.name || "Primary Bank Account";
+
+      const payload: any = {
+        action: "ADJUST",
+        expenseId: adjustingExpense.id,
+        amount: amt,
+        category: isNewCustomCat ? adjustCustomCategoryName.trim() : adjustCategory,
+        customCategoryName: isNewCustomCat ? adjustCustomCategoryName.trim() : undefined,
+        customCategoryIcon: isNewCustomCat ? adjustCustomCategoryIcon : undefined,
+        date: adjustDate,
+        vendor: adjustVendor.trim(),
+        invoiceProof: adjustInvoiceProof.trim(),
+        paymentMode: isCustomMode ? "BANK_TRANSFER" : adjustPaymentMode,
+        customPaymentMode: isCustomMode ? adjustCustomPaymentMode.trim() : undefined,
+        account: adjustPaymentMode === "CASH" ? "Cash" : selectedAccName,
+        customAccount: isCustomAcc ? adjustCustomAccount.trim() : undefined,
+        notes: adjustNotes.trim(),
+        adjustmentReason: adjustReason.trim(),
+      };
+
+      const res = await fetch("/api/finance/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || "Failed to adjust expense");
+
+      setShowAdjustModal(false);
+      setAdjustingExpense(null);
+      setAdjustReason("");
+      reload();
+    } catch (err: any) {
+      setAdjustError(err.message || "Failed to save adjustment");
+    } finally {
+      setAdjustSaving(false);
+    }
+  };
+
   const handleAddNewCategoryStandalone = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) {
@@ -289,11 +442,8 @@ export default function ExpensesPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🧾</span>
-            <h1 className="text-xl font-black text-ink">Business Expense Management</h1>
+            <h1 className="text-xl font-black text-ink">Expenses</h1>
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Track operational spending across all categories with flexible custom expense types and approval workflows
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -473,7 +623,7 @@ export default function ExpensesPage() {
         <div className="p-4 border-b border-line bg-surface-hi/50 flex flex-wrap justify-between items-center gap-3">
           <div>
             <h2 className="text-sm font-bold text-ink">Expense Vouchers Ledger</h2>
-            <p className="text-[11px] text-muted">Showing {filteredExpenses.length} expense entries</p>
+
           </div>
 
           <div className="w-full sm:w-72">
@@ -498,13 +648,14 @@ export default function ExpensesPage() {
               <th className="py-3 px-3">Payment Mode</th>
               <th className="py-3 px-3 text-right">Amount (₹)</th>
               <th className="py-3 px-3">Created By</th>
-              <th className="py-3 px-4 text-center">Approved By</th>
+              <th className="py-3 px-4 text-center">Status</th>
+              <th className="py-3 px-4 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line/60">
             {filteredExpenses.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-muted">
+                <td colSpan={10} className="py-8 text-center text-muted">
                   No expense records matching criteria.
                 </td>
               </tr>
@@ -518,13 +669,23 @@ export default function ExpensesPage() {
                 return (
                   <tr key={exp.id} className="hover:bg-surface-hi/80 transition-colors">
                     {/* Date */}
-                    <td className="py-3 px-4 font-mono text-[11px] text-muted">{exp.date}</td>
+                    <td className="py-3 px-4 font-mono text-[11px] text-muted whitespace-nowrap">{exp.date}</td>
 
                     {/* Category */}
                     <td className="py-3 px-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${catObj.color}`}>
-                        {catObj.label}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${catObj.color}`}>
+                          {catObj.label}
+                        </span>
+                        {exp.isAdjusted && (
+                          <span
+                            title={exp.adjustmentInfo || "Adjusted record"}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-700 border border-amber-500/30 cursor-help"
+                          >
+                            <span>🔄 Adjusted</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Vendor */}
@@ -532,6 +693,11 @@ export default function ExpensesPage() {
                       <div className="font-bold text-ink">{exp.vendor}</div>
                       {exp.notes && (
                         <div className="text-[10px] text-muted truncate max-w-xs">{exp.notes}</div>
+                      )}
+                      {exp.adjustmentInfo && (
+                        <div className="text-[9px] text-amber-600/90 font-medium truncate max-w-xs" title={exp.adjustmentInfo}>
+                          ℹ️ {exp.adjustmentInfo}
+                        </div>
                       )}
                     </td>
 
@@ -566,7 +732,7 @@ export default function ExpensesPage() {
                     </td>
 
                     {/* Amount */}
-                    <td className="py-3 px-3 text-right font-black text-bad text-sm">
+                    <td className="py-3 px-3 text-right font-black text-bad text-sm whitespace-nowrap">
                       ₹{exp.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
 
@@ -576,8 +742,8 @@ export default function ExpensesPage() {
                       <div className="text-[10px] text-muted font-mono">{exp.createdByUser?.staffId}</div>
                     </td>
 
-                    {/* Approved By */}
-                    <td className="py-3 px-4 text-center">
+                    {/* Status / Approval */}
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
                       {exp.isApproved ? (
                         <div className="inline-flex flex-col items-center">
                           <span className="text-[10px] font-bold text-good bg-good/15 px-2 py-0.5 rounded-full">
@@ -602,6 +768,18 @@ export default function ExpensesPage() {
                           )}
                         </div>
                       )}
+                    </td>
+
+                    {/* Actions Column */}
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => handleOpenAdjustModal(exp)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-surface border border-line text-ink hover:bg-accent hover:text-white hover:border-accent transition-all shadow-xs"
+                        title="Adjust or update this recorded expense with audit tracking"
+                      >
+                        <span>✏️</span>
+                        <span>Adjust</span>
+                      </button>
                     </td>
                   </tr>
                 );
@@ -754,7 +932,7 @@ export default function ExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-ink mb-1">Vendor / Payee Name *</label>
+                  <label className="block font-semibold text-ink mb-1">Vendor / Receiver Name *</label>
                   <input
                     type="text"
                     required
@@ -945,6 +1123,382 @@ export default function ExpensesPage() {
         </div>
       )}
 
+      {/* ADJUST EXPENSE MODAL */}
+      {showAdjustModal && adjustingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="card w-full max-w-lg bg-surface border border-line p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-base">✏️</span>
+                  <h3 className="text-base font-black text-ink">Adjust Expense Record</h3>
+                </div>
+                <p className="text-xs text-muted">Update expense details. Every change is permanently tracked in the audit trail.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAdjustModal(false);
+                  setAdjustingExpense(null);
+                }}
+                className="text-muted hover:text-ink text-sm p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Original Summary Context Card */}
+            <div className="p-3 bg-surface-hi rounded-lg border border-line space-y-1 text-xs">
+              <div className="flex justify-between items-center text-muted font-mono text-[10px]">
+                <span>ID: {adjustingExpense.id.slice(0, 12)}...</span>
+                <span>Original Date: {adjustingExpense.date}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-ink font-bold">Original: ₹{adjustingExpense.amount.toLocaleString("en-IN")} &bull; {adjustingExpense.vendor}</span>
+                <span className="text-muted text-[11px]">{adjustingExpense.account} ({adjustingExpense.displayPaymentMode || adjustingExpense.paymentMode})</span>
+              </div>
+              {adjustingExpense.adjustmentInfo && (
+                <div className="mt-1.5 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-[11px] text-amber-800">
+                  <span className="font-bold">Previous Adjustment:</span> {adjustingExpense.adjustmentInfo}
+                </div>
+              )}
+            </div>
+
+            {adjustError && (
+              <div className="p-3 rounded-lg bg-bad/15 text-bad border border-bad/30 text-xs font-semibold">
+                {adjustError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAdjustment} className="space-y-3 text-xs">
+              {/* Row 1: Amount & Category */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-ink mb-1">Adjusted Amount (₹) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={adjustAmount}
+                    onChange={(e) => setAdjustAmount(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-line bg-surface-hi font-bold text-ink text-sm focus:border-accent"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block font-semibold text-ink">Category *</label>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustCategory("__NEW_CUSTOM__")}
+                      className="text-[10px] text-accent hover:underline font-bold"
+                    >
+                      + Custom
+                    </button>
+                  </div>
+                  <select
+                    value={adjustCategory}
+                    onChange={(e) => setAdjustCategory(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-line bg-surface-hi text-xs font-medium"
+                  >
+                    <optgroup label="Standard Categories">
+                      {categoriesList.filter((c) => !c.isCustom).map((c) => (
+                        <option key={c.key} value={c.key}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {categoriesList.some((c) => c.isCustom) && (
+                      <optgroup label="Created Custom Types">
+                        {categoriesList.filter((c) => c.isCustom).map((c) => (
+                          <option key={c.key} value={c.key}>
+                            {c.label} (Custom)
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Add Custom">
+                      <option value="__NEW_CUSTOM__">➕ Add Custom Category...</option>
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+
+              {/* Dynamic Custom Expense Category Input */}
+              {adjustCategory === "__NEW_CUSTOM__" && (
+                <div className="bg-accent/5 border border-accent/30 p-3 rounded-lg space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-accent">✨ Custom Category Name</span>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustCategory(categoriesList[0]?.key || "RENT")}
+                      className="text-[10px] text-muted hover:text-ink"
+                    >
+                      Cancel Custom
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2 items-center">
+                    <div className="col-span-1">
+                      <label className="block text-[10px] font-semibold text-muted mb-0.5">Icon</label>
+                      <div className="flex flex-wrap gap-1 bg-surface p-1 rounded border border-line">
+                        {SUGGESTED_ICONS.slice(0, 4).map((ic) => (
+                          <button
+                            key={ic}
+                            type="button"
+                            onClick={() => setAdjustCustomCategoryIcon(ic)}
+                            className={`p-1 text-xs rounded ${adjustCustomCategoryIcon === ic ? "bg-accent/20 font-bold" : "hover:bg-surface-hi"}`}
+                          >
+                            {ic}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="col-span-3">
+                      <label className="block text-[10px] font-semibold text-ink mb-0.5">Category Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={adjustCustomCategoryName}
+                        onChange={(e) => setAdjustCustomCategoryName(e.target.value)}
+                        placeholder="e.g. Tea & Snacks / Generator Fuel / Legal Fees"
+                        className="w-full p-2 rounded-lg border border-accent/40 bg-surface text-xs font-semibold text-ink focus:outline-none focus:border-accent"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Row 2: Date & Vendor */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-ink mb-1">Expense Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={adjustDate}
+                    onChange={(e) => setAdjustDate(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-line bg-surface-hi"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-ink mb-1">Vendor / Receiver Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={adjustVendor}
+                    onChange={(e) => setAdjustVendor(e.target.value)}
+                    placeholder="e.g. Tata Power / Landlord Ramesh / Petty Cash"
+                    className="w-full p-2 rounded-lg border border-line bg-surface-hi"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Payment Mode & Debited Account */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block font-semibold text-ink">Payment Mode *</label>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustPaymentMode("__CUSTOM_MODE__")}
+                      className="text-[10px] text-accent hover:underline font-bold"
+                    >
+                      + Custom
+                    </button>
+                  </div>
+                  <select
+                    value={adjustPaymentMode}
+                    onChange={(e) => setAdjustPaymentMode(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-line bg-surface-hi"
+                  >
+                    <optgroup label="Standard Modes">
+                      <option value="BANK_TRANSFER">Bank Transfer (NEFT / RTGS)</option>
+                      <option value="UPI">UPI Transfer</option>
+                      <option value="CASH">Cash</option>
+                      <option value="CHEQUE">Cheque</option>
+                    </optgroup>
+                    {data?.customPaymentModes && data.customPaymentModes.length > 0 && (
+                      <optgroup label="Saved Custom Modes">
+                        {data.customPaymentModes.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Add Custom">
+                      <option value="__CUSTOM_MODE__">➕ Custom Payment Mode...</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block font-semibold text-ink">Debited Account *</label>
+                    {adjustPaymentMode !== "CASH" && (
+                      <button
+                        type="button"
+                        onClick={() => setAdjustAccount("__CUSTOM_ACCOUNT__")}
+                        className="text-[10px] text-accent hover:underline font-bold"
+                      >
+                        + Custom
+                      </button>
+                    )}
+                  </div>
+                  {adjustPaymentMode === "CASH" ? (
+                    <input
+                      type="text"
+                      disabled
+                      value="Cash Drawer (Daily Till)"
+                      className="w-full p-2 rounded-lg border border-line bg-surface-hi/50 text-muted font-medium"
+                    />
+                  ) : (
+                    <select
+                      value={adjustAccount}
+                      onChange={(e) => setAdjustAccount(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-line bg-surface-hi"
+                    >
+                      {userAccounts.length === 0 ? (
+                        <option value="">No registered bank accounts found</option>
+                      ) : (
+                        <optgroup label="My Created Bank Accounts">
+                          {userAccounts.map((acc) => (
+                            <option key={acc.id} value={acc.name}>
+                              {acc.name} {acc.accountNumber && acc.accountNumber !== "Custom" ? `(${acc.accountNumber.slice(-4)})` : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Add Custom">
+                        <option value="__CUSTOM_ACCOUNT__">➕ Custom / Other Account...</option>
+                      </optgroup>
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {/* Dynamic Custom Payment Mode Input */}
+              {adjustPaymentMode === "__CUSTOM_MODE__" && (
+                <div className="bg-accent/5 border border-accent/30 p-2.5 rounded-lg space-y-1.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-accent">✨ Specify Custom Payment Mode *</label>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustPaymentMode("BANK_TRANSFER")}
+                      className="text-[10px] text-muted hover:text-ink"
+                    >
+                      Cancel Custom
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={adjustCustomPaymentMode}
+                    onChange={(e) => setAdjustCustomPaymentMode(e.target.value)}
+                    placeholder="e.g. Corporate Credit Card, Director Personal Loan, Forex"
+                    className="w-full p-2 rounded-lg border border-accent/40 bg-surface text-xs font-semibold text-ink focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* Dynamic Custom Debited Account Input */}
+              {adjustPaymentMode !== "CASH" && adjustAccount === "__CUSTOM_ACCOUNT__" && (
+                <div className="bg-accent/5 border border-accent/30 p-2.5 rounded-lg space-y-1.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-accent">✨ Specify Custom Debited Account *</label>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustAccount(userAccounts[0]?.name || "")}
+                      className="text-[10px] text-muted hover:text-ink"
+                    >
+                      Cancel Custom
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={adjustCustomAccount}
+                    onChange={(e) => setAdjustCustomAccount(e.target.value)}
+                    placeholder="e.g. ICICI OD Account (5540), Director Personal UPI"
+                    className="w-full p-2 rounded-lg border border-accent/40 bg-surface text-xs font-semibold text-ink focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* Row 4: Invoice / Receipt Proof */}
+              <div>
+                <label className="block font-semibold text-ink mb-1">Invoice / Receipt Proof Reference #</label>
+                <input
+                  type="text"
+                  value={adjustInvoiceProof}
+                  onChange={(e) => setAdjustInvoiceProof(e.target.value)}
+                  placeholder="e.g. BILL-9481 / INV-2026-08 / UTR-49102"
+                  className="w-full p-2 rounded-lg border border-line bg-surface-hi"
+                />
+              </div>
+
+              {/* Row 5: Description / Notes */}
+              <div>
+                <label className="block font-semibold text-ink mb-1">Description / Notes</label>
+                <textarea
+                  rows={2}
+                  value={adjustNotes}
+                  onChange={(e) => setAdjustNotes(e.target.value)}
+                  placeholder="e.g. Monthly warehouse rent payment for September"
+                  className="w-full p-2 rounded-lg border border-line bg-surface-hi"
+                />
+              </div>
+
+              {/* Mandatory Reason for Adjustment with Highlight */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-amber-800 text-xs">
+                    ⚠️ Mandatory Reason for Adjustment *
+                  </label>
+                  <span className="text-[10px] text-amber-700 font-semibold">Required for Audit Log</span>
+                </div>
+                <textarea
+                  rows={2}
+                  required
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="State clearly why this expense was adjusted (e.g., GST invoice revised, typo in bill amount, changed payment account)..."
+                  className="w-full p-2 rounded-lg border border-amber-500/40 bg-surface text-xs font-semibold text-ink focus:outline-none focus:border-amber-600"
+                />
+                <p className="text-[10px] text-amber-700/80">
+                  This justification and your user info will be permanently stamped on this expense record and recorded in the system audit logs.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdjustModal(false);
+                    setAdjustingExpense(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-line text-muted hover:text-ink font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={adjustSaving}
+                  className="px-5 py-2 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700 disabled:opacity-50 shadow-md flex items-center gap-1.5"
+                >
+                  {adjustSaving ? "Saving Adjustment..." : "✓ Confirm & Save Adjustment"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MANAGE CUSTOM EXPENSE CATEGORIES MODAL */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -1057,3 +1611,4 @@ export default function ExpensesPage() {
     </div>
   );
 }
+

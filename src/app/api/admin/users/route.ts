@@ -89,8 +89,20 @@ async function createUser(req: NextRequest) {
         staffId: parsed.data.staffId,
         name: parsed.data.name,
         passwordHash,
+        plainPassword: parsed.data.password,
         role: parsed.data.role,
         warehouseId: parsed.data.role === "ADMIN" ? null : parsed.data.warehouseId,
+        contact: parsed.data.contact || null,
+        designation: parsed.data.designation || null,
+        city: parsed.data.city || null,
+        town: parsed.data.town || null,
+        employmentType: parsed.data.employmentType || "Full-time",
+        shift: parsed.data.shift || "General",
+        joiningDate: parsed.data.joiningDate || null,
+        endingDate: parsed.data.endingDate || null,
+        salary: parsed.data.salary || null,
+        bankUpi: parsed.data.bankUpi || null,
+        reportingManager: parsed.data.reportingManager || null,
       })
       .returning();
     await writeAuditDrizzle({ userId: session.sub, role: session.role, action: "USER_CREATED", entityType: "User", entityId: created!.id, newValue: { staffId: created!.staffId, role: created!.role } });

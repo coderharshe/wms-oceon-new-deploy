@@ -34,21 +34,22 @@ export default function PortalShell({
 }) {
   return (
     <div
-      className={`flex min-h-screen flex-col bg-surface ${
-        fontSize && fontSize !== "standard" ? "font-size-" + fontSize : ""
-      }`}
+      className={`flex min-h-screen flex-col bg-surface ${fontSize && fontSize !== "standard" ? "font-size-" + fontSize : ""
+        }`}
       style={themeVars(theme)}
     >
       <SessionGuard />
       <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur-md shadow-xs">
-        <div className="mx-auto flex w-full max-w-[1700px] flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1700px] flex-wrap items-center justify-between gap-3 px-3.5 py-2 sm:px-6">
           <div className="flex flex-wrap items-center gap-3 sm:gap-5">
-            <div className="flex items-center gap-2.5 shrink-0">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-surface font-black text-xs shadow-xs">
-                O
-              </span>
-              <span className="text-sm font-bold tracking-tight text-ink">
-                OCEON-WMS <span className="font-normal text-muted">· {title}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <img
+                src="/logo.png"
+                alt="Oceon Logo"
+                className="h-[34px] w-auto object-contain shrink-0"
+              />
+              <span className="hidden md:inline-block text-xs font-semibold text-muted">
+                · {title}
               </span>
             </div>
 

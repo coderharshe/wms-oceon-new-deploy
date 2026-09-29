@@ -36,6 +36,12 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/favicon") ||
+    pathname.endsWith(".png") ||
+    pathname.endsWith(".jpg") ||
+    pathname.endsWith(".jpeg") ||
+    pathname.endsWith(".svg") ||
+    pathname.endsWith(".webp") ||
+    pathname.endsWith(".ico") ||
     // PWA assets: must always be served directly, unauthenticated, with no
     // redirect — a service worker script fetched via a redirect is refused
     // outright by the browser (confirmed live: registration silently failed

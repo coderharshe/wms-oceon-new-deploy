@@ -7,13 +7,19 @@ export async function getSetting(key: string): Promise<string> {
     const { systemSetting } = await import("@/generated/drizzle/schema");
     const { eq } = await import("drizzle-orm");
     const [row] = await getDrizzleDb().select().from(systemSetting).where(eq(systemSetting.key, key));
-    if (row) return row.value as string;
+    if (row && row.value !== null && row.value !== undefined) {
+      if (typeof row.value === "string") return row.value;
+      return JSON.stringify(row.value);
+    }
     return getEnv(key) ?? "";
   }
 
   const db = (await import("./db")).getDb();
   const row = await db.systemSetting.findUnique({ where: { key } });
-  if (row) return row.value as string;
+  if (row && row.value !== null && row.value !== undefined) {
+    if (typeof row.value === "string") return row.value;
+    return JSON.stringify(row.value);
+  }
   return getEnv(key) ?? "";
 }
 

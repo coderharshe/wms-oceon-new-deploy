@@ -5,6 +5,9 @@ import { getDb } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings";
 import { resolveDateRange } from "@/lib/date-filter";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export type BankAccountConfig = {
   id: string;
   name: string; // e.g. "HDFC Current"
@@ -19,62 +22,13 @@ export type BankAccountConfig = {
   active: boolean;
 };
 
-const DEFAULT_ACCOUNTS: BankAccountConfig[] = [
-  {
-    id: "hdfc-current",
-    name: "HDFC Current",
-    bankName: "HDFC Bank",
-    accountNumber: "50200088991122",
-    ifsc: "HDFC0001234",
-    branch: "Main Corporate Branch",
-    accountType: "CURRENT",
-    openingBalance: 250000,
-    openingDate: "2026-04-01",
-    isDefault: true,
-    active: true,
-  },
-  {
-    id: "sbi-current",
-    name: "SBI Current",
-    bankName: "State Bank of India",
-    accountNumber: "38912345678",
-    ifsc: "SBIN0004321",
-    branch: "Commercial Branch",
-    accountType: "CURRENT",
-    openingBalance: 120000,
-    openingDate: "2026-04-01",
-    isDefault: false,
-    active: true,
-  },
-  {
-    id: "other-bank",
-    name: "Other Bank",
-    bankName: "ICICI / Axis Bank",
-    accountNumber: "987654321098",
-    ifsc: "ICIC0009876",
-    branch: "Industrial Branch",
-    accountType: "CURRENT",
-    openingBalance: 50000,
-    openingDate: "2026-04-01",
-    isDefault: false,
-    active: true,
-  },
-];
-
 async function getBankAccountsConfig(): Promise<BankAccountConfig[]> {
   try {
     const raw = await getSetting("BANK_ACCOUNTS_CONFIG");
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      // Exclude boilerplate placeholder mock accounts if user hasn't created them
-      return parsed.filter((a: any) => {
-        if (!a || a.active === false) return false;
-        if (a.id === "hdfc-current" && a.accountNumber === "50200088991122") return false;
-        if (a.id === "sbi-current" && a.accountNumber === "38912345678") return false;
-        if (a.id === "other-bank" && a.accountNumber === "987654321098") return false;
-        return true;
-      });
+      return parsed.filter((a: any) => a && typeof a === "object" && a.active !== false);
     }
     return [];
   } catch {

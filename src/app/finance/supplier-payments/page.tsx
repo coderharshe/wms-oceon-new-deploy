@@ -607,11 +607,9 @@ export default function SupplierPaymentsPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xl">💸</span>
-              <h1 className="text-xl font-black text-ink">Supplier Payments & Banking Master</h1>
+              <h1 className="text-xl font-black text-ink">Supplier Payments</h1>
             </div>
-            <p className="text-xs text-muted mt-0.5">
-              End-to-end payable authorization: Request &rarr; Tiered Approval &rarr; Disbursement (NEFT/RTGS/UPI) &rarr; Bank Reconciliation
-            </p>
+
           </div>
 
           <div className="flex items-center gap-2">
@@ -654,27 +652,26 @@ export default function SupplierPaymentsPage() {
         {/* Visual Lifecycle Stepper */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-line/60 text-xs">
           <div className="p-2 rounded bg-surface border border-line flex items-center gap-2">
-            <span className="font-bold text-ink">1️⃣ Payable Inward</span>
+            <span className="font-bold text-ink">Payable Inward</span>
             <span className="text-[10px] text-muted ml-auto">{metrics.pendingBillsCount} Bills</span>
           </div>
           <div className="p-2 rounded bg-surface border border-line flex items-center gap-2">
-            <span className="font-bold text-ink">2️⃣ Request Made</span>
+            <span className="font-bold text-ink">Request Made</span>
             <span className="text-[10px] text-muted ml-auto">Finance Team</span>
           </div>
-          <div className={`p-2 rounded border flex items-center gap-2 ${
-            metrics.pendingApprovalCount > 0 ? "bg-warn/10 border-warn/40 text-warn" : "bg-surface border-line text-ink"
-          }`}>
-            <span className="font-bold">3️⃣ Approval</span>
+          <div className={`p-2 rounded border flex items-center gap-2 ${metrics.pendingApprovalCount > 0 ? "bg-warn/10 border-warn/40 text-warn" : "bg-surface border-line text-ink"
+            }`}>
+            <span className="font-bold">Approval</span>
             <span className="text-[10px] ml-auto font-semibold">
               {metrics.pendingApprovalCount > 0 ? `${metrics.pendingApprovalCount} Pending` : "✓ Clear"}
             </span>
           </div>
           <div className="p-2 rounded bg-surface border border-line flex items-center gap-2">
-            <span className="font-bold text-ink">4️⃣ Disburse</span>
+            <span className="font-bold text-ink">Disburse</span>
             <span className="text-[10px] text-muted ml-auto">NEFT/RTGS/UPI</span>
           </div>
           <div className="p-2 rounded bg-surface border border-line flex items-center gap-2">
-            <span className="font-bold text-ink">5️⃣ Reconciliation</span>
+            <span className="font-bold text-ink">Reconciliation</span>
             <span className="text-[10px] text-good ml-auto font-semibold">{metrics.reconciledCount} Cleared</span>
           </div>
         </div>
@@ -690,9 +687,8 @@ export default function SupplierPaymentsPage() {
           <div className="text-[10px] text-muted mt-1">{metrics.pendingBillsCount} pending purchase bills</div>
         </div>
 
-        <div className={`card p-3 border-l-4 ${
-          metrics.pendingApprovalCount > 0 ? "border-l-warn bg-warn/[0.03]" : "border-l-line"
-        }`}>
+        <div className={`card p-3 border-l-4 ${metrics.pendingApprovalCount > 0 ? "border-l-warn bg-warn/[0.03]" : "border-l-line"
+          }`}>
           <div className="text-[11px] font-semibold text-warn">Pending Approval (&gt;₹25k)</div>
           <div className="text-lg font-black text-warn mt-0.5">
             ₹{metrics.pendingApprovalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -733,33 +729,29 @@ export default function SupplierPaymentsPage() {
           <div className="flex bg-surface-hi p-1 rounded-lg border border-line text-xs font-semibold">
             <button
               onClick={() => setActiveTab("requests")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "requests" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "requests" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               🛡️ Payment Requests ({data.paymentRequests.length})
             </button>
             <button
               onClick={() => setActiveTab("bills")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "bills" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "bills" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               📄 Pending Bills & Bank Details ({data.pendingBills.length})
             </button>
             <button
               onClick={() => setActiveTab("suppliers")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "suppliers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "suppliers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               🏢 Supplier Bank Directory ({(data.suppliers || []).length})
             </button>
             <button
               onClick={() => setActiveTab("reconciliation")}
-              className={`px-3 py-1.5 rounded transition-all ${
-                activeTab === "reconciliation" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1.5 rounded transition-all ${activeTab === "reconciliation" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               ⚖️ Bank Outflows & Recon ({data.bankOutflows.length})
             </button>
@@ -797,9 +789,7 @@ export default function SupplierPaymentsPage() {
           <div className="p-4 border-b border-line bg-surface-hi/50 flex justify-between items-center">
             <div>
               <h2 className="text-sm font-bold text-ink">Payment Authorization & Approval Pipeline</h2>
-              <p className="text-[11px] text-muted">
-                Large payouts (&gt;₹25,000) require Manager/Admin sign-off prior to bank release
-              </p>
+
             </div>
             <div className="text-xs font-semibold text-muted">
               Threshold Limit: <strong className="text-ink">₹25,000 Direct / Manager Sign-off</strong>
@@ -950,10 +940,8 @@ export default function SupplierPaymentsPage() {
         <div className="card overflow-x-auto p-0 border border-line">
           <div className="p-4 border-b border-line bg-surface-hi/50 flex flex-wrap justify-between items-center gap-2">
             <div>
-              <h2 className="text-sm font-bold text-ink">Inward Purchase Bills & Supplier Bank Account Master</h2>
-              <p className="text-[11px] text-muted">
-                View supplier bank account number, IFSC code, and UPI ID directly for smooth NEFT/RTGS payouts
-              </p>
+              <h2 className="text-sm font-bold text-ink">Inward Purchase Bills & Supplier Bank Account</h2>
+
             </div>
             <div className="text-xs font-semibold">
               Total Inward Due:{" "}
@@ -1125,7 +1113,7 @@ export default function SupplierPaymentsPage() {
         <div className="card overflow-x-auto p-0 border border-line">
           <div className="p-4 border-b border-line bg-surface-hi/50 flex flex-wrap justify-between items-center gap-2">
             <div>
-              <h2 className="text-sm font-bold text-ink">Suppliers Bank & Master Directory</h2>
+              <h2 className="text-sm font-bold text-ink">Suppliers Bank Directory</h2>
               <p className="text-[11px] text-muted">
                 Maintain vendor bank account numbers, IFSC codes, UPI handles, and tax credentials for finance payouts
               </p>
@@ -1353,9 +1341,8 @@ export default function SupplierPaymentsPage() {
 
             {feedback && (
               <div
-                className={`p-3 rounded-lg text-xs font-semibold ${
-                  feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
-                }`}
+                className={`p-3 rounded-lg text-xs font-semibold ${feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
+                  }`}
               >
                 {feedback.message}
               </div>
@@ -1452,9 +1439,8 @@ export default function SupplierPaymentsPage() {
                                     setRequestSupplier(sup.name);
                                     setIsSupplierDropdownOpen(false);
                                   }}
-                                  className={`w-full text-left p-2.5 hover:bg-surface-hi transition-colors flex items-start justify-between gap-2 ${
-                                    isSelected ? "bg-accent/10 border-l-2 border-accent" : ""
-                                  }`}
+                                  className={`w-full text-left p-2.5 hover:bg-surface-hi transition-colors flex items-start justify-between gap-2 ${isSelected ? "bg-accent/10 border-l-2 border-accent" : ""
+                                    }`}
                                 >
                                   <div>
                                     <div className="font-bold text-ink flex items-center gap-1.5">
@@ -1712,9 +1698,8 @@ export default function SupplierPaymentsPage() {
 
             {feedback && (
               <div
-                className={`p-3 rounded-lg text-xs font-semibold ${
-                  feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
-                }`}
+                className={`p-3 rounded-lg text-xs font-semibold ${feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
+                  }`}
               >
                 {feedback.message}
               </div>
@@ -1863,9 +1848,8 @@ export default function SupplierPaymentsPage() {
 
             {feedback && (
               <div
-                className={`p-3 rounded-lg text-xs font-semibold ${
-                  feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
-                }`}
+                className={`p-3 rounded-lg text-xs font-semibold ${feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
+                  }`}
               >
                 {feedback.message}
               </div>
@@ -2078,11 +2062,10 @@ export default function SupplierPaymentsPage() {
 
             {feedback && (
               <div
-                className={`p-3 rounded-lg text-xs font-semibold ${
-                  feedback.type === "success"
-                    ? "bg-good/15 text-good border border-good/30"
-                    : "bg-bad/15 text-bad border border-bad/30"
-                }`}
+                className={`p-3 rounded-lg text-xs font-semibold ${feedback.type === "success"
+                  ? "bg-good/15 text-good border border-good/30"
+                  : "bg-bad/15 text-bad border border-bad/30"
+                  }`}
               >
                 {feedback.message}
               </div>

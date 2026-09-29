@@ -205,28 +205,24 @@ export default function AccountsPayablePage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🤝</span>
-            <h1 className="text-xl font-black text-ink">Accounts Payable & Supplier Dues</h1>
+            <h1 className="text-xl font-black text-ink">Account Payables</h1>
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Track vendor purchase bills, credit terms, NEFT/RTGS/Cheque/UPI payouts, and overdue commitments
-          </p>
+
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-surface p-1 rounded-lg border border-line text-xs font-semibold">
             <button
               onClick={() => setViewMode("suppliers")}
-              className={`px-3 py-1 rounded-md transition-all ${
-                viewMode === "suppliers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1 rounded-md transition-all ${viewMode === "suppliers" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               🏢 Supplier-wise ({data.supplierSummary.length})
             </button>
             <button
               onClick={() => setViewMode("invoices")}
-              className={`px-3 py-1 rounded-md transition-all ${
-                viewMode === "invoices" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
-              }`}
+              className={`px-3 py-1 rounded-md transition-all ${viewMode === "invoices" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"
+                }`}
             >
               📄 All Invoices ({data.payablesList.length})
             </button>
@@ -291,33 +287,29 @@ export default function AccountsPayablePage() {
           <span className="text-xs font-semibold text-muted">Filter Bills:</span>
           <button
             onClick={() => setFilterStatus("all")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterStatus === "all" ? "bg-surface-hi font-bold text-ink border-line" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterStatus === "all" ? "bg-surface-hi font-bold text-ink border-line" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             All Bills
           </button>
           <button
             onClick={() => setFilterStatus("pending")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterStatus === "pending" ? "bg-accent/10 text-accent font-bold border-accent/30" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterStatus === "pending" ? "bg-accent/10 text-accent font-bold border-accent/30" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             Outstanding Only
           </button>
           <button
             onClick={() => setFilterStatus("overdue")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterStatus === "overdue" ? "bg-warn/10 text-warn font-bold border-warn/30" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterStatus === "overdue" ? "bg-warn/10 text-warn font-bold border-warn/30" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             Overdue Only
           </button>
           <button
             onClick={() => setFilterStatus("critical")}
-            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-              filterStatus === "critical" ? "bg-bad/10 text-bad font-bold border-bad/30" : "text-muted hover:text-ink border-transparent"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded border transition-colors ${filterStatus === "critical" ? "bg-bad/10 text-bad font-bold border-bad/30" : "text-muted hover:text-ink border-transparent"
+              }`}
           >
             Critical Overdue (&gt;15d)
           </button>
@@ -347,9 +339,8 @@ export default function AccountsPayablePage() {
               return (
                 <div
                   key={sup.supplierId}
-                  className={`card transition-all border ${
-                    hasOverdue ? "border-warn/40 bg-warn/[0.01]" : "border-line"
-                  }`}
+                  className={`card transition-all border ${hasOverdue ? "border-warn/40 bg-warn/[0.01]" : "border-line"
+                    }`}
                 >
                   {/* Supplier Header Row */}
                   <div className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -500,13 +491,12 @@ export default function AccountsPayablePage() {
                                     </span>
                                   ) : bill.isOverdue ? (
                                     <span
-                                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                        bill.overdueDays > 30
-                                          ? "bg-bad text-white"
-                                          : bill.overdueDays > 15
+                                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${bill.overdueDays > 30
+                                        ? "bg-bad text-white"
+                                        : bill.overdueDays > 15
                                           ? "bg-warn text-white"
                                           : "bg-warn/20 text-warn"
-                                      }`}
+                                        }`}
                                     >
                                       {bill.overdueDays}d Overdue
                                     </span>
@@ -657,13 +647,12 @@ export default function AccountsPayablePage() {
                         </span>
                       ) : p.isOverdue ? (
                         <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            p.overdueDays > 30
-                              ? "bg-bad text-white"
-                              : p.overdueDays > 15
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${p.overdueDays > 30
+                            ? "bg-bad text-white"
+                            : p.overdueDays > 15
                               ? "bg-warn text-white"
                               : "bg-warn/20 text-warn"
-                          }`}
+                            }`}
                         >
                           {p.overdueDays}d Overdue
                         </span>
@@ -787,9 +776,8 @@ export default function AccountsPayablePage() {
 
             {feedback && (
               <div
-                className={`p-3 rounded-lg text-xs font-semibold ${
-                  feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
-                }`}
+                className={`p-3 rounded-lg text-xs font-semibold ${feedback.type === "success" ? "bg-good/15 text-good border border-good/30" : "bg-bad/15 text-bad border border-bad/30"
+                  }`}
               >
                 {feedback.message}
               </div>

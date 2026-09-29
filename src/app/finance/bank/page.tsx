@@ -102,7 +102,7 @@ export default function BankManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Reconciliation statement check
-  const [statementBalance, setStatementBalance] = useState<string>("" );
+  const [statementBalance, setStatementBalance] = useState<string>("");
 
   // Add Account Form
   const [accountForm, setAccountForm] = useState({
@@ -254,7 +254,7 @@ export default function BankManagementPage() {
         setSelectedAccountId("ALL");
         reload();
       }
-    } catch {}
+    } catch { }
   }
 
   async function handleInterBankTransfer(e: React.FormEvent) {
@@ -312,7 +312,7 @@ export default function BankManagementPage() {
         }),
       });
       if (res.ok) reload();
-    } catch {}
+    } catch { }
   }
 
   function parseStatementText(text: string) {
@@ -441,12 +441,10 @@ export default function BankManagementPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black tracking-tight text-ink">Bank Management & Reconciliation</h1>
-            <span className="badge bg-primary/10 text-primary font-bold">Multi-Bank Engine</span>
+            <h1 className="text-xl font-black tracking-tight text-ink">Bank Reconciliation</h1>
+
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Individual Bank Accounts, Flow Breakdown, Inter-Bank Transfers, Statement Import & Live Reconciliation
-          </p>
+
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -494,9 +492,8 @@ export default function BankManagementPage() {
             <>
               <button
                 onClick={() => setSelectedAccountId("ALL")}
-                className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-                  selectedAccountId === "ALL" ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
-                }`}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${selectedAccountId === "ALL" ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
+                  }`}
               >
                 🏛️ All Consolidated ({rs(data.accounts.reduce((sum, a) => sum + a.currentBalance, 0))})
               </button>
@@ -505,11 +502,10 @@ export default function BankManagementPage() {
                 <button
                   key={acc.id}
                   onClick={() => setSelectedAccountId(acc.id)}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                    selectedAccountId === acc.id
-                      ? "bg-accent text-white shadow-sm"
-                      : "bg-paper border border-line text-ink hover:bg-surface-hi"
-                  }`}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${selectedAccountId === acc.id
+                    ? "bg-accent text-white shadow-sm"
+                    : "bg-paper border border-line text-ink hover:bg-surface-hi"
+                    }`}
                 >
                   <span>{acc.name}</span>
                   <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${selectedAccountId === acc.id ? "bg-white/20 text-white" : "bg-surface text-muted"}`}>
@@ -535,7 +531,7 @@ export default function BankManagementPage() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-black text-ink uppercase tracking-tight">
-                {currentAccount ? `Account Ledger: ${currentAccount.name} (${currentAccount.accountNumber})` : "Consolidated Bank Ledger Formula"}
+                {currentAccount ? `Account Ledger: ${currentAccount.name} (${currentAccount.accountNumber})` : "Consolidated Bank Ledger"}
               </h2>
               {currentAccount && (
                 <>
@@ -550,9 +546,7 @@ export default function BankManagementPage() {
                 </>
               )}
             </div>
-            <p className="text-[11px] text-muted">
-              Opening balance is anchored to opening date and not double-counted with historical transactions
-            </p>
+
           </div>
 
           <div className="text-right">
@@ -611,8 +605,7 @@ export default function BankManagementPage() {
       <section className="card space-y-3 bg-paper">
         <div className="flex flex-wrap justify-between items-center border-b border-line pb-2 gap-2">
           <div>
-            <h2 className="text-sm font-bold text-ink">⚖️ Bank Statement Reconciliation Checker</h2>
-            <p className="text-[11px] text-muted">Compare bank passbook/statement closing balance with software ledger</p>
+            <h2 className="text-sm font-bold text-ink">⚖️ Bank Statement Reconciliation</h2>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -672,9 +665,8 @@ export default function BankManagementPage() {
                 <button
                   key={t.id}
                   onClick={() => setFilterType(t.id)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                    filterType === t.id ? "bg-accent text-white" : "text-muted hover:text-ink"
-                  }`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold ${filterType === t.id ? "bg-accent text-white" : "text-muted hover:text-ink"
+                    }`}
                 >
                   {t.label}
                 </button>
@@ -714,15 +706,14 @@ export default function BankManagementPage() {
                     <td className="py-2 font-medium">{tx.bankName || "Main"}</td>
                     <td className="py-2">
                       <span
-                        className={`badge text-[10px] font-semibold ${
-                          tx.type === "DIRECT_DEPOSIT" || tx.type === "CUSTOMER_TRANSFER" || tx.type === "UPI_COLLECTION"
-                            ? "bg-good/15 text-good"
-                            : tx.type === "ADJUSTMENT"
+                        className={`badge text-[10px] font-semibold ${tx.type === "DIRECT_DEPOSIT" || tx.type === "CUSTOMER_TRANSFER" || tx.type === "UPI_COLLECTION"
+                          ? "bg-good/15 text-good"
+                          : tx.type === "ADJUSTMENT"
                             ? "bg-primary/15 text-primary"
                             : tx.type === "BANK_CHARGES"
-                            ? "bg-bad/15 text-bad"
-                            : "bg-ink/10 text-ink"
-                        }`}
+                              ? "bg-bad/15 text-bad"
+                              : "bg-ink/10 text-ink"
+                          }`}
                       >
                         {tx.type}
                       </span>
@@ -739,9 +730,8 @@ export default function BankManagementPage() {
                     <td className="py-2 text-center">
                       <button
                         onClick={() => toggleReconcile(tx.id, tx.reconciled)}
-                        className={`badge text-[10px] font-bold cursor-pointer transition-colors ${
-                          tx.reconciled ? "bg-good/15 text-good hover:bg-good/25" : "bg-warn/15 text-warn hover:bg-warn/25"
-                        }`}
+                        className={`badge text-[10px] font-bold cursor-pointer transition-colors ${tx.reconciled ? "bg-good/15 text-good hover:bg-good/25" : "bg-warn/15 text-warn hover:bg-warn/25"
+                          }`}
                         title="Click to toggle reconcile status"
                       >
                         {tx.reconciled ? "✓ Reconciled" : "⚠️ Unreconciled"}
