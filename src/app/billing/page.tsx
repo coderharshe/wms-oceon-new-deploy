@@ -105,7 +105,7 @@ export default function BillingDashboardPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {/* 1. Today's Sales */}
         <div className="card p-3.5 border-l-4 border-l-emerald-500">
-          <div className="text-xs font-semibold text-emerald-700">1. Today's Sales</div>
+          <div className="text-xs font-semibold text-emerald-700">Today's Sales</div>
           <div className="text-xl font-black text-emerald-700 font-mono mt-0.5">
             ₹{metrics.todaySales.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </div>
@@ -114,7 +114,7 @@ export default function BillingDashboardPage() {
 
         {/* 2. Total Bills */}
         <div className="card p-3.5 border-l-4 border-l-sky-500">
-          <div className="text-xs font-semibold text-sky-700">2. Total Bills</div>
+          <div className="text-xs font-semibold text-sky-700">Total Bills</div>
           <div className="text-xl font-black text-ink font-mono mt-0.5">
             {metrics.totalBills}
           </div>
@@ -123,7 +123,7 @@ export default function BillingDashboardPage() {
 
         {/* 3. Inventory Sold */}
         <div className="card p-3.5 border-l-4 border-l-teal-500">
-          <div className="text-xs font-semibold text-teal-700">3. Items Sold</div>
+          <div className="text-xs font-semibold text-teal-700">Items Sold</div>
           <div className="text-xl font-black text-teal-700 font-mono mt-0.5">
             {metrics.itemsSold.toLocaleString()}
           </div>
@@ -132,7 +132,7 @@ export default function BillingDashboardPage() {
 
         {/* 4. Pending Bills */}
         <div className="card p-3.5 border-l-4 border-l-amber-500">
-          <div className="text-xs font-semibold text-amber-700">4. Pending Bills</div>
+          <div className="text-xs font-semibold text-amber-700">Pending Bills</div>
           <div className="text-xl font-black text-amber-700 font-mono mt-0.5">
             {metrics.pendingBills.count}
           </div>
@@ -143,7 +143,7 @@ export default function BillingDashboardPage() {
 
         {/* 5. Cancelled Bills */}
         <div className="card p-3.5 border-l-4 border-l-rose-500">
-          <div className="text-xs font-semibold text-rose-700">5. Cancelled Bills</div>
+          <div className="text-xs font-semibold text-rose-700">Cancelled Bills</div>
           <div className="text-xl font-black text-rose-700 font-mono mt-0.5">
             {metrics.cancelledBills.count}
           </div>
@@ -154,7 +154,7 @@ export default function BillingDashboardPage() {
 
         {/* 6. Refunds */}
         <div className="card p-3.5 border-l-4 border-l-purple-500">
-          <div className="text-xs font-semibold text-purple-700">6. Refunds / Returns</div>
+          <div className="text-xs font-semibold text-purple-700">Refunds / Returns</div>
           <div className="text-xl font-black text-purple-700 font-mono mt-0.5">
             ₹{metrics.refunds.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </div>
@@ -163,7 +163,7 @@ export default function BillingDashboardPage() {
 
         {/* 7. Payment Collection */}
         <div className="card p-3.5 border-l-4 border-l-primary">
-          <div className="text-xs font-semibold text-primary">7. Total Collection</div>
+          <div className="text-xs font-semibold text-primary">Total Collection</div>
           <div className="text-xl font-black text-primary font-mono mt-0.5">
             ₹{metrics.paymentCollection.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </div>
