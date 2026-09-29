@@ -53,7 +53,7 @@ type PurchaseOrder = {
   supplierId: string;
   supplier: { id: string; name: string; phone?: string | null; contactPerson?: string | null };
   warehouseId: string;
-  warehouse: { id: string; name: string; code: string };
+  warehouse: { id: string; name: string; code: string; address?: string | null };
   status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "SENT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CLOSED" | "CANCELLED";
   subtotal: string | number;
   gstAmount: string | number;
@@ -70,7 +70,7 @@ type PurchaseOrder = {
   purchaseBills?: Array<{ id: string; grnNumber: string; total: string | number; createdAt: string }>;
 };
 
-type Warehouse = { id: string; name: string; code: string };
+type Warehouse = { id: string; name: string; code: string; address?: string | null };
 
 export default function InventoryPurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");

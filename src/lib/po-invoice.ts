@@ -23,6 +23,7 @@ export type PurchaseOrderPrintData = {
     email?: string | null;
   };
   warehouse?: {
+    id?: string;
     name: string;
     code: string;
     address?: string | null;
@@ -40,7 +41,7 @@ export type PurchaseOrderPrintData = {
     unit: {
       symbol: string;
     };
-    quantity: number;
+    quantity: number | string;
     purchaseRate: number | string;
     taxPercent: number | string;
     schemeDiscount?: number | string | null;
