@@ -3,7 +3,12 @@ import { z } from "zod";
 import { requireRole, isErrorResponse, assertWarehouseAccess } from "@/lib/guard";
 import { isWorkersRuntime } from "@/lib/cf-env";
 
-const schema = z.object({ name: z.string().optional(), address: z.string().optional(), active: z.boolean().optional() });
+const schema = z.object({
+  name: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+  address: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+});
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(["ADMIN", "MANAGER"]);
@@ -25,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { writeAuditDrizzle } = await import("@/lib/drizzle-audit");
     const db = getDrizzleDb();
     const [before] = await db.select().from(warehouse).where(eq(warehouse.id, id));
+    if (!before) return NextResponse.json({ error: "Warehouse not found" }, { status: 404 });
     const [updated] = await db.update(warehouse).set(parsed.data).where(eq(warehouse.id, id)).returning();
     await writeAuditDrizzle({ userId: session.sub, role: session.role, action: "WAREHOUSE_UPDATED", entityType: "Warehouse", entityId: id, oldValue: before as object, newValue: parsed.data });
     return NextResponse.json(updated);
@@ -32,7 +38,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const db = (await import("@/lib/db")).getDb();
   const before = await db.warehouse.findUnique({ where: { id } });
-  const warehouse = await db.warehouse.update({ where: { id }, data: parsed.data });
+  if (!before) return NextResponse.json({ error: "Warehouse not found" }, { status: 404 });
+  const updatedWarehouse = await db.warehouse.update({ where: { id }, data: parsed.data });
   await (await import("@/lib/audit")).writeAudit({ userId: session.sub, role: session.role, action: "WAREHOUSE_UPDATED", entityType: "Warehouse", entityId: id, oldValue: before as object, newValue: parsed.data });
-  return NextResponse.json(warehouse);
+  return NextResponse.json(updatedWarehouse);
 }

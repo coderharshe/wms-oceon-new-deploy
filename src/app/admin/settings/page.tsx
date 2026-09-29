@@ -38,6 +38,14 @@ type UserRecord = {
   fontSize?: string | null;
 };
 
+type WarehouseRecord = {
+  id: string;
+  name: string;
+  code: string;
+  address: string | null;
+  active: boolean;
+};
+
 const TABS = [
   { id: "general", label: "Business & GST", icon: "🏢" },
   { id: "billing", label: "Billing & Printing", icon: "🧾" },
@@ -63,6 +71,11 @@ export default function SettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
+
+  // Warehouses list for branch-specific GST and information configuration
+  const { data: warehousesData, reload: reloadWarehouses } = useApiGet<WarehouseRecord[]>("/api/admin/warehouses");
+  const warehouses = warehousesData ?? [];
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("");
   
   // Users list for the User Themes Manager
   const { data: usersData, reload: reloadUsers } = useApiGet<UserRecord[]>("/api/admin/users");
@@ -89,6 +102,12 @@ export default function SettingsPage() {
   useEffect(() => {
     if (data) setValues(data);
   }, [data]);
+
+  useEffect(() => {
+    if (warehouses.length > 0 && !selectedWarehouseId) {
+      setSelectedWarehouseId(warehouses[0].id);
+    }
+  }, [warehouses, selectedWarehouseId]);
 
   useEffect(() => {
     if (myPrefs) {
@@ -424,6 +443,338 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Warehouse / Branch Specific GST & Master Data */}
+          <div className="card space-y-4 border border-accent/20 bg-surface shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+                  <span>📍</span>
+                  <span>Warehouse-Specific GST & Branch Identification</span>
+                </h2>
+                <p className="text-xs text-muted">
+                  Configure distinct GSTIN, branch trade name, dispatch address, and UPI IDs for each warehouse. Invoices generated at a warehouse will automatically reflect its specific statutory details.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/admin/warehouses")}
+                  className="btn text-xs py-1.5 px-3 flex items-center gap-1.5"
+                >
+                  <span>🏭</span>
+                  <span>Manage Warehouses</span>
+                </button>
+              </div>
+            </div>
+
+            {warehouses.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-line p-6 text-center text-xs text-muted">
+                No warehouses found in system. Create a warehouse in the Warehouses page first.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Warehouse Selector Tabs */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-ink">
+                    Select Warehouse Branch to Configure:
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {warehouses.map((wh) => {
+                      const isSelected = wh.id === (selectedWarehouseId || warehouses[0].id);
+                      const hasCustomGst = Boolean(values[`WAREHOUSE_GSTIN_${wh.id}`]);
+                      return (
+                        <button
+                          key={wh.id}
+                          type="button"
+                          onClick={() => setSelectedWarehouseId(wh.id)}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium border transition-all ${
+                            isSelected
+                              ? "bg-accent/10 border-accent text-accent font-semibold shadow-sm"
+                              : "bg-surface-2 border-line text-muted hover:text-ink hover:border-line-strong"
+                          }`}
+                        >
+                          <span className="font-mono text-[10px] bg-surface px-1.5 py-0.5 rounded border border-line">
+                            {wh.code}
+                          </span>
+                          <span>{wh.name}</span>
+                          {hasCustomGst ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-good/15 text-good font-semibold">
+                              GST Configured
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface text-muted">
+                              Using Global
+                            </span>
+                          )}
+                          {!wh.active && (
+                            <span className="text-[10px] text-bad font-normal">(Inactive)</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Selected Warehouse Config Form */}
+                {(() => {
+                  const currentWh = warehouses.find((w) => w.id === (selectedWarehouseId || warehouses[0].id)) || warehouses[0];
+                  if (!currentWh) return null;
+                  const whId = currentWh.id;
+
+                  const nameKey = `WAREHOUSE_NAME_${whId}`;
+                  const gstinKey = `WAREHOUSE_GSTIN_${whId}`;
+                  const addressKey = `WAREHOUSE_ADDRESS_${whId}`;
+                  const emailKey = `WAREHOUSE_EMAIL_${whId}`;
+                  const phoneKey = `WAREHOUSE_PHONE_${whId}`;
+                  const upiKey = `WAREHOUSE_UPI_VPA_${whId}`;
+
+                  const currentGst = values[gstinKey] ?? "";
+
+                  const copyFromGlobal = () => {
+                    const newValues = { ...values };
+                    if (values.BUSINESS_NAME) newValues[nameKey] = `${values.BUSINESS_NAME} (${currentWh.name})`;
+                    if (values.BUSINESS_GSTIN) newValues[gstinKey] = values.BUSINESS_GSTIN;
+                    if (currentWh.address || values.BUSINESS_ADDRESS) newValues[addressKey] = currentWh.address || values.BUSINESS_ADDRESS || "";
+                    if (values.BUSINESS_EMAIL) newValues[emailKey] = values.BUSINESS_EMAIL;
+                    if (values.BUSINESS_PHONE) newValues[phoneKey] = values.BUSINESS_PHONE;
+                    if (values.UPI_VPA) newValues[upiKey] = values.UPI_VPA;
+                    setValues(newValues);
+                  };
+
+                  const saveAllForWarehouse = async () => {
+                    setSavingKey(`WH_ALL_${whId}`);
+                    try {
+                      await Promise.all([
+                        save(nameKey),
+                        save(gstinKey),
+                        save(addressKey),
+                        save(emailKey),
+                        save(phoneKey),
+                        save(upiKey),
+                      ]);
+                      setSavedKey(`WH_ALL_${whId}`);
+                      setTimeout(() => setSavedKey((curr) => (curr === `WH_ALL_${whId}` ? null : curr)), 3000);
+                    } finally {
+                      setSavingKey(null);
+                    }
+                  };
+
+                  return (
+                    <div className="rounded-xl border border-line bg-surface-2/40 p-4 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🏭</span>
+                          <div>
+                            <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+                              <span>{currentWh.name}</span>
+                              <span className="badge font-mono text-[11px]">{currentWh.code}</span>
+                            </h3>
+                            <p className="text-[11px] text-muted">
+                              Unique statutory tax & branch header configuration for this location
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={copyFromGlobal}
+                            className="btn text-xs py-1.5 px-3 flex items-center gap-1.5 bg-surface text-ink hover:bg-surface-hi"
+                            title="Pre-populate fields with details from Global Business Profile"
+                          >
+                            <span>📋</span>
+                            <span>Copy from Global Profile</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveAllForWarehouse}
+                            disabled={savingKey === `WH_ALL_${whId}`}
+                            className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                          >
+                            <span>💾</span>
+                            <span>{savingKey === `WH_ALL_${whId}` ? "Saving All…" : "Save All Branch Details"}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {savedKey === `WH_ALL_${whId}` && (
+                        <div className="p-2.5 rounded-lg bg-good/15 border border-good/30 text-good text-xs font-semibold flex items-center gap-2">
+                          <span>✓</span>
+                          <span>All branch parameters for {currentWh.name} were saved successfully!</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-ink">
+                            Warehouse Trade / Billing Name
+                            <span className="text-muted font-normal"> (Leave blank to use Global Business Name)</span>
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              className="input flex-1 text-xs"
+                              placeholder={values.BUSINESS_NAME || "e.g. OCEON - Delhi Hub"}
+                              value={values[nameKey] ?? ""}
+                              onChange={(e) => setValues({ ...values, [nameKey]: e.target.value })}
+                            />
+                            <button
+                              className="btn text-xs px-3"
+                              disabled={savingKey === nameKey}
+                              onClick={() => save(nameKey)}
+                            >
+                              {savingKey === nameKey ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                          {savedKey === nameKey && <p className="text-[11px] text-good mt-0.5">Saved successfully</p>}
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-ink">
+                            Branch UPI VPA ID
+                            <span className="text-muted font-normal"> (Counter dynamic QR destination for this branch)</span>
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              className="input flex-1 text-xs font-mono"
+                              placeholder={values.UPI_VPA || "e.g. delhihub@icici"}
+                              value={values[upiKey] ?? ""}
+                              onChange={(e) => setValues({ ...values, [upiKey]: e.target.value })}
+                            />
+                            <button
+                              className="btn text-xs px-3"
+                              disabled={savingKey === upiKey}
+                              onClick={() => save(upiKey)}
+                            >
+                              {savingKey === upiKey ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                          {savedKey === upiKey && <p className="text-[11px] text-good mt-0.5">Saved successfully</p>}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-ink">
+                          Warehouse Statutory GSTIN
+                          <span className="text-muted font-normal"> (15-character GST for this state branch)</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            className="input flex-1 text-xs font-mono uppercase tracking-wider"
+                            placeholder={values.BUSINESS_GSTIN || "e.g. 07AQNPG1418P1ZK"}
+                            maxLength={15}
+                            value={values[gstinKey] ?? ""}
+                            onChange={(e) => setValues({ ...values, [gstinKey]: e.target.value.toUpperCase() })}
+                          />
+                          <button
+                            className="btn text-xs px-3"
+                            disabled={savingKey === gstinKey}
+                            onClick={() => save(gstinKey)}
+                          >
+                            {savingKey === gstinKey ? "Saving…" : "Save"}
+                          </button>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-xs">
+                          {currentGst ? (
+                            isGstin(currentGst) ? (
+                              <span className="badge bg-good/10 text-good font-medium">
+                                ✓ Valid Branch GSTIN: {stateName(stateCodeOfGstin(currentGst))} · PAN {panOfGstin(currentGst)}
+                              </span>
+                            ) : (
+                              <span className="badge bg-bad/10 text-bad font-medium">
+                                ✕ Invalid GSTIN format or checksum mismatch
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-muted text-[11px]">
+                              No warehouse-specific GSTIN set (Falling back to Global: {values.BUSINESS_GSTIN || "Not set"})
+                            </span>
+                          )}
+                          {savedKey === gstinKey && <span className="text-good font-medium">Saved</span>}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-ink">
+                            Warehouse Dispatch & Registered Address
+                            <span className="text-muted font-normal"> (Printed on this warehouse's tax invoices)</span>
+                          </label>
+                          <textarea
+                            className="input w-full text-xs"
+                            rows={3}
+                            placeholder={currentWh.address || values.BUSINESS_ADDRESS || "Street, City, State, PIN Code"}
+                            value={values[addressKey] ?? ""}
+                            onChange={(e) => setValues({ ...values, [addressKey]: e.target.value })}
+                          />
+                          <div className="mt-1 flex justify-between items-center">
+                            <span className="text-[11px] text-muted">
+                              {currentWh.address ? "Default physical address from warehouse master is shown" : "Leave blank to use global business address"}
+                            </span>
+                            <button
+                              className="btn text-xs px-3"
+                              disabled={savingKey === addressKey}
+                              onClick={() => save(addressKey)}
+                            >
+                              {savingKey === addressKey ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                          {savedKey === addressKey && <p className="text-[11px] text-good mt-0.5">Saved successfully</p>}
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-ink">
+                              Warehouse Official Contact Email
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                className="input flex-1 text-xs"
+                                type="email"
+                                placeholder={values.BUSINESS_EMAIL || "branch@yourdomain.com"}
+                                value={values[emailKey] ?? ""}
+                                onChange={(e) => setValues({ ...values, [emailKey]: e.target.value })}
+                              />
+                              <button
+                                className="btn text-xs px-3"
+                                disabled={savingKey === emailKey}
+                                onClick={() => save(emailKey)}
+                              >
+                                {savingKey === emailKey ? "Saving…" : "Save"}
+                              </button>
+                            </div>
+                            {savedKey === emailKey && <p className="text-[11px] text-good mt-0.5">Saved</p>}
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-ink">
+                              Warehouse Official Support Phone / Landline
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                className="input flex-1 text-xs"
+                                placeholder={values.BUSINESS_PHONE || "+91 98765 43210"}
+                                value={values[phoneKey] ?? ""}
+                                onChange={(e) => setValues({ ...values, [phoneKey]: e.target.value })}
+                              />
+                              <button
+                                className="btn text-xs px-3"
+                                disabled={savingKey === phoneKey}
+                                onClick={() => save(phoneKey)}
+                              >
+                                {savingKey === phoneKey ? "Saving…" : "Save"}
+                              </button>
+                            </div>
+                            {savedKey === phoneKey && <p className="text-[11px] text-good mt-0.5">Saved</p>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}
