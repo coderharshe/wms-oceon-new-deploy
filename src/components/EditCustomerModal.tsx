@@ -112,131 +112,198 @@ export function EditCustomerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="card max-h-full w-full max-w-lg space-y-3 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-base font-semibold">Edit {customer.shopName}</h2>
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-line bg-paper shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <label className="mb-1 block text-xs text-muted">Shop / Business Name</label>
-            <input
-              className="w-full"
-              placeholder="e.g. Ramesh Kirana Store"
-              value={form.shopName}
-              onChange={(e) => setForm({ ...form, shopName: e.target.value })}
-            />
+            <h2 className="text-base font-bold text-ink">Edit {customer.shopName}</h2>
+            <p className="text-[11px] text-muted">Update customer details, credit limits & ledger adjustments</p>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">Customer / Owner Name</label>
-            <input
-              className="w-full"
-              placeholder="e.g. Ramesh Kumar"
-              value={form.ownerName}
-              onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
-            />
-          </div>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-hi hover:text-ink transition-colors"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <div className="flex-1">
-            <label className="mb-1 block text-xs text-muted">Mobile</label>
-            <input className="w-full" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
-          </div>
-          <div className="flex-1">
-            <label className="mb-1 block text-xs text-muted">GSTIN</label>
-            <input className="w-full" value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} />
-          </div>
-        </div>
+        {/* Scrollable Form Content */}
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-xs">
+          {error && <ErrorNote error={error} onDismiss={() => setError(null)} />}
 
-        <div>
-          <label className="mb-1 block text-xs text-muted">Address</label>
-          <input className="w-full" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        </div>
-
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <label className="mb-1 block text-xs text-muted">Type</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-              <option value="WHOLESALE">WHOLESALE</option>
-              <option value="RETAIL">RETAIL</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">Status</label>
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="INACTIVE">INACTIVE</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">Credit limit ₹</label>
-            <input
-              className="w-28"
-              placeholder="No limit"
-              value={form.creditLimit}
-              onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs text-muted">Notes</label>
-          <input className="w-full" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        </div>
-
-        <div className="space-y-2 border-t border-line pt-2">
-          <h3 className="text-sm font-semibold">Credit</h3>
-          <div className="flex flex-wrap gap-4 text-sm">
-            <span>
-              Limit: <strong>{limit === null ? "No limit" : `₹${limit.toFixed(2)}`}</strong>
-            </span>
-            <span>
-              To collect: <strong className={available !== null && available < 0 ? "text-bad" : undefined}>₹{outstanding.toFixed(2)}</strong>
-            </span>
-            <span>
-              Available:{" "}
-              <strong className={available !== null && available < 0 ? "text-bad" : undefined}>
-                {available === null ? "—" : `₹${available.toFixed(2)}`}
-              </strong>
-            </span>
-          </div>
-          <p className="text-xs text-muted">
-            Adjust the balance to collect for something the ledger cannot see — dues written off, money settled
-            outside the system, an opening balance. Use a negative amount to reduce what the customer owes. The
-            balance never goes below ₹0.
-          </p>
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs text-muted">Amount ₹ (− reduces)</label>
-              <input
-                type="number"
-                step="0.01"
-                className="w-28"
-                value={adjust.amount}
-                onChange={(e) => setAdjust({ ...adjust, amount: e.target.value })}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-muted">Reason (required)</label>
+              <label className="mb-1 block font-semibold text-ink">Shop / Business Name</label>
               <input
                 className="w-full"
-                placeholder="e.g. settled in cash at the shop"
-                value={adjust.reason}
-                onChange={(e) => setAdjust({ ...adjust, reason: e.target.value })}
+                placeholder="e.g. Ramesh Kirana Store"
+                value={form.shopName}
+                onChange={(e) => setForm({ ...form, shopName: e.target.value })}
               />
             </div>
-            <button className="btn" disabled={saving || !adjust.amount || !adjust.reason.trim()} onClick={applyAdjustment}>
-              Adjust
-            </button>
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Customer / Owner Name</label>
+              <input
+                className="w-full"
+                placeholder="e.g. Ramesh Kumar"
+                value={form.ownerName}
+                onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Mobile Number</label>
+              <input
+                className="w-full font-mono"
+                value={form.mobile}
+                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block font-semibold text-ink">GSTIN</label>
+              <input
+                className="w-full font-mono uppercase"
+                value={form.gstin}
+                onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })}
+                maxLength={15}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block font-semibold text-ink">Address</label>
+            <input
+              className="w-full"
+              placeholder="Shop address, market, or city"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Customer Type</label>
+              <select
+                className="w-full"
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+              >
+                <option value="WHOLESALE">WHOLESALE</option>
+                <option value="RETAIL">RETAIL</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Account Status</label>
+              <select
+                className="w-full"
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+              >
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block font-semibold text-ink">Credit limit (₹)</label>
+              <input
+                className="w-full font-mono"
+                placeholder="No limit"
+                value={form.creditLimit}
+                onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block font-semibold text-ink">Internal Notes</label>
+            <input
+              className="w-full"
+              placeholder="Any remarks about payment terms or preferences"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </div>
+
+          {/* Ledger / Credit Adjustment Section */}
+          <div className="rounded-lg border border-line bg-surface-hi/30 p-3.5 space-y-2.5">
+            <h3 className="text-xs font-bold text-ink uppercase tracking-wide">Credit & Balance Status</h3>
+            <div className="flex flex-wrap items-center gap-4 text-xs">
+              <span className="rounded bg-paper px-2.5 py-1 border border-line">
+                Limit: <strong className="text-ink font-mono">{limit === null ? "No limit" : `₹${limit.toFixed(2)}`}</strong>
+              </span>
+              <span className="rounded bg-paper px-2.5 py-1 border border-line">
+                To collect: <strong className={`font-mono ${available !== null && available < 0 ? "text-bad font-bold" : "text-ink"}`}>₹{outstanding.toFixed(2)}</strong>
+              </span>
+              <span className="rounded bg-paper px-2.5 py-1 border border-line">
+                Available:{" "}
+                <strong className={`font-mono ${available !== null && available < 0 ? "text-bad font-bold" : "text-good"}`}>
+                  {available === null ? "—" : `₹${available.toFixed(2)}`}
+                </strong>
+              </span>
+            </div>
+            <p className="text-[11px] text-muted leading-relaxed">
+              Adjust balance for outside settlements or opening dues. Use a negative amount (e.g. <code>-500</code>) to reduce dues.
+            </p>
+            <div className="flex flex-wrap items-end gap-2 pt-1">
+              <div className="w-28 min-w-[100px]">
+                <label className="mb-1 block text-[11px] font-semibold text-muted">Amount ₹ (− reduces)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full font-mono"
+                  placeholder="e.g. -250"
+                  value={adjust.amount}
+                  onChange={(e) => setAdjust({ ...adjust, amount: e.target.value })}
+                />
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="mb-1 block text-[11px] font-semibold text-muted">Reason (required)</label>
+                <input
+                  className="w-full"
+                  placeholder="e.g. settled in cash at the shop"
+                  value={adjust.reason}
+                  onChange={(e) => setAdjust({ ...adjust, reason: e.target.value })}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn px-3 py-1.5 text-xs font-semibold"
+                disabled={saving || !adjust.amount || !adjust.reason.trim()}
+                onClick={applyAdjustment}
+              >
+                Apply Adjustment
+              </button>
+            </div>
           </div>
         </div>
 
-        {error && <ErrorNote error={error} onDismiss={() => setError(null)} />}
-
-        <div className="flex justify-end gap-2 border-t border-line pt-2">
-          <button onClick={onClose}>Cancel</button>
-          <button className="btn-primary" disabled={saving || !form.shopName.trim() || (!!form.mobile.trim() && form.mobile.trim().length < 6)} onClick={save}>
-            {saving ? "Saving…" : "Save"}
+        {/* Footer Actions */}
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-hi/40 px-5 py-3">
+          <button
+            type="button"
+            className="btn px-4 py-2 text-xs font-medium"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-primary px-4 py-2 text-xs font-bold shadow-sm"
+            disabled={saving || !form.shopName.trim() || (!!form.mobile.trim() && form.mobile.trim().length < 6)}
+            onClick={save}
+          >
+            {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
       </div>

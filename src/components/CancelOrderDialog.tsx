@@ -48,7 +48,7 @@ export default function CancelOrderDialog({ orderId, paid, onClose, onDone }: { 
           <h2 className="text-base font-bold text-bad">Cancel this bill?</h2>
         </div>
         <p className="text-sm text-muted">
-          All items on this bill will be removed and their quantities will be restored back to warehouse inventory. The bill will be marked as <strong>CANCELLED</strong>.
+          All items on this bill will be removed. The bill will be marked as <strong>CANCELLED</strong>.
         </p>
 
         {hasPaid && (

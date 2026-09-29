@@ -101,128 +101,156 @@ export function AddCustomerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg space-y-4 rounded-lg border border-line bg-paper p-5 shadow-xl"
+        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-line bg-paper shadow-2xl animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line pb-3">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="text-base font-bold text-ink">Add New Customer</h2>
+            <p className="text-[11px] text-muted">Create customer account for billing & inventory ledger</p>
           </div>
           <button
             type="button"
-            className="rounded p-1 text-muted hover:bg-surface-hi hover:text-ink"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-hi hover:text-ink transition-colors"
             onClick={onClose}
+            aria-label="Close dialog"
           >
             ✕
           </button>
         </div>
 
-        {error && (
-          <div className="rounded border border-bad/20 bg-bad/10 p-2 text-xs text-bad">
-            {error}
-          </div>
-        )}
+        {/* Scrollable Form Content */}
+        <form onSubmit={handleSave} className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-xs">
+            {error && (
+              <div className="rounded-lg border border-bad/30 bg-bad/10 p-3 text-xs text-bad leading-relaxed">
+                {error}
+              </div>
+            )}
 
-        <form onSubmit={handleSave} className="space-y-3 text-xs">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block font-semibold text-ink">Shop / Business Name *</label>
-              <input
-                ref={shopNameRef}
-                className="w-full"
-                placeholder="e.g. Ramesh Kirana Store"
-                value={shopName}
-                onChange={(e) => setShopName(e.target.value)}
-              />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block font-semibold text-ink">
+                  Shop / Business Name <span className="text-bad">*</span>
+                </label>
+                <input
+                  ref={shopNameRef}
+                  className="w-full"
+                  placeholder="e.g. Ramesh Kirana Store"
+                  value={shopName}
+                  onChange={(e) => setShopName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-semibold text-ink">Customer / Owner Name</label>
+                <input
+                  className="w-full"
+                  placeholder="e.g. Ramesh Kumar"
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block font-semibold text-ink">Customer / Owner Name</label>
-              <input
-                className="w-full"
-                placeholder="e.g. Ramesh Kumar"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block font-semibold text-ink">Mobile Number</label>
+                <input
+                  ref={mobileRef}
+                  className="w-full font-mono"
+                  inputMode="numeric"
+                  placeholder="10-digit mobile number"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-semibold text-ink">Customer Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className={`rounded-md py-1.5 px-2 text-center text-xs font-semibold transition-all ${
+                      type === "WHOLESALE"
+                        ? "bg-ink text-surface shadow-sm"
+                        : "border border-line bg-surface-hi text-ink hover:bg-surface"
+                    }`}
+                    onClick={() => setType("WHOLESALE")}
+                  >
+                    Wholesale
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md py-1.5 px-2 text-center text-xs font-semibold transition-all ${
+                      type === "RETAIL"
+                        ? "bg-ink text-surface shadow-sm"
+                        : "border border-line bg-surface-hi text-ink hover:bg-surface"
+                    }`}
+                    onClick={() => setType("RETAIL")}
+                  >
+                    Retail
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div>
-              <label className="mb-1 block font-semibold text-ink">Mobile Number</label>
+              <label className="mb-1 block font-semibold text-ink">Address / Area</label>
               <input
-                ref={mobileRef}
                 className="w-full"
-                inputMode="numeric"
-                placeholder="10-digit mobile number"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
+                placeholder="Shop address, market, or city"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
               />
             </div>
-            <div>
-              <label className="mb-1 block font-semibold text-ink">Customer Type</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={`flex-1 rounded py-1.5 font-medium ${type === "WHOLESALE" ? "bg-ink text-surface" : "border border-line bg-surface-hi text-ink"}`}
-                  onClick={() => setType("WHOLESALE")}
-                >
-                  Wholesale
-                </button>
-                <button
-                  type="button"
-                  className={`flex-1 rounded py-1.5 font-medium ${type === "RETAIL" ? "bg-ink text-surface" : "border border-line bg-surface-hi text-ink"}`}
-                  onClick={() => setType("RETAIL")}
-                >
-                  Retail
-                </button>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block font-semibold text-ink">GSTIN (Optional)</label>
+                <input
+                  className="w-full font-mono uppercase"
+                  placeholder="22AAAAA0000A1Z5"
+                  value={gstin}
+                  onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                  maxLength={15}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-semibold text-ink">Credit Limit (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  className="w-full font-mono"
+                  placeholder="0 for no credit"
+                  value={creditLimit}
+                  onChange={(e) => setCreditLimit(e.target.value)}
+                />
               </div>
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block font-semibold text-ink">Address</label>
-            <input
-              className="w-full"
-              placeholder="Shop address or area / city"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block font-semibold text-ink">GSTIN (Optional)</label>
-              <input
-                className="w-full uppercase"
-                placeholder="22AAAAA0000A1Z5"
-                value={gstin}
-                onChange={(e) => setGstin(e.target.value.toUpperCase())}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block font-semibold text-ink">Credit Limit (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                className="w-full"
-                placeholder="0 for no credit"
-                value={creditLimit}
-                onChange={(e) => setCreditLimit(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-line pt-3">
-            <button type="button" className="btn" onClick={onClose} disabled={saving}>
+          {/* Footer Actions */}
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-hi/40 px-5 py-3">
+            <button
+              type="button"
+              className="btn px-4 py-2 text-xs font-medium"
+              onClick={onClose}
+              disabled={saving}
+            >
               Cancel (Esc)
             </button>
-            <button type="submit" className="btn-primary px-4 py-1.5 font-bold" disabled={saving}>
-              {saving ? "Saving Customer…" : "Save & Add to Bill (Enter)"}
+            <button
+              type="submit"
+              className="btn-primary px-4 py-2 text-xs font-bold shadow-sm"
+              disabled={saving}
+            >
+              {saving ? "Saving Customer…" : "Save Customer (Enter)"}
             </button>
           </div>
         </form>
