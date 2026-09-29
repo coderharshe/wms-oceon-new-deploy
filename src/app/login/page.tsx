@@ -40,11 +40,11 @@ function LoginForm() {
 
     const res = navigator.onLine
       ? await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ staffId, password, force }),
-          signal: AbortSignal.timeout(10_000),
-        }).catch(() => null)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId, password, force }),
+        signal: AbortSignal.timeout(10_000),
+      }).catch(() => null)
       : null;
 
     if (!res) return signInOffline(staffId, password);
@@ -240,7 +240,7 @@ function LoginForm() {
           alt="Oceon"
           className="mx-auto mb-2 h-20 w-auto object-contain"
         />
-        <p className="text-xs text-muted">Enterprise Warehouse & Billing System</p>
+        <h2 className="text-lg font-bold text-ink">HUB MANAGEMENT SYSTEM</h2>
       </div>
 
       <div>

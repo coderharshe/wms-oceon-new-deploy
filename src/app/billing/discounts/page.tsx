@@ -50,8 +50,7 @@ export default function DiscountApprovalsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold">Discount Authorization & Approvals</h1>
-          <p className="text-xs text-muted">Tiered approval controls: 0–2% Direct · 2–5% Manager Dual · 5%+ Sir/Admin Approval</p>
+          <h1 className="text-lg font-bold">Discount & Approvals</h1>
         </div>
       </div>
 
@@ -96,14 +95,12 @@ export default function DiscountApprovalsPage() {
               <div key={req.id} className="card space-y-2">
                 <div className="flex flex-wrap items-center justify-between border-b border-line pb-2">
                   <div className="flex items-center gap-2">
-                    <span className={`badge text-xs font-bold ${
-                      pct > 5 ? "bg-bad text-white" : pct > 2 ? "bg-warn text-white" : "bg-good text-white"
-                    }`}>
+                    <span className={`badge text-xs font-bold ${pct > 5 ? "bg-bad text-white" : pct > 2 ? "bg-warn text-white" : "bg-good text-white"
+                      }`}>
                       {pct.toFixed(1)}% Discount (₹{Number(req.discountAmount).toFixed(2)})
                     </span>
-                    <span className={`badge text-xs font-semibold ${
-                      req.status === "PENDING" ? "bg-warn text-white" : req.status === "APPROVED" ? "bg-good text-white" : "bg-bad text-white"
-                    }`}>
+                    <span className={`badge text-xs font-semibold ${req.status === "PENDING" ? "bg-warn text-white" : req.status === "APPROVED" ? "bg-good text-white" : "bg-bad text-white"
+                      }`}>
                       {req.status}
                     </span>
                     {req.order && (

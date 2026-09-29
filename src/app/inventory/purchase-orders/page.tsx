@@ -7,6 +7,7 @@ import { SkeletonStats, SkeletonTable } from "@/components/Skeleton";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { fmtDate } from "@/lib/fmt";
 import { SearchableSupplierSelect, SearchableProductSelect } from "@/components/SearchableSelect";
+import { printPurchaseOrder } from "@/lib/po-invoice";
 
 type Supplier = {
   id: string;
@@ -90,6 +91,8 @@ export default function InventoryPurchaseOrdersPage() {
 
   const { data: productsData, loading: productsLoading } = useApiGet<Product[]>("/api/admin/products");
   const products = productsData || [];
+
+  const { data: settingsData } = useApiGet<Record<string, string>>("/api/admin/settings");
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -343,6 +346,20 @@ export default function InventoryPurchaseOrdersPage() {
     }
   }
 
+  function handlePrintPO(po: PurchaseOrder) {
+    const whId = po.warehouse?.id;
+    printPurchaseOrder({
+      ...po,
+      companyInfo: {
+        name: (whId && settingsData?.[`WAREHOUSE_NAME_${whId}`]) || settingsData?.BUSINESS_NAME || "OCEON PVT. LTD.",
+        gstin: (whId && settingsData?.[`WAREHOUSE_GSTIN_${whId}`]) || settingsData?.BUSINESS_GSTIN || "06AQNPG1418P1ZK",
+        address: (whId && settingsData?.[`WAREHOUSE_ADDRESS_${whId}`]) || po.warehouse?.address || settingsData?.BUSINESS_ADDRESS || "Central Distribution Hub, Industrial Area, New Delhi",
+        phone: (whId && settingsData?.[`WAREHOUSE_PHONE_${whId}`]) || settingsData?.BUSINESS_PHONE || "+91 98765 43210",
+        email: (whId && settingsData?.[`WAREHOUSE_EMAIL_${whId}`]) || settingsData?.BUSINESS_EMAIL || "purchase@oceon.com",
+      },
+    });
+  }
+
   function getStatusBadge(status: PurchaseOrder["status"]) {
     switch (status) {
       case "APPROVED":
@@ -498,6 +515,14 @@ export default function InventoryPurchaseOrdersPage() {
                           className="px-2 py-1 text-xs rounded bg-surface-2 hover:bg-surface-hi border border-line text-ink font-medium"
                         >
                           View
+                        </button>
+                        <button
+                          onClick={() => handlePrintPO(po)}
+                          className="px-2 py-1 text-xs rounded bg-surface-2 hover:bg-surface-hi border border-line text-ink font-medium flex items-center gap-1"
+                          title="Print Professional A4 Purchase Order"
+                        >
+                          <span>🖨️</span>
+                          <span>Print</span>
                         </button>
                         {(po.status === "APPROVED" || po.status === "SENT" || po.status === "PARTIALLY_RECEIVED") && (
                           <Link
@@ -956,10 +981,10 @@ export default function InventoryPurchaseOrdersPage() {
             <div className="flex justify-between items-center pt-2 border-t border-line">
               <button
                 type="button"
-                onClick={() => window.print()}
-                className="btn text-xs py-1.5 px-3 flex items-center gap-1.5"
+                onClick={() => handlePrintPO(viewingPO)}
+                className="btn text-xs py-1.5 px-3 flex items-center gap-1.5 bg-accent/10 text-accent hover:bg-accent hover:text-white border border-accent/30 font-semibold transition-all"
               >
-                <span>🖨️</span> Print PO
+                <span>🖨️</span> Print Official PO (A4)
               </button>
 
               <div className="flex items-center gap-2">
