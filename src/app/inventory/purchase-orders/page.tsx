@@ -6,6 +6,7 @@ import { useApiGet } from "@/lib/useApiGet";
 import { SkeletonStats, SkeletonTable } from "@/components/Skeleton";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { fmtDate } from "@/lib/fmt";
+import { SearchableSupplierSelect, SearchableProductSelect } from "@/components/SearchableSelect";
 
 type Supplier = {
   id: string;
@@ -20,6 +21,9 @@ type Product = {
   id: string;
   sku: string;
   name: string;
+  category?: string | null;
+  brand?: string | null;
+  barcode?: string | null;
   taxPercent: string | number;
   wholesalePrice: string | number;
   baseUnit: { id: string; symbol: string; name: string };
@@ -517,18 +521,12 @@ export default function InventoryPurchaseOrdersPage() {
                     + New Supplier
                   </button>
                 </div>
-                <select
-                  value={poForm.supplierId}
-                  onChange={(e) => setPoForm({ ...poForm, supplierId: e.target.value })}
-                  className="w-full py-1.5 px-2 rounded border border-line bg-surface-2 text-ink font-medium"
-                >
-                  <option value="">Select Supplier…</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} {s.phone ? `(${s.phone})` : ""}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSupplierSelect
+                  suppliers={suppliers}
+                  selectedId={poForm.supplierId}
+                  onSelect={(supplierId) => setPoForm({ ...poForm, supplierId })}
+                  onNewSupplier={() => setShowNewSupplier(true)}
+                />
               </div>
 
               <div>
@@ -553,7 +551,7 @@ export default function InventoryPurchaseOrdersPage() {
                   type="date"
                   value={poForm.expectedDelivery}
                   onChange={(e) => setPoForm({ ...poForm, expectedDelivery: e.target.value })}
-                  className="w-full py-1 px-2 rounded border border-line bg-surface-2 text-ink"
+                  className="w-full py-1.5 px-2 rounded border border-line bg-surface-2 text-ink"
                 />
               </div>
             </div>
@@ -602,7 +600,7 @@ export default function InventoryPurchaseOrdersPage() {
             )}
 
             {/* Product Items Table */}
-            <div className="space-y-2 border-t border-line pt-3">
+            <div className="space-y-3 border-t border-line pt-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-ink uppercase tracking-wider">Order Items</h3>
                 <button
@@ -614,12 +612,40 @@ export default function InventoryPurchaseOrdersPage() {
                 </button>
               </div>
 
+              {/* Quick Search & Add Product Bar */}
+              <div className="bg-surface-2/60 p-2.5 rounded-lg border border-line flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold text-ink flex items-center gap-1 shrink-0">
+                  <span>🔍</span> Quick Search & Add:
+                </span>
+                <div className="flex-1 min-w-[240px]">
+                  <SearchableProductSelect
+                    products={products}
+                    selectedId=""
+                    placeholder="Type SKU or product name to quickly add to PO…"
+                    loading={productsLoading}
+                    onSelect={(p) => {
+                      setDraftItems((prev) => [
+                        ...prev,
+                        {
+                          productId: p.id,
+                          unitId: p.baseUnit?.id || p.saleUnits?.[0]?.unitId || "",
+                          quantity: 1,
+                          purchaseRate: Number(p.wholesalePrice || 0),
+                          taxPercent: Number(p.taxPercent || 0),
+                          schemeDiscount: 0,
+                        },
+                      ]);
+                    }}
+                  />
+                </div>
+              </div>
+
               <div className="overflow-x-auto border border-line rounded">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-surface-2 border-b border-line text-[10px] text-muted uppercase">
-                      <th className="py-2 px-2.5">Product</th>
-                      <th className="py-2 px-2.5">Unit</th>
+                      <th className="py-2 px-2.5 min-w-[240px]">Product</th>
+                      <th className="py-2 px-2.5 w-24">Unit</th>
                       <th className="py-2 px-2.5 text-right w-20">Qty</th>
                       <th className="py-2 px-2.5 text-right w-24">Rate (₹)</th>
                       <th className="py-2 px-2.5 text-right w-16">Tax %</th>
@@ -667,18 +693,20 @@ export default function InventoryPurchaseOrdersPage() {
 
                         return (
                           <tr key={idx}>
-                            <td className="p-1.5">
-                              <select
-                                value={item.productId}
-                                onChange={(e) => updateDraftItem(idx, { productId: e.target.value })}
-                                className="w-full py-1 px-1.5 rounded border border-line bg-surface text-ink text-xs font-medium"
-                              >
-                                {products.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.name} ({p.sku})
-                                  </option>
-                                ))}
-                              </select>
+                            <td className="p-1.5 min-w-[240px]">
+                              <SearchableProductSelect
+                                products={products}
+                                selectedId={item.productId}
+                                loading={productsLoading}
+                                onSelect={(p) => {
+                                  updateDraftItem(idx, {
+                                    productId: p.id,
+                                    unitId: p.baseUnit?.id || p.saleUnits?.[0]?.unitId || "",
+                                    purchaseRate: Number(p.wholesalePrice || 0),
+                                    taxPercent: Number(p.taxPercent || 0),
+                                  });
+                                }}
+                              />
                             </td>
                             <td className="p-1.5">
                               <select

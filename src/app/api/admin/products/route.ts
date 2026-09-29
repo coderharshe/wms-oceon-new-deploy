@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT", "FINANCE", "BILLING", "QC"]);
   if (isErrorResponse(session)) return session;
   const q = req.nextUrl.searchParams.get("q")?.trim();
+  const limit = Math.min(2000, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") || "1000", 10)));
 
   if (isWorkersRuntime()) {
     const { getDrizzleDb } = await import("@/lib/drizzle-db");
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     const { or, ilike, inArray, asc } = await import("drizzle-orm");
     const db = getDrizzleDb();
     const where = q ? or(ilike(product.name, `%${q}%`), ilike(product.sku, `%${q}%`)) : undefined;
-    const products = await db.select().from(product).where(where).orderBy(asc(product.name)).limit(200);
+    const products = await db.select().from(product).where(where).orderBy(asc(product.name)).limit(limit);
     const productIds = products.map((p) => p.id);
     const baseUnitIds = [...new Set(products.map((p) => p.baseUnitId))];
     const [saleUnits, baseUnits] = await Promise.all([
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     where: q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { sku: { contains: q, mode: "insensitive" } }] } : {},
     include: { baseUnit: true, saleUnits: { include: { unit: true } } },
     orderBy: { name: "asc" },
-    take: 200,
+    take: limit,
   });
   return NextResponse.json(products);
 }

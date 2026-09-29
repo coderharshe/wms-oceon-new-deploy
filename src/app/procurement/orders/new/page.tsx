@@ -4,12 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
+import { SearchableSupplierSelect, SearchableProductSelect } from "@/components/SearchableSelect";
 
 type Supplier = { id: string; name: string; phone: string | null };
 type Product = {
   id: string;
   name: string;
   sku: string;
+  category?: string | null;
+  brand?: string | null;
   baseUnitId: string;
   baseUnit: { id: string; name: string; symbol: string };
   wholesalePrice: number;
@@ -167,17 +170,12 @@ export default function CreatePurchaseOrderPage() {
         <section className="card grid grid-cols-1 gap-3 sm:grid-cols-4 text-xs">
           <div>
             <label className="mb-1 block font-semibold">Supplier / Distributor *</label>
-            <select
-              className="w-full"
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              required
-            >
-              <option value="">Select supplier…</option>
-              {suppliers?.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            <SearchableSupplierSelect
+              suppliers={suppliers || []}
+              selectedId={supplierId}
+              onSelect={(id) => setSupplierId(id)}
+              placeholder="Search or select supplier…"
+            />
           </div>
 
           <div>
@@ -216,17 +214,14 @@ export default function CreatePurchaseOrderPage() {
           <h2 className="text-sm font-semibold border-b border-line pb-1">Add Order Line Items</h2>
           <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 text-xs items-end">
             <div className="sm:col-span-2">
-              <label className="mb-1 block font-semibold">Product SKU</label>
-              <select
-                className="w-full"
-                value={selectedProductId}
-                onChange={(e) => handleProductSelect(e.target.value)}
-              >
-                <option value="">Select product…</option>
-                {products?.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                ))}
-              </select>
+              <label className="mb-1 block font-semibold">Product SKU / Name</label>
+              <SearchableProductSelect
+                products={products || []}
+                selectedId={selectedProductId}
+                loading={pLoading}
+                onSelect={(p) => handleProductSelect(p.id)}
+                placeholder="Search SKU, name, barcode…"
+              />
             </div>
 
             <div>
