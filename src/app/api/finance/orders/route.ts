@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
 
     let results = orders.map((o) => ({ ...o, customer: customerMap.get(o.customerId) ?? null, bill: billByOrder.get(o.id) ?? null }));
     if (paymentStatus) {
-      results = results.filter((r) => r.bill?.paymentStatus === paymentStatus);
+      results = results.filter((r) => r.bill?.paymentStatus === paymentStatus && (paymentStatus !== "UNPAID" || r.status !== "CANCELLED"));
     }
     return NextResponse.json(results);
   }
@@ -246,7 +246,12 @@ export async function GET(req: NextRequest) {
       ...(customerId ? { customerId } : {}),
       ...(status ? { status: status as any } : {}),
       ...(sellingMode ? { sellingMode: sellingMode as any } : {}),
-      ...(paymentStatus ? { bill: { paymentStatus: paymentStatus as any } } : {}),
+      ...(paymentStatus
+        ? {
+            bill: { paymentStatus: paymentStatus as any },
+            ...(paymentStatus === "UNPAID" && !status ? { status: { not: "CANCELLED" as any } } : {}),
+          }
+        : {}),
       ...(since || until ? { createdAt: { gte: since ?? undefined, lte: until ?? undefined } } : {}),
       ...(q
         ? {

@@ -233,6 +233,7 @@ export async function confirmUpiPayment(
     tx
   );
   publish(`order:${args.orderId}`, "payment:confirmed", { billId: args.billId, status: result?.status });
+  publish(`warehouse:${args.warehouseId}`, "payment:updated", { orderId: args.orderId, billId: args.billId, status: result?.status });
   return result;
 }
 
@@ -681,7 +682,9 @@ export async function resolvePaymentAdjustment(
   tx: Tx,
   args: {
     adjustmentId: string;
-    resolutionType: "CASH_REFUND" | "UPI_REFUND" | "CUSTOMER_CREDIT" | "MANAGER_ADJUSTMENT" | "ADDITIONAL_PAYMENT";
+    resolutionType: string;
+    paymentMethod?: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
+    reference?: string;
     userId: string;
     notes?: string;
     clickedAt?: Date;
@@ -696,15 +699,136 @@ export async function resolvePaymentAdjustment(
   });
   // Resolving twice would write a second refund for the same difference.
   if (adjustment.resolutionType) throw new PaymentError("This adjustment has already been resolved");
-  assertResolutionDirection(new Decimal(adjustment.difference), args.resolutionType);
+  assertResolutionDirection(new Decimal(adjustment.difference), args.resolutionType as any);
+
+  const dbResolutionType =
+    args.resolutionType === "CASH" || args.resolutionType === "UPI" || args.resolutionType === "BANK_TRANSFER" || args.resolutionType === "CHEQUE"
+      ? "ADDITIONAL_PAYMENT"
+      : (args.resolutionType as "CASH_REFUND" | "UPI_REFUND" | "CUSTOMER_CREDIT" | "MANAGER_ADJUSTMENT" | "ADDITIONAL_PAYMENT");
 
   await tx.paymentAdjustment.update({
     where: { id: args.adjustmentId },
-    data: { resolutionType: args.resolutionType, resolvedByUserId: args.userId, notes: args.notes },
+    data: { resolutionType: dbResolutionType, resolvedByUserId: args.userId, notes: args.notes },
   });
 
-  if (args.resolutionType === "ADDITIONAL_PAYMENT" || !adjustment.bill.payment) return;
+  if (!adjustment.bill.payment) return;
 
+  const isCustomerOwed = new Decimal(adjustment.difference).gt(0);
+  if (isCustomerOwed) {
+    const method = (args.paymentMethod || args.resolutionType) as "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT" | "CUSTOMER_CREDIT" | "MANAGER_ADJUSTMENT" | "ADDITIONAL_PAYMENT";
+    const amount = args.amount ?? new Decimal(adjustment.difference);
+
+    if (method === "CASH") {
+      const payTx = await tx.paymentTransaction.create({
+        data: {
+          paymentId: adjustment.bill.payment.id,
+          type: "PAYMENT",
+          method: "CASH",
+          amount,
+          amountReceived: amount,
+          status: "CONFIRMED",
+          recordedByUserId: args.userId,
+          clickedAt: args.clickedAt,
+        },
+      });
+      await recordCashMovement(prismaQ(tx), {
+        warehouseId: adjustment.bill.warehouseId,
+        userId: args.userId,
+        type: "SALE",
+        amount,
+        referenceId: payTx.id,
+      });
+      await afterLedgerChange(tx, adjustment.billId, adjustment.bill.warehouseId, adjustment.bill.orderId);
+    } else if (method === "UPI") {
+      await tx.paymentTransaction.create({
+        data: {
+          paymentId: adjustment.bill.payment.id,
+          type: "PAYMENT",
+          method: "UPI",
+          amount,
+          amountReceived: amount,
+          upiReference: args.reference,
+          status: "CONFIRMED",
+          recordedByUserId: args.userId,
+          clickedAt: args.clickedAt,
+        },
+      });
+      await tx.bankTransaction.create({
+        data: {
+          warehouseId: adjustment.bill.warehouseId,
+          businessDate: new Date(),
+          type: "UPI_COLLECTION",
+          amount,
+          isCredit: true,
+          utrReference: args.reference,
+          notes: `UPI Adjustment for Order #${adjustment.bill.orderId.slice(-6)}`,
+          reconciled: true,
+          recordedByUserId: args.userId,
+        },
+      });
+      await afterLedgerChange(tx, adjustment.billId, adjustment.bill.warehouseId, adjustment.bill.orderId);
+    } else if (method === "BANK_TRANSFER") {
+      await tx.paymentTransaction.create({
+        data: {
+          paymentId: adjustment.bill.payment.id,
+          type: "PAYMENT",
+          method: "BANK_TRANSFER",
+          amount,
+          amountReceived: amount,
+          bankReference: args.reference,
+          status: "CONFIRMED",
+          recordedByUserId: args.userId,
+          clickedAt: args.clickedAt,
+        },
+      });
+      await tx.bankTransaction.create({
+        data: {
+          warehouseId: adjustment.bill.warehouseId,
+          businessDate: new Date(),
+          type: "CUSTOMER_TRANSFER",
+          amount,
+          isCredit: true,
+          utrReference: args.reference,
+          notes: `Bank Transfer Adjustment for Order #${adjustment.bill.orderId.slice(-6)}`,
+          reconciled: true,
+          recordedByUserId: args.userId,
+        },
+      });
+      await afterLedgerChange(tx, adjustment.billId, adjustment.bill.warehouseId, adjustment.bill.orderId);
+    } else if (method === "CHEQUE") {
+      await tx.paymentTransaction.create({
+        data: {
+          paymentId: adjustment.bill.payment.id,
+          type: "PAYMENT",
+          method: "CHEQUE",
+          amount,
+          amountReceived: amount,
+          chequeNumber: args.reference,
+          chequeStatus: "CLEARED",
+          status: "CONFIRMED",
+          recordedByUserId: args.userId,
+          clickedAt: args.clickedAt,
+        },
+      });
+      await tx.bankTransaction.create({
+        data: {
+          warehouseId: adjustment.bill.warehouseId,
+          businessDate: new Date(),
+          type: "CHEQUE_CLEARANCE",
+          amount,
+          isCredit: true,
+          notes: `Cheque #${args.reference || "N/A"} - Adjustment for Order #${adjustment.bill.orderId.slice(-6)}`,
+          reconciled: true,
+          recordedByUserId: args.userId,
+        },
+      });
+      await afterLedgerChange(tx, adjustment.billId, adjustment.bill.warehouseId, adjustment.bill.orderId);
+    }
+    // For CREDIT / CUSTOMER_CREDIT / MANAGER_ADJUSTMENT / plain ADDITIONAL_PAYMENT
+    return;
+  }
+
+  // Store owes refund (difference < 0)
   const amount = args.amount ?? new Decimal(adjustment.difference).abs();
   const method = args.resolutionType === "UPI_REFUND" ? "UPI" : "CASH";
   const refundTx = await tx.paymentTransaction.create({
@@ -722,9 +846,6 @@ export async function resolvePaymentAdjustment(
   if (args.resolutionType === "CASH_REFUND") {
     await recordCashMovement(prismaQ(tx), { warehouseId: adjustment.bill.warehouseId, userId: args.userId, type: "REFUND", amount, referenceId: refundTx.id });
   }
-  // CUSTOMER_CREDIT deliberately touches outstandingBalance only through the
-  // REFUND row above: afterLedgerChange re-derives the customer's receivable
-  // from the ledger, so a manual decrement here would count the credit twice.
 
   await afterLedgerChange(tx, adjustment.billId, adjustment.bill.warehouseId, adjustment.bill.orderId);
 }

@@ -5,13 +5,15 @@ import { isWorkersRuntime } from "@/lib/cf-env";
 import { PaymentError } from "@/lib/payments";
 
 const schema = z.object({
-  resolutionType: z.enum(["CASH_REFUND", "UPI_REFUND", "CUSTOMER_CREDIT", "MANAGER_ADJUSTMENT", "ADDITIONAL_PAYMENT"]),
+  resolutionType: z.string().min(1),
+  paymentMethod: z.enum(["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "CREDIT"]).optional(),
+  reference: z.string().optional(),
   notes: z.string().optional(),
   clickedAt: z.string().datetime().optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "FINANCE", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "FINANCE", "BILLING", "MANAGER"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
 
@@ -32,7 +34,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
     try {
-      await db.transaction((tx) => resolvePaymentAdjustmentDrizzle(tx, { adjustmentId: id, resolutionType: parsed.data.resolutionType, userId: session.sub, notes: parsed.data.notes, clickedAt: parsed.data.clickedAt ? new Date(parsed.data.clickedAt) : undefined }));
+      await db.transaction((tx) =>
+        resolvePaymentAdjustmentDrizzle(tx, {
+          adjustmentId: id,
+          resolutionType: parsed.data.resolutionType,
+          paymentMethod: parsed.data.paymentMethod,
+          reference: parsed.data.reference,
+          userId: session.sub,
+          notes: parsed.data.notes,
+          clickedAt: parsed.data.clickedAt ? new Date(parsed.data.clickedAt) : undefined,
+        })
+      );
     } catch (err) {
       if (err instanceof PaymentError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
@@ -52,7 +64,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     await db.$transaction((tx) =>
-      resolvePaymentAdjustment(tx, { adjustmentId: id, resolutionType: parsed.data.resolutionType, userId: session.sub, notes: parsed.data.notes, clickedAt: parsed.data.clickedAt ? new Date(parsed.data.clickedAt) : undefined })
+      resolvePaymentAdjustment(tx, {
+        adjustmentId: id,
+        resolutionType: parsed.data.resolutionType,
+        paymentMethod: parsed.data.paymentMethod,
+        reference: parsed.data.reference,
+        userId: session.sub,
+        notes: parsed.data.notes,
+        clickedAt: parsed.data.clickedAt ? new Date(parsed.data.clickedAt) : undefined,
+      })
     );
   } catch (err) {
     if (err instanceof PaymentError) return NextResponse.json({ error: err.message }, { status: 409 });

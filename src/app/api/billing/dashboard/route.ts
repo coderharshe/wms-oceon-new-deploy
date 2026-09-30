@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
         total: Math.round(billTotal * 100) / 100,
         itemsCount: Math.round(itemsCount),
         orderStatus: o.status,
-        paymentStatus: o.bill?.paymentStatus || "UNPAID",
+        paymentStatus: isCancelled ? "CANCELLED" : (o.bill?.paymentStatus || "UNPAID"),
         paidAmount: Math.round(paidAmt * 100) / 100,
         createdAt: o.createdAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
       });

@@ -11,6 +11,7 @@ import { listLocalBills, subscribeSync, type LocalBill } from "@/lib/offline-bil
 import { filterSavedRows, unsyncedLocalRows, type ListRow as OrderRow } from "@/lib/offline-screens";
 import { LocalBillOverlay } from "@/components/LocalBillView";
 import CancelOrderDialog from "@/components/CancelOrderDialog";
+import { useLiveEvents } from "@/lib/live-events";
 
 type ExtendedOrderRow = Omit<OrderRow, "customer"> & {
   customer: { shopName: string; ownerName?: string | null; mobile?: string | null; type?: string | null } | null;
@@ -64,6 +65,26 @@ export default function BillsAndOrdersPage() {
   const [local, setLocal] = useState<LocalBill[]>([]);
   const [openLocal, setOpenLocal] = useState<string | null>(null);
 
+  // Multi-user live synchronization across all connected counters and terminals
+  useLiveEvents((e) => {
+    if (
+      [
+        "resync",
+        "order:created",
+        "payment:updated",
+        "payment:confirmed",
+        "bill:revised",
+        "status:updated",
+        "order:completed",
+        "order:cancelled",
+        "order:refunded",
+        "qc:completed",
+      ].includes(e.type)
+    ) {
+      reload();
+    }
+  });
+
   const filterKey = new URLSearchParams(params);
   filterKey.delete("q");
   const savedKey = listKey(String(filterKey));
@@ -108,9 +129,9 @@ export default function BillsAndOrdersPage() {
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       if (activeTab === "ALL") return true;
-      if (activeTab === "PAID") return o.bill?.paymentStatus === "PAID";
-      if (activeTab === "UNPAID") return o.bill?.paymentStatus === "UNPAID" || o.bill?.paymentStatus === "PENDING";
-      if (activeTab === "PARTIAL") return o.bill?.paymentStatus === "PARTIALLY_PAID";
+      if (activeTab === "PAID") return o.status !== "CANCELLED" && o.bill?.paymentStatus === "PAID";
+      if (activeTab === "UNPAID") return o.status !== "CANCELLED" && (o.bill?.paymentStatus === "UNPAID" || o.bill?.paymentStatus === "PENDING");
+      if (activeTab === "PARTIAL") return o.status !== "CANCELLED" && o.bill?.paymentStatus === "PARTIALLY_PAID";
       if (activeTab === "CANCELLED") return o.status === "CANCELLED";
       if (activeTab === "RETURNED") {
         return (
@@ -276,7 +297,7 @@ export default function BillsAndOrdersPage() {
             }`}
           onClick={() => setActiveTab("PAID")}
         >
-          🟢 Paid Invoices ({orders.filter((o) => o.bill?.paymentStatus === "PAID").length})
+          🟢 Paid Invoices ({orders.filter((o) => o.status !== "CANCELLED" && o.bill?.paymentStatus === "PAID").length})
         </button>
 
         <button
@@ -285,7 +306,7 @@ export default function BillsAndOrdersPage() {
             }`}
           onClick={() => setActiveTab("UNPAID")}
         >
-          🔴 Unpaid / Credit ({orders.filter((o) => o.bill?.paymentStatus === "UNPAID" || o.bill?.paymentStatus === "PENDING").length})
+          🔴 Unpaid / Credit ({orders.filter((o) => o.status !== "CANCELLED" && (o.bill?.paymentStatus === "UNPAID" || o.bill?.paymentStatus === "PENDING")).length})
         </button>
 
         <button
@@ -294,7 +315,7 @@ export default function BillsAndOrdersPage() {
             }`}
           onClick={() => setActiveTab("PARTIAL")}
         >
-          🟡 Partial Paid ({orders.filter((o) => o.bill?.paymentStatus === "PARTIALLY_PAID").length})
+          🟡 Partial Paid ({orders.filter((o) => o.status !== "CANCELLED" && o.bill?.paymentStatus === "PARTIALLY_PAID").length})
         </button>
 
         <button
@@ -474,15 +495,31 @@ export default function BillsAndOrdersPage() {
 
               {/* Synchronized Server Bills & Orders */}
               {filteredOrders.map((o) => {
-                const due = Number(o.bill?.payment?.amountDue ?? o.bill?.versions?.[0]?.total ?? 0);
+                const isCancelled = o.status === "CANCELLED";
+                const due = isCancelled ? 0 : Number(o.bill?.payment?.amountDue ?? o.bill?.versions?.[0]?.total ?? 0);
                 const paid = Number(o.bill?.payment?.amountPaid ?? 0);
-                const bal = Math.max(0, due - paid);
-                const payStatus = o.bill?.paymentStatus ?? (due === 0 ? "PAID" : "UNPAID");
+                const bal = isCancelled ? 0 : Math.max(0, due - paid);
+                const rawPayStatus = isCancelled ? "CANCELLED" : (o.bill?.paymentStatus ?? (due === 0 ? "PAID" : "UNPAID"));
 
-                let payBadgeClass = "bg-bad/15 text-bad border border-bad/30";
-                if (payStatus === "PAID") payBadgeClass = "bg-good/15 text-good border border-good/30";
-                else if (payStatus === "PARTIALLY_PAID") payBadgeClass = "bg-warn/15 text-warn font-bold border border-warn/30";
-                else if (payStatus === "REFUNDED") payBadgeClass = "bg-purple-100 text-purple-800 border border-purple-300";
+                let displayPayStatus = rawPayStatus.replace(/_/g, " ");
+                let payBadgeClass = "bg-amber-100 text-amber-900 border border-amber-300 font-bold";
+
+                if (isCancelled) {
+                  displayPayStatus = "CANCELLED";
+                  payBadgeClass = "bg-rose-50 text-rose-700 border border-rose-200 font-bold";
+                } else if (rawPayStatus === "PAID" || (due > 0 && paid >= due)) {
+                  displayPayStatus = "PAID";
+                  payBadgeClass = "bg-good/15 text-good border border-good/30";
+                } else if (rawPayStatus === "PARTIALLY_PAID" || (paid > 0 && bal > 0)) {
+                  displayPayStatus = "PARTIALLY PAID";
+                  payBadgeClass = "bg-warn/15 text-warn font-bold border border-warn/30";
+                } else if (rawPayStatus === "REFUNDED" || rawPayStatus === "REFUND_DUE") {
+                  displayPayStatus = rawPayStatus === "REFUND_DUE" ? "REFUND DUE" : "REFUNDED";
+                  payBadgeClass = "bg-purple-100 text-purple-800 border border-purple-300";
+                } else if (rawPayStatus === "UNPAID" || rawPayStatus === "PENDING") {
+                  displayPayStatus = "CREDIT";
+                  payBadgeClass = "bg-amber-50 text-amber-800 border border-amber-300 font-black";
+                }
 
                 return (
                   <tr key={o.id} className="border-b border-line/70 hover:bg-surface-hi/80 transition-colors">
@@ -512,14 +549,22 @@ export default function BillsAndOrdersPage() {
                       </div>
                     </td>
                     <td className="p-3 text-xs text-muted whitespace-nowrap">{fmtDateTime(o.createdAt)}</td>
-                    <td className="p-3 text-right font-bold text-base text-ink">₹{due.toFixed(2)}</td>
-                    <td className="p-3 text-right text-xs font-bold text-good">₹{paid.toFixed(2)}</td>
+                    <td className="p-3 text-right font-bold text-base text-ink">
+                      {isCancelled ? (
+                        <span className="text-muted line-through text-xs">₹{Number(o.bill?.payment?.amountDue ?? o.bill?.versions?.[0]?.total ?? 0).toFixed(2)}</span>
+                      ) : (
+                        `₹${due.toFixed(2)}`
+                      )}
+                    </td>
+                    <td className="p-3 text-right text-xs font-bold text-good">
+                      {paid > 0 ? `₹${paid.toFixed(2)}` : "—"}
+                    </td>
                     <td className="p-3 text-right text-xs font-bold text-bad">
                       {bal > 0 ? `₹${bal.toFixed(2)}` : "—"}
                     </td>
                     <td className="p-3">
                       <span className={`badge text-xs font-bold ${payBadgeClass}`}>
-                        {payStatus.replace(/_/g, " ")}
+                        {displayPayStatus}
                       </span>
                     </td>
                     <td className="p-3">

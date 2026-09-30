@@ -10,6 +10,7 @@ import { cacheOrderDetail, getCachedOrderDetail } from "@/lib/offline-catalog";
 import { listLocalBills, subscribeSync, type LocalBill } from "@/lib/offline-bills";
 import { filterSavedRows, unsyncedLocalRows, type ListRow as OrderRow } from "@/lib/offline-screens";
 import { LocalBillOverlay } from "@/components/LocalBillView";
+import { useLiveEvents } from "@/lib/live-events";
 
 // The last list the server gave, per filter, in the bill-snapshot store — so
 // with the router down the counter still sees today's bills, not an error.
@@ -32,6 +33,26 @@ export default function OrdersListPage() {
   // Opened in place, not via /finance/orders/local/…: offline, that route may
   // never have been loaded in this tab and can't be reached.
   const [openLocal, setOpenLocal] = useState<string | null>(null);
+
+  // Multi-user live synchronization across terminals
+  useLiveEvents((e) => {
+    if (
+      [
+        "resync",
+        "order:created",
+        "payment:updated",
+        "payment:confirmed",
+        "bill:revised",
+        "status:updated",
+        "order:completed",
+        "order:cancelled",
+        "order:refunded",
+        "qc:completed",
+      ].includes(e.type)
+    ) {
+      reload();
+    }
+  });
 
   // Saved without the search text: typing would otherwise store a list per
   // keystroke. Offline, the search is applied here instead.
@@ -163,21 +184,53 @@ export default function OrdersListPage() {
                 </td>
               </tr>
             ))}
-            {orders.map((o) => (
-              <tr key={o.id}>
-                <td>{o.orderNumber}</td>
-                <td>{o.bill?.billNumber}</td>
-                <td>{o.customer?.shopName}</td>
-                <td>{o.status}</td>
-                <td>{o.bill?.paymentStatus}</td>
-                <td>{fmtDateTime(o.createdAt)}</td>
-                <td>
-                  <Link href={`/finance/orders/${o.id}`} className="text-accent">
-                    Open
-                  </Link>
-                </td>
-              </tr>
-            ))}
+            {orders.map((o) => {
+              const isCancelled = o.status === "CANCELLED";
+              const rawPayStatus = isCancelled ? "CANCELLED" : (o.bill?.paymentStatus ?? "UNPAID");
+              const isCredit = !isCancelled && (rawPayStatus === "UNPAID" || rawPayStatus === "PENDING");
+              const displayPayStatus = isCancelled
+                ? "CANCELLED"
+                : rawPayStatus === "PAID"
+                  ? "PAID"
+                  : rawPayStatus === "PARTIALLY_PAID"
+                    ? "PARTIALLY PAID"
+                    : isCredit
+                      ? "CREDIT"
+                      : rawPayStatus;
+              return (
+                <tr key={o.id}>
+                  <td>{o.orderNumber}</td>
+                  <td>{o.bill?.billNumber}</td>
+                  <td>{o.customer?.shopName}</td>
+                  <td>
+                    <span className={`badge ${isCancelled ? "bg-rose-600 text-white font-bold" : "bg-line"}`}>{o.status}</span>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge font-bold text-xs ${
+                        isCancelled
+                          ? "bg-rose-50 text-rose-700 border border-rose-200"
+                          : rawPayStatus === "PAID"
+                            ? "bg-good/15 text-good border border-good/30"
+                            : rawPayStatus === "PARTIALLY_PAID"
+                              ? "bg-warn/15 text-warn border border-warn/30"
+                              : isCredit
+                                ? "bg-amber-100 text-amber-900 border border-amber-300 font-black"
+                                : "bg-purple-100 text-purple-800 border border-purple-300"
+                      }`}
+                    >
+                      {displayPayStatus}
+                    </span>
+                  </td>
+                  <td>{fmtDateTime(o.createdAt)}</td>
+                  <td>
+                    <Link href={`/finance/orders/${o.id}`} className="text-accent">
+                      Open
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
             {orders.length === 0 && waiting.length === 0 && (
               <tr>
                 <td colSpan={7} className="text-center text-muted">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useApiGet } from "@/lib/useApiGet";
+import { useLiveEvents } from "@/lib/live-events";
 import { SkeletonStats, SkeletonTable } from "@/components/Skeleton";
 import { ErrorRetry } from "@/components/ErrorRetry";
 
@@ -54,6 +55,26 @@ type BillingDashboardData = {
 export default function BillingDashboardPage() {
   const [q, setQ] = useState("");
   const { data, loading, error, reload } = useApiGet<BillingDashboardData>("/api/billing/dashboard");
+
+  // Multi-user live synchronization across terminals
+  useLiveEvents((e) => {
+    if (
+      [
+        "resync",
+        "order:created",
+        "payment:updated",
+        "payment:confirmed",
+        "bill:revised",
+        "status:updated",
+        "order:completed",
+        "order:cancelled",
+        "order:refunded",
+        "qc:completed",
+      ].includes(e.type)
+    ) {
+      reload();
+    }
+  });
 
   if (loading) {
     return (
@@ -298,16 +319,35 @@ export default function BillingDashboardPage() {
                       ₹{b.paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
                     <td className="py-2 text-center">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${b.paymentStatus === "PAID"
-                          ? "bg-emerald-500/15 text-emerald-700"
-                          : b.paymentStatus === "PARTIALLY_PAID"
-                            ? "bg-amber-500/15 text-amber-700"
-                            : "bg-rose-500/15 text-rose-700"
-                          }`}
-                      >
-                        {b.paymentStatus}
-                      </span>
+                      {(() => {
+                        const isCancelled = b.orderStatus === "CANCELLED" || b.paymentStatus === "CANCELLED";
+                        const isCredit = !isCancelled && (b.paymentStatus === "UNPAID" || b.paymentStatus === "PENDING");
+                        const displayStatus = isCancelled
+                          ? "CANCELLED"
+                          : b.paymentStatus === "PAID"
+                            ? "PAID"
+                            : b.paymentStatus === "PARTIALLY_PAID"
+                              ? "PARTIALLY PAID"
+                              : isCredit
+                                ? "CREDIT"
+                                : b.paymentStatus;
+                        return (
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded ${isCancelled
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : b.paymentStatus === "PAID"
+                                ? "bg-emerald-500/15 text-emerald-700"
+                                : b.paymentStatus === "PARTIALLY_PAID"
+                                  ? "bg-amber-500/15 text-amber-700"
+                                  : isCredit
+                                    ? "bg-amber-50 text-amber-800 border border-amber-300 font-black"
+                                    : "bg-purple-100 text-purple-800"
+                              }`}
+                          >
+                            {displayStatus}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-2 text-center">
                       <span

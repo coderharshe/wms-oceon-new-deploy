@@ -24,12 +24,26 @@ export type AdjustmentResolutionType =
   | "UPI_REFUND"
   | "CUSTOMER_CREDIT"
   | "MANAGER_ADJUSTMENT"
-  | "ADDITIONAL_PAYMENT";
+  | "ADDITIONAL_PAYMENT"
+  | "CASH"
+  | "UPI"
+  | "BANK_TRANSFER"
+  | "CHEQUE"
+  | "CREDIT";
 
 // A revision that made the bill bigger can only be settled by collecting more;
 // one that made it smaller can only be settled by giving money back. Letting
 // the two mix silently books a refund against a customer who in fact owes.
-const RESOLUTIONS_WHEN_CUSTOMER_OWES: AdjustmentResolutionType[] = ["ADDITIONAL_PAYMENT", "MANAGER_ADJUSTMENT"];
+const RESOLUTIONS_WHEN_CUSTOMER_OWES: AdjustmentResolutionType[] = [
+  "ADDITIONAL_PAYMENT",
+  "MANAGER_ADJUSTMENT",
+  "CASH",
+  "UPI",
+  "BANK_TRANSFER",
+  "CHEQUE",
+  "CREDIT",
+  "CUSTOMER_CREDIT"
+];
 const RESOLUTIONS_WHEN_STORE_OWES: AdjustmentResolutionType[] = ["CASH_REFUND", "UPI_REFUND", "CUSTOMER_CREDIT", "MANAGER_ADJUSTMENT"];
 
 export function assertResolutionDirection(difference: Decimal, resolutionType: AdjustmentResolutionType) {

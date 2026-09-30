@@ -537,7 +537,23 @@ export default function OrderDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className={`badge ${order.status === "CANCELLED" ? "bg-rose-600 text-white font-bold" : "bg-line"}`}>{order.status}</span>
-          {bill && <span className="badge bg-line">{bill.paymentStatus}</span>}
+          {bill && (
+            <span
+              className={`badge font-bold ${
+                bill.paymentStatus === "PAID"
+                  ? "bg-good/15 text-good border border-good/30"
+                  : bill.paymentStatus === "PARTIALLY_PAID"
+                    ? "bg-warn/15 text-warn border border-warn/30"
+                    : bill.paymentStatus === "REFUNDED"
+                      ? "bg-purple-100 text-purple-800 border border-purple-300"
+                      : "bg-amber-100 text-amber-900 border border-amber-300 font-black"
+              }`}
+            >
+              {bill.paymentStatus === "UNPAID" || bill.paymentStatus === "PENDING"
+                ? "CREDIT"
+                : bill.paymentStatus.replace(/_/g, " ")}
+            </span>
+          )}
           {bill && (
             <button className="btn" disabled={busy} onClick={viewInvoice}>
               Invoice
@@ -668,11 +684,37 @@ export default function OrderDetailPage() {
 
       {bill && (
         <section className="card space-y-2">
-          <h2 className="text-sm font-semibold">Payment</h2>
-          <div className="flex gap-6 text-sm">
-            <span>Due: ₹{due.toFixed(2)}</span>
-            <span>Paid: ₹{paid.toFixed(2)}</span>
-            <span className={balance > 0 ? "text-bad" : "text-good"}>Balance: ₹{balance.toFixed(2)}</span>
+          <h2 className="text-sm font-semibold">Payment Details</h2>
+          <div className="flex flex-wrap items-center gap-6 text-sm">
+            {order.status === "CANCELLED" ? (
+              <>
+                <span>Bill Due: <span className="line-through text-muted">₹{due.toFixed(2)}</span> <strong className="text-bad">(₹0.00 Void)</strong></span>
+                <span>Total Paid: <strong className="text-good">₹{paid.toFixed(2)}</strong></span>
+                <span className="text-muted font-bold">Balance: ₹0.00 (Cancelled / Void)</span>
+                <span className="badge text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                  Payment Status: CANCELLED
+                </span>
+              </>
+            ) : (
+              <>
+                <span>Bill Due: <strong>₹{due.toFixed(2)}</strong></span>
+                <span>Total Paid: <strong className="text-good">₹{paid.toFixed(2)}</strong></span>
+                <span className={balance > 0 ? "text-amber-700 font-bold" : "text-good font-bold"}>
+                  {balance > 0 ? `Credit / Balance: ₹${balance.toFixed(2)}` : "Fully Settled (PAID)"}
+                </span>
+                <span
+                  className={`badge text-xs font-bold ${
+                    bill.paymentStatus === "PAID"
+                      ? "bg-good/15 text-good border border-good/30"
+                      : bill.paymentStatus === "PARTIALLY_PAID"
+                        ? "bg-warn/15 text-warn border border-warn/30"
+                        : "bg-amber-100 text-amber-900 border border-amber-300 font-black"
+                  }`}
+                >
+                  Payment Status: {bill.paymentStatus === "UNPAID" || bill.paymentStatus === "PENDING" ? "CREDIT" : bill.paymentStatus.replace(/_/g, " ")}
+                </span>
+              </>
+            )}
           </div>
 
           {bill.unpaidMarks?.map((m) => (
@@ -683,7 +725,7 @@ export default function OrderDetailPage() {
             </p>
           ))}
 
-          {bill.payment?.transactions.some((t) => t.status === "CONFIRMED" && t.method === "CASH" && t.type === "PAYMENT") &&
+          {order.status !== "CANCELLED" && bill.payment?.transactions.some((t) => t.status === "CONFIRMED" && t.method === "CASH" && t.type === "PAYMENT") &&
             (unpaidReason === null ? (
               <button className="btn text-xs" disabled={busy || stale} onClick={() => setUnpaidReason("")}>
                 Mark unpaid
@@ -709,7 +751,7 @@ export default function OrderDetailPage() {
               </div>
             ))}
 
-          {balance > 0 && (
+          {order.status !== "CANCELLED" && balance > 0 && (
             <div className="flex flex-wrap items-end gap-2 border-t border-line pt-2">
               <div>
                 <label className="mb-1 block text-xs text-muted">Cash received</label>

@@ -153,6 +153,7 @@ export async function confirmUpiPaymentDrizzle(tx: Tx, args: { transactionId: st
   const result = await afterLedgerChange(tx, args.billId, args.warehouseId, args.orderId);
   await writeAuditDrizzle({ userId: args.userId, warehouseId: args.warehouseId, action: "PAYMENT_CONFIRMED", entityType: "PaymentTransaction", entityId: args.transactionId, newValue: { method: "UPI", status: "CONFIRMED" } }, tx);
   publish(`order:${args.orderId}`, "payment:confirmed", { billId: args.billId, status: result?.status });
+  publish(`warehouse:${args.warehouseId}`, "payment:updated", { orderId: args.orderId, billId: args.billId, status: result?.status });
   return result;
 }
 
@@ -296,7 +297,16 @@ export async function applyBillRevisionAdjustmentDrizzle(tx: Tx, args: { billId:
 
 export async function resolvePaymentAdjustmentDrizzle(
   tx: Tx,
-  args: { adjustmentId: string; resolutionType: "CASH_REFUND" | "UPI_REFUND" | "CUSTOMER_CREDIT" | "MANAGER_ADJUSTMENT" | "ADDITIONAL_PAYMENT"; userId: string; notes?: string; clickedAt?: Date; amount?: Decimal }
+  args: {
+    adjustmentId: string;
+    resolutionType: string;
+    paymentMethod?: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT";
+    reference?: string;
+    userId: string;
+    notes?: string;
+    clickedAt?: Date;
+    amount?: Decimal;
+  }
 ) {
   const [adj] = await tx.select().from(paymentAdjustment).where(eq(paymentAdjustment.id, args.adjustmentId));
   if (!adj) throw new Error("Adjustment not found");
@@ -305,14 +315,41 @@ export async function resolvePaymentAdjustmentDrizzle(
 
   // Resolving twice would write a second refund for the same difference.
   if (adj.resolutionType) throw new PaymentError("This adjustment has already been resolved");
-  assertResolutionDirection(new Decimal(adj.difference), args.resolutionType);
+  assertResolutionDirection(new Decimal(adj.difference), args.resolutionType as any);
 
-  await tx.update(paymentAdjustment).set({ resolutionType: args.resolutionType, resolvedByUserId: args.userId, notes: args.notes }).where(eq(paymentAdjustment.id, args.adjustmentId));
+  const dbResolutionType =
+    args.resolutionType === "CASH" || args.resolutionType === "UPI" || args.resolutionType === "BANK_TRANSFER" || args.resolutionType === "CHEQUE"
+      ? "ADDITIONAL_PAYMENT"
+      : (args.resolutionType as "CASH_REFUND" | "UPI_REFUND" | "CUSTOMER_CREDIT" | "MANAGER_ADJUSTMENT" | "ADDITIONAL_PAYMENT");
 
-  if (args.resolutionType === "ADDITIONAL_PAYMENT") return;
+  await tx.update(paymentAdjustment).set({ resolutionType: dbResolutionType, resolvedByUserId: args.userId, notes: args.notes }).where(eq(paymentAdjustment.id, args.adjustmentId));
+
   const [pay] = await tx.select().from(payment).where(eq(payment.billId, adj.billId));
   if (!pay) return;
 
+  const isCustomerOwed = new Decimal(adj.difference).gt(0);
+  if (isCustomerOwed) {
+    const method = (args.paymentMethod || args.resolutionType) as "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CREDIT" | "CUSTOMER_CREDIT" | "MANAGER_ADJUSTMENT" | "ADDITIONAL_PAYMENT";
+    const amount = args.amount ?? new Decimal(adj.difference);
+
+    if (method === "CASH") {
+      const [payTx] = await tx
+        .insert(paymentTransaction)
+        .values({ id: crypto.randomUUID(), paymentId: pay.id, type: "PAYMENT", method: "CASH", amount: amount.toString(), amountReceived: amount.toString(), status: "CONFIRMED", recordedByUserId: args.userId, clickedAt: args.clickedAt?.toISOString() })
+        .returning();
+      await recordCashMovement(drizzleQ(tx), { warehouseId: b.warehouseId, userId: args.userId, type: "SALE", amount, referenceId: payTx!.id });
+      await afterLedgerChange(tx, adj.billId, b.warehouseId, b.orderId);
+    } else if (method === "UPI" || method === "BANK_TRANSFER" || method === "CHEQUE") {
+      await tx
+        .insert(paymentTransaction)
+        .values({ id: crypto.randomUUID(), paymentId: pay.id, type: "PAYMENT", method: method as any, amount: amount.toString(), amountReceived: amount.toString(), upiReference: args.reference, status: "CONFIRMED", recordedByUserId: args.userId, clickedAt: args.clickedAt?.toISOString() });
+      await afterLedgerChange(tx, adj.billId, b.warehouseId, b.orderId);
+    }
+    // For CREDIT / CUSTOMER_CREDIT / MANAGER_ADJUSTMENT / plain ADDITIONAL_PAYMENT
+    return;
+  }
+
+  // Store owes refund (difference < 0)
   const amount = args.amount ?? new Decimal(adj.difference).abs(); // see payment-service.ts
   const method = args.resolutionType === "UPI_REFUND" ? "UPI" : "CASH";
   const [refundTx] = await tx
@@ -323,9 +360,6 @@ export async function resolvePaymentAdjustmentDrizzle(
   if (args.resolutionType === "CASH_REFUND") {
     await recordCashMovement(drizzleQ(tx), { warehouseId: b.warehouseId, userId: args.userId, type: "REFUND", amount, referenceId: refundTx!.id });
   }
-  // CUSTOMER_CREDIT deliberately touches outstandingBalance only through the
-  // REFUND row above: afterLedgerChange re-derives the customer's receivable
-  // from the ledger, so a manual decrement here would count the credit twice.
 
   await afterLedgerChange(tx, adj.billId, b.warehouseId, b.orderId);
 }
