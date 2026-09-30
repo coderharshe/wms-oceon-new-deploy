@@ -132,7 +132,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     publish(`warehouse:${ord0.warehouseId}`, "order:created", { orderId: result.order!.id });
-    if (!unpaid) await completeIfQcOff(ord0.id, session.sub);
+    if (result.bill) await completeIfQcOff(ord0.id, session.sub);
     return NextResponse.json(result);
   }
 
@@ -239,6 +239,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   );
 
   publish(`warehouse:${ord0.warehouseId}`, "order:created", { orderId: result.order.id });
-  if (!unpaid) await completeIfQcOff(ord0.id, session.sub);
+  if (result.bill) await completeIfQcOff(ord0.id, session.sub);
   return NextResponse.json(result);
 }

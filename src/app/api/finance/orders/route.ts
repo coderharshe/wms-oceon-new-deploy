@@ -641,10 +641,8 @@ export async function POST(req: NextRequest) {
       });
 
       publish(`warehouse:${warehouseId}`, "order:created", { orderId: result.order!.id });
-      // Paid on creation, so with QC off the order is already finished —
-      // same follow-up the cash route does, and outside the transaction for
-      // the same reason.
-      if (result.bill && !body.unpaid) await completeIfQcOff(result.order!.id, session.sub);
+      // With QC off, the order is finished and stock is deducted immediately.
+      if (result.bill) await completeIfQcOff(result.order!.id, session.sub);
       return NextResponse.json(result, { status: 201 });
     }
 
@@ -946,11 +944,8 @@ export async function POST(req: NextRequest) {
     }, { timeout: 15000 });
 
     publish(`warehouse:${warehouseId}`, "order:created", { orderId: result.order.id });
-    // Paid on creation, so with QC off the order is already finished — same
-    // follow-up the cash route does, and outside the transaction for the same
-    // reason.
-    const isCredit = body.unpaid || body.paymentMethod === "CREDIT";
-    if (result.bill && !isCredit) await completeIfQcOff(result.order.id, session.sub);
+    // With QC off, the order is finished and stock is deducted immediately.
+    if (result.bill) await completeIfQcOff(result.order.id, session.sub);
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     // A retried submission of a click the server already committed. The order

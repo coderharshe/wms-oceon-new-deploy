@@ -34,5 +34,11 @@ export async function POST(req: NextRequest) {
     entityId: "QC_ENABLED",
     newValue: { enabled: parsed.data.enabled },
   });
+
+  if (!parsed.data.enabled) {
+    const { processAllOrdersWhenQcDisabled } = await import("@/lib/complete-without-qc");
+    await processAllOrdersWhenQcDisabled(session.sub, session.role === "ADMIN" ? undefined : session.warehouseId ?? undefined);
+  }
+
   return NextResponse.json({ enabled: parsed.data.enabled });
 }
