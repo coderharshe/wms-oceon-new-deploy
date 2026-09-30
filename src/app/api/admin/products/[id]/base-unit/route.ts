@@ -18,7 +18,7 @@ const schema = z.object({ unitId: z.string().min(1) });
  * first, then detach the old one like any other unit.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
   const parsed = schema.safeParse(await req.json().catch(() => null));

@@ -96,6 +96,19 @@ export default function BankManagementPage() {
   const [showAddTxModal, setShowAddTxModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showOutsideInflowModal, setShowOutsideInflowModal] = useState(false);
+
+  // Outside Bank Inflow Form (Owner / Capital / Outside Collection)
+  const [outsideInflowForm, setOutsideInflowForm] = useState({
+    bankAccountId: "",
+    businessDate: new Date().toISOString().split("T")[0],
+    category: "OWNER_CAPITAL",
+    amount: "",
+    partyName: "Owner",
+    paymentMode: "NEFT",
+    utrReference: "",
+    notes: "",
+  });
 
   // Filters
   const [filterType, setFilterType] = useState<string>("ALL");
@@ -146,6 +159,77 @@ export default function BankManagementPage() {
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Handler for Outside Bank Inflow (Money In from Owner / Capital / Partner / Outside Party)
+  async function handleRecordOutsideInflow(e: React.FormEvent) {
+    e.preventDefault();
+    if (!outsideInflowForm.amount || Number(outsideInflowForm.amount) <= 0) {
+      setFormError("Valid amount is required");
+      return;
+    }
+    const targetAcc = data?.accounts.find((a) => a.id === outsideInflowForm.bankAccountId) || data?.accounts[0];
+    if (!targetAcc) {
+      setFormError("Please select a bank account");
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
+
+    const categoryLabels: Record<string, string> = {
+      OWNER_CAPITAL: "Owner Capital Inflow",
+      DIRECTOR_INFLOW: "Director / Partner Transfer",
+      OUTSIDE_COLLECTION: "Direct Outside Collection",
+      LOAN_INFLOW: "Loan / Credit Facility Inflow",
+      REFUND_INFLOW: "Refund / Direct Settlement",
+      OTHER_INFLOW: "Other Direct Bank Inflow",
+    };
+
+    const categoryLabel = categoryLabels[outsideInflowForm.category] || "Outside Bank Inflow";
+    const narration = `[${categoryLabel}] Via ${outsideInflowForm.paymentMode} from ${
+      outsideInflowForm.partyName.trim() || "Owner"
+    }${outsideInflowForm.notes.trim() ? ` — ${outsideInflowForm.notes.trim()}` : ""}`;
+
+    try {
+      const res = await fetch("/api/finance/bank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "RECORD_TRANSACTION",
+          businessDate: outsideInflowForm.businessDate,
+          type: "DIRECT_DEPOSIT",
+          amount: Number(outsideInflowForm.amount),
+          isCredit: true,
+          utrReference: outsideInflowForm.utrReference.trim() || null,
+          bankName: targetAcc.name,
+          accountNumber: targetAcc.accountNumber,
+          partyName: outsideInflowForm.partyName.trim() || "Owner",
+          notes: narration,
+          reconciled: true,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to record bank inflow");
+
+      setShowOutsideInflowModal(false);
+      setOutsideInflowForm({
+        bankAccountId: "",
+        businessDate: new Date().toISOString().split("T")[0],
+        category: "OWNER_CAPITAL",
+        amount: "",
+        partyName: "Owner",
+        paymentMode: "NEFT",
+        utrReference: "",
+        notes: "",
+      });
+      reload();
+    } catch (err: any) {
+      setFormError(err.message || "Error saving bank inflow");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleAddAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -448,13 +532,28 @@ export default function BankManagementPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFormError(null);
+              setOutsideInflowForm((prev) => ({
+                ...prev,
+                bankAccountId: selectedAccountId !== "ALL" ? selectedAccountId : data.accounts[0]?.id || "",
+              }));
+              setShowOutsideInflowModal(true);
+            }}
+            className="btn-primary text-xs font-bold py-1.5 px-3 flex items-center gap-1.5 shadow-sm hover:scale-[1.02] transition-transform"
+          >
+            <span>📥</span>
+            <span>+ Collect Money / Bank Inflow</span>
+          </button>
           <button onClick={() => setShowTransferModal(true)} className="btn text-xs font-semibold">
             ⇄ Inter-Bank Transfer
           </button>
           <button onClick={() => setShowImportModal(true)} className="btn text-xs font-semibold">
             📥 Import Statement
           </button>
-          <button onClick={() => setShowAddTxModal(true)} className="btn btn-primary text-xs font-semibold">
+          <button onClick={() => setShowAddTxModal(true)} className="btn text-xs font-semibold">
             + Record Transaction
           </button>
           <button onClick={exportCSV} className="btn text-xs font-semibold" title="Export CSV">
@@ -1193,6 +1292,157 @@ export default function BankManagementPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 5: COLLECT OUTSIDE BANK INFLOW / CAPITAL ── */}
+      {showOutsideInflowModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-paper border border-line rounded-xl shadow-2xl w-full max-w-lg p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-line pb-2">
+              <div>
+                <h3 className="font-bold text-base text-ink flex items-center gap-1.5">
+                  <span>📥</span> Collect Outside Money / Bank Inflow
+                </h3>
+                <p className="text-xs text-muted">
+                  Record funds credited directly into bank account (Owner capital, partner loan, or outside collection)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOutsideInflowModal(false)}
+                className="text-muted hover:text-ink font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordOutsideInflow} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-ink mb-1">Target Bank Account *</label>
+                <select
+                  required
+                  className="w-full font-bold"
+                  value={outsideInflowForm.bankAccountId}
+                  onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, bankAccountId: e.target.value })}
+                >
+                  <option value="">Select Account</option>
+                  {data.accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.bankName} - {a.accountNumber}) · Bal: {rs(a.currentBalance)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-ink mb-1">Inflow Amount (₹) *</label>
+                  <input
+                    required
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="e.g. 50000"
+                    className="w-full font-mono font-bold text-sm text-good"
+                    value={outsideInflowForm.amount}
+                    onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-ink mb-1">Date</label>
+                  <input
+                    type="date"
+                    className="w-full font-mono"
+                    value={outsideInflowForm.businessDate}
+                    onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, businessDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-ink mb-1">Inflow Category</label>
+                <select
+                  className="w-full font-semibold"
+                  value={outsideInflowForm.category}
+                  onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, category: e.target.value })}
+                >
+                  <option value="OWNER_CAPITAL">💼 Owner Capital / Inflow</option>
+                  <option value="DIRECTOR_INFLOW">🤝 Director / Partner Funds</option>
+                  <option value="OUTSIDE_COLLECTION">💰 Direct Outside Customer Collection</option>
+                  <option value="LOAN_INFLOW">🏦 Bank Loan / Credit Facility Inflow</option>
+                  <option value="REFUND_INFLOW">🔄 Refund / Outside Settlement</option>
+                  <option value="OTHER_INFLOW">🏛️ Other Direct Bank Inflow</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-ink mb-1">Deposited By (Party / Person)</label>
+                  <input
+                    placeholder="e.g. Owner, Farah, Partner"
+                    className="w-full"
+                    value={outsideInflowForm.partyName}
+                    onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, partyName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-ink mb-1">Transfer Mode</label>
+                  <select
+                    className="w-full"
+                    value={outsideInflowForm.paymentMode}
+                    onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, paymentMode: e.target.value })}
+                  >
+                    <option value="NEFT">NEFT Transfer</option>
+                    <option value="IMPS">IMPS Transfer</option>
+                    <option value="RTGS">RTGS Transfer</option>
+                    <option value="UPI">UPI / QR Transfer</option>
+                    <option value="CHEQUE">Cheque / DD Deposit</option>
+                    <option value="CASH_DEPOSIT">Cash Deposit at Branch</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-ink mb-1">UTR / Transaction Reference No (Optional)</label>
+                <input
+                  placeholder="e.g. HDFC0001928381 or Cheque #"
+                  className="w-full font-mono"
+                  value={outsideInflowForm.utrReference}
+                  onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, utrReference: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-ink mb-1">Narration / Remarks (Optional)</label>
+                <input
+                  placeholder="e.g. Capital infused for inventory purchase"
+                  className="w-full"
+                  value={outsideInflowForm.notes}
+                  onChange={(e) => setOutsideInflowForm({ ...outsideInflowForm, notes: e.target.value })}
+                />
+              </div>
+
+              {formError && <p className="text-xs text-bad bg-bad/10 p-2 rounded">{formError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setShowOutsideInflowModal(false)}
+                  className="btn text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="btn btn-primary font-bold text-xs px-4 py-2"
+                >
+                  {saving ? "Recording Inflow..." : "✓ Add Inflow to Bank"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

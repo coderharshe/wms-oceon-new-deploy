@@ -574,6 +574,14 @@ export default function BillingNewOrderPage() {
   function onProductKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && !productQuery.trim()) {
       e.preventDefault();
+      if (!hasPaymentBreakdown && lines.length > 0) {
+        const payInput = document.querySelector<HTMLInputElement>('input[data-payment-amount="0"]');
+        if (payInput) {
+          payInput.focus();
+          payInput.select();
+          return;
+        }
+      }
       submitButtonRef.current?.focus();
       return;
     }
@@ -749,16 +757,17 @@ export default function BillingNewOrderPage() {
   );
   const isSingleRow = paymentRows.length === 1;
   const singleRow = paymentRows[0] || { id: "1", method: "CASH" as const, amount: "" };
-  const effectivePaid =
-    isSingleRow && !singleRow.amount && singleRow.method !== "CREDIT"
-      ? total
-      : totalPaid;
-  const changeDue = effectivePaid > total ? round2(effectivePaid - total) : 0;
-  const remainingCredit = round2(Math.max(0, total - effectivePaid));
+
+  // Payment breakdown is considered entered when at least one row has amount > 0 or is marked CREDIT
+  const hasPaymentBreakdown = paymentRows.some((r) => r.method === "CREDIT" || Number(r.amount) > 0);
+
+  const effectivePaid = hasPaymentBreakdown ? totalPaid : 0;
+  const changeDue = totalPaid > total ? round2(totalPaid - total) : 0;
+  const remainingCredit = round2(Math.max(0, total - totalPaid));
   const isCreditSale =
     (isSingleRow && singleRow.method === "CREDIT") ||
-    (!isSingleRow && totalPaid <= 0) ||
-    (effectivePaid < total);
+    (paymentRows.some((r) => r.method === "CREDIT") && totalPaid < total) ||
+    (hasPaymentBreakdown && totalPaid < total);
 
   function billed() {
     requestIdRef.current = null;
@@ -771,8 +780,10 @@ export default function BillingNewOrderPage() {
       setError("Add at least one product to generate a bill");
       return;
     }
-    if (!isSingleRow && totalPaid <= 0 && !paymentRows.some((r) => r.method === "CREDIT")) {
-      setError("Please enter an amount for at least one payment method or select Credit");
+    if (!hasPaymentBreakdown) {
+      setError("Please add payment breakdown (enter amount received or select Credit) before generating the bill.");
+      const payInput = document.querySelector<HTMLInputElement>('input[data-payment-amount="0"]');
+      payInput?.focus();
       return;
     }
     submittingRef.current = true;
@@ -787,20 +798,24 @@ export default function BillingNewOrderPage() {
       reference?: string;
     }> | undefined;
 
+    const validPaidRows = paymentRows.filter((r) => r.method !== "CREDIT" && Number(r.amount) > 0);
+
     if (isSingleRow) {
       paymentMethod = singleRow.method;
-    } else {
+    } else if (validPaidRows.length === 1 && !paymentRows.some((r) => r.method === "CREDIT")) {
+      paymentMethod = validPaidRows[0]!.method;
+    } else if (validPaidRows.length > 0) {
       paymentMethod = "SPLIT";
-      splitsPayload = paymentRows
-        .filter((r) => r.method !== "CREDIT" && Number(r.amount) > 0)
-        .map((r) => ({
-          method: r.method as "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE",
-          amount: Number(r.amount),
-          reference: r.reference?.trim() || undefined,
-        }));
+      splitsPayload = validPaidRows.map((r) => ({
+        method: r.method as "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE",
+        amount: Number(r.amount),
+        reference: r.reference?.trim() || undefined,
+      }));
+    } else {
+      paymentMethod = "CREDIT";
     }
 
-    const singleRowAmt = Number(singleRow.amount) > 0 ? Number(singleRow.amount) : total;
+    const singleRowAmt = Number(singleRow.amount) > 0 ? Number(singleRow.amount) : 0;
     const paymentDetails = {
       amountReceived: isSingleRow ? (singleRow.method === "CREDIT" ? 0 : singleRowAmt) : totalPaid,
       changeGiven: changeDue,
@@ -1606,20 +1621,38 @@ export default function BillingNewOrderPage() {
                 </div>
 
                 {/* Amount */}
-                <div className="w-40 min-w-[120px]">
-                  <label className="mb-0.5 block text-[10px] font-semibold text-muted uppercase">Amount (₹)</label>
+                <div className="w-48 min-w-[140px]">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="block text-[10px] font-semibold text-muted uppercase">Amount (₹)</label>
+                    {row.method !== "CREDIT" && total > 0 && (
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="text-[10px] font-bold text-accent hover:underline cursor-pointer"
+                        onClick={() => {
+                          const otherPaid = paymentRows
+                            .filter((r) => r.id !== row.id && r.method !== "CREDIT")
+                            .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+                          const rem = Math.max(0, round2(total - otherPaid));
+                          updatePaymentRow(row.id, { amount: String(rem > 0 ? rem : total) });
+                        }}
+                        title="Click to fill exact remaining amount"
+                      >
+                        ⚡ Exact
+                      </button>
+                    )}
+                  </div>
                   <input
+                    data-payment-amount={idx}
                     type="number"
                     min="0"
                     step="any"
                     disabled={row.method === "CREDIT"}
-                    className={`w-full text-xs font-bold font-mono ${row.method === "CREDIT" ? "opacity-50" : ""}`}
+                    className={`w-full text-xs font-bold font-mono ${row.method === "CREDIT" ? "opacity-50 bg-surface-2" : ""}`}
                     placeholder={
                       row.method === "CREDIT"
-                        ? "Credit Ledger"
-                        : paymentRows.length === 1
-                          ? `Exact (₹${total.toFixed(2)})`
-                          : "0.00"
+                        ? `Credit / Khata (₹${total.toFixed(2)})`
+                        : "0.00"
                     }
                     value={row.amount}
                     onChange={(e) => updatePaymentRow(row.id, { amount: e.target.value })}
@@ -1687,21 +1720,36 @@ export default function BillingNewOrderPage() {
               </div>
               <div>
                 <span className="text-muted">Total Paid: </span>
-                <strong className="text-good font-mono text-sm">
-                  ₹{effectivePaid.toFixed(2)}
+                <strong className={`font-mono text-sm ${totalPaid > 0 ? "text-good" : "text-ink"}`}>
+                  ₹{totalPaid.toFixed(2)}
                 </strong>
               </div>
-              {changeDue > 0 ? (
-                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30">
-                  Change to Return: ₹{changeDue.toFixed(2)}
+              {!hasPaymentBreakdown ? (
+                <div className="rounded bg-bad/10 px-2.5 py-1 font-bold text-bad border border-bad/30 flex items-center gap-1.5">
+                  <span>⚠️</span>
+                  <span>Payment Breakdown Required</span>
                 </div>
-              ) : remainingCredit > 0 && !(isSingleRow && !singleRow.amount && singleRow.method !== "CREDIT") ? (
-                <div className="rounded bg-amber-500/15 px-2.5 py-1 font-bold text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                  Remaining on Credit: ₹{remainingCredit.toFixed(2)}
+              ) : changeDue > 0 ? (
+                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30 flex items-center gap-1.5">
+                  <span>✓ Full Settled</span>
+                  <span className="opacity-40">|</span>
+                  <span>Change: ₹{changeDue.toFixed(2)}</span>
+                </div>
+              ) : totalPaid >= total ? (
+                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30 flex items-center gap-1">
+                  <span>✓ Full Settled</span>
+                </div>
+              ) : isSingleRow && singleRow.method === "CREDIT" ? (
+                <div className="rounded bg-amber-500/15 px-2.5 py-1 font-bold text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                  <span>📒 100% on Credit / Khata (₹{total.toFixed(2)})</span>
+                </div>
+              ) : remainingCredit > 0 ? (
+                <div className="rounded bg-amber-500/15 px-2.5 py-1 font-bold text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                  <span>Remaining on Credit: ₹{remainingCredit.toFixed(2)}</span>
                 </div>
               ) : (
-                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30">
-                  ✓ Full Settled
+                <div className="rounded bg-good/15 px-2.5 py-1 font-bold text-good border border-good/30 flex items-center gap-1">
+                  <span>✓ Full Settled</span>
                 </div>
               )}
             </div>
@@ -1780,7 +1828,11 @@ export default function BillingNewOrderPage() {
               disabled={submitting}
               onClick={submit}
             >
-              {submitting ? "Generating & Printing…" : `⚡ Generate & Print Bill (${keyFor("submit-order") || "F10"})`}
+              {submitting
+                ? "Generating & Printing…"
+                : !hasPaymentBreakdown && lines.length > 0
+                  ? `⚡ Enter Payment to Generate (${keyFor("submit-order") || "F10"})`
+                  : `⚡ Generate & Print Bill (${keyFor("submit-order") || "F10"})`}
             </button>
           </div>
         </div>

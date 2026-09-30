@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isErrorResponse } from "@/lib/guard";
 import { getDb } from "@/lib/db";
 import { resolveDateRange } from "@/lib/date-filter";
+import { getSetting } from "@/lib/settings";
 
 export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
@@ -55,18 +56,19 @@ export async function GET(req: NextRequest) {
 
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // 2. Cash Sessions & Management
-    const latestCashSession = await db.cashSession.findFirst({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
-
-    const openCashSessions = await db.cashSession.count({
+    // 2. Cash Sessions & Management (Actual Cumulative Till Date)
+    const openCashSessionsList = await db.cashSession.findMany({
       where: {
         ...where,
         status: "OPEN",
       },
+      include: {
+        transactions: true,
+      },
+      orderBy: { createdAt: "desc" },
     });
+
+    const openCashSessions = openCashSessionsList.length;
 
     const cashDiscrepancySessions = await db.cashSession.count({
       where: {
@@ -76,27 +78,105 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const cashBal = latestCashSession ? Number(latestCashSession.actualCash || latestCashSession.expectedCash || latestCashSession.openingCash) : 0;
-    const cashOpening = latestCashSession ? Number(latestCashSession.openingCash) : 0;
-    const cashExpected = latestCashSession ? Number(latestCashSession.expectedCash || 0) : 0;
-    const cashActual = latestCashSession ? Number(latestCashSession.actualCash || 0) : 0;
-    const cashDiff = latestCashSession ? Number(latestCashSession.difference || 0) : 0;
+    let cashBal = 0;
+    let cashOpening = 0;
+    let cashExpected = 0;
+    let cashActual = 0;
+    let cashDiff = 0;
+    let latestCashSession: any = null;
 
-    // 3. Bank Balances & Management
-    const latestBank = await db.bankBalance.findFirst({
+    if (openCashSessionsList.length > 0) {
+      latestCashSession = openCashSessionsList[0];
+      cashOpening = openCashSessionsList.reduce((sum, s) => sum + Number(s.openingCash || 0), 0);
+      for (const s of openCashSessionsList) {
+        let sessionExpected = Number(s.openingCash || 0);
+        for (const t of s.transactions) {
+          const amt = Number(t.amount || 0);
+          if (t.type === "SALE" || t.type === "OTHER_RECEIPT") {
+            sessionExpected += amt;
+          } else {
+            sessionExpected -= amt; // REFUND, WITHDRAWAL, BANK_DEPOSIT
+          }
+        }
+        cashExpected += sessionExpected;
+      }
+      cashBal = cashExpected;
+    } else {
+      latestCashSession = await db.cashSession.findFirst({
+        where: {
+          ...where,
+          status: "CLOSED",
+        },
+        orderBy: { closedAt: "desc" },
+      });
+      if (!latestCashSession) {
+        latestCashSession = await db.cashSession.findFirst({
+          where,
+          orderBy: { createdAt: "desc" },
+        });
+      }
+      cashBal = latestCashSession ? Number(latestCashSession.actualCash ?? latestCashSession.expectedCash ?? latestCashSession.openingCash ?? 0) : 0;
+      cashOpening = latestCashSession ? Number(latestCashSession.openingCash || 0) : 0;
+      cashExpected = latestCashSession ? Number(latestCashSession.expectedCash || 0) : cashBal;
+      cashActual = latestCashSession ? Number(latestCashSession.actualCash || 0) : 0;
+      cashDiff = latestCashSession ? Number(latestCashSession.difference || 0) : 0;
+    }
+
+    // 3. Bank Balances & Management (Actual Till Date across Operating Accounts)
+    let bankAccountsConfig: any[] = [];
+    try {
+      const rawBankCfg = await getSetting("BANK_ACCOUNTS_CONFIG");
+      if (rawBankCfg) {
+        const parsed = JSON.parse(rawBankCfg);
+        if (Array.isArray(parsed)) {
+          bankAccountsConfig = parsed.filter((a: any) => a && typeof a === "object" && a.active !== false);
+        }
+      }
+    } catch {}
+
+    const allBankTxs = await db.bankTransaction.findMany({
       where,
-      orderBy: { businessDate: "desc" },
+      orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
     });
 
-    const unreconciledBankTx = await db.bankTransaction.findMany({
-      where: {
-        ...where,
-        reconciled: false,
-      },
-    });
-    const unreconciledBankAmount = unreconciledBankTx.reduce((sum, tx) => sum + Number(tx.amount), 0);
+    const unreconciledBankTx = allBankTxs.filter((tx) => !tx.reconciled);
+    const unreconciledBankAmount = unreconciledBankTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
 
-    const bankBal = latestBank ? Number(latestBank.closingBalance) : 0;
+    let bankBal = 0;
+    if (bankAccountsConfig.length > 0) {
+      const totalOpening = bankAccountsConfig.reduce((sum, a) => sum + (Number(a.openingBalance) || 0), 0);
+      let deposits = 0;
+      let withdrawals = 0;
+      let transfersIn = 0;
+      let transfersOut = 0;
+      let bankCharges = 0;
+
+      for (const t of allBankTxs) {
+        const amt = Number(t.amount) || 0;
+        if (t.type === "BANK_CHARGES") {
+          bankCharges += amt;
+        } else if (t.type === "ADJUSTMENT") {
+          if (t.isCredit) transfersIn += amt;
+          else transfersOut += amt;
+        } else if (t.isCredit) {
+          deposits += amt;
+        } else {
+          withdrawals += amt;
+        }
+      }
+      bankBal = totalOpening + deposits + transfersIn - withdrawals - transfersOut - bankCharges;
+    } else {
+      const latestBank = await db.bankBalance.findFirst({
+        where,
+        orderBy: { businessDate: "desc" },
+      });
+      const baseOpening = latestBank ? Number(latestBank.openingBalance || latestBank.closingBalance || 0) : 0;
+      const netTxs = allBankTxs.reduce((sum, tx) => {
+        const amt = Number(tx.amount) || 0;
+        return sum + (tx.isCredit ? amt : -amt);
+      }, 0);
+      bankBal = latestBank?.closingBalance ? Number(latestBank.closingBalance) : (baseOpening + netTxs);
+    }
 
     // 4. UPI / Digital Payments & Settlements
     const upiSettlements = await db.uPISettlement.findMany({
@@ -422,12 +502,12 @@ export async function GET(req: NextRequest) {
 
     const periodOutflows = periodSupplierPayments + totalPeriodExpense + periodRefunds;
     const periodNetReceived = periodCollection - periodOutflows;
-    const netWorkingCapital = (cashBal > 0 ? cashBal : periodCash) + (bankBal > 0 ? bankBal : periodBank) + totalReceivables - totalPayables;
+    const netWorkingCapital = cashBal + bankBal + totalReceivables - totalPayables;
 
     return NextResponse.json({
       // 1. Overview & Liquidity
-      cashBalance: cashBal > 0 ? cashBal : periodCash,
-      bankBalance: bankBal > 0 ? bankBal : periodBank,
+      cashBalance: cashBal,
+      bankBalance: bankBal,
       totalReceivables,
       totalPayables,
       netWorkingCapital,
@@ -438,10 +518,10 @@ export async function GET(req: NextRequest) {
 
       // 2. Cash Management
       cash: {
-        status: latestCashSession?.status || "CLOSED",
+        status: openCashSessionsList.length > 0 ? "OPEN" : (latestCashSession?.status || "CLOSED"),
         todayCash: periodCash,
         openingCash: cashOpening,
-        expectedCash: cashExpected > 0 ? cashExpected : (cashOpening + periodCash),
+        expectedCash: cashExpected,
         actualCash: cashActual,
         difference: cashDiff,
         discrepancyCount: cashDiscrepancySessions,

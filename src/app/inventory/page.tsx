@@ -150,14 +150,20 @@ export default function InventoryDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/inventory/ledger" className="btn text-xs font-semibold flex items-center gap-1">
-            📑 Inventory Ledger
+          <Link href="/inventory/products" className="btn text-xs font-semibold flex items-center gap-1 hover:bg-surface-hi">
+            📦 Products &amp; Units
           </Link>
-          <Link href="/inventory/grn" className="btn-primary text-xs font-semibold flex items-center gap-1">
+          <Link href="/inventory/units" className="btn text-xs font-semibold flex items-center gap-1 hover:bg-surface-hi">
+            📏 Units (UOM)
+          </Link>
+          <Link href="/inventory/ledger" className="btn text-xs font-semibold flex items-center gap-1">
+            📑 Ledger
+          </Link>
+          <Link href="/inventory/grn" className="btn-primary text-xs font-semibold flex items-center gap-1 shadow-xs">
             📥 Inward (GRN)
           </Link>
           <Link href="/inventory/count" className="btn text-xs font-medium flex items-center gap-1">
-            🔎 Physical Count
+            🔎 Count
           </Link>
         </div>
       </div>

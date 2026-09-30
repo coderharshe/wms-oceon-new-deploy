@@ -36,7 +36,7 @@ const schema = z.object({
 // a customer asks for a peti of something only stocked in pieces. Making
 // them fetch a manager to add it stalls the queue.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "INVENTORY", "PROCUREMENT", "FINANCE", "BILLING"]);
   if (isErrorResponse(session)) return session;
   const { id } = await params;
   const parsed = schema.safeParse(await req.json().catch(() => null));

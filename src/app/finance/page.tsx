@@ -233,7 +233,7 @@ export default function FinanceDashboardPage() {
             <div className="text-xl font-black text-good mt-1 font-mono">
               ₹{Number(d.cashBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-muted mt-0.5">Physical Counter Till</div>
+            <div className="text-[10px] text-muted mt-0.5">Physical Counter Till (Till Date)</div>
           </div>
 
           <div className="card border-l-4 border-l-primary/80">
@@ -244,7 +244,7 @@ export default function FinanceDashboardPage() {
             <div className="text-xl font-black text-primary mt-1 font-mono">
               ₹{Number(d.bankBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-muted mt-0.5">Operating Accounts</div>
+            <div className="text-[10px] text-muted mt-0.5">Operating Accounts (Till Date)</div>
           </div>
 
           <div className="card border-l-4 border-l-warn/80">

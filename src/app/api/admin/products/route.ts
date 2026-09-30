@@ -73,13 +73,13 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "INVENTORY", "PROCUREMENT"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
-  // Finance creating a product mid-bill is a manager-controlled privilege, and
+  // Finance/Billing creating a product mid-bill is a manager-controlled privilege, and
   // the check lives here rather than only in the UI — hiding a button is not a
   // permission. Admin and Manager are unaffected by the switch.
-  if (session.role === "FINANCE" && !(await (await import("@/lib/settings")).financeCanAddProducts())) {
+  if (["FINANCE", "BILLING"].includes(session.role) && !(await (await import("@/lib/settings")).financeCanAddProducts())) {
     return fail(403, "Adding new products from the billing screen is switched off.", { label: "Turn it on", href: "/manager/settings" });
   }
 

@@ -5,6 +5,8 @@ import { getSetting } from "@/lib/settings";
 
 const LINKS = [
   { href: "/inventory", label: "Inventory Dashboard" },
+  { href: "/inventory/products", label: "Products & Sale Units" },
+  { href: "/inventory/units", label: "Units of Measure (UOM)" },
   { href: "/inventory/ledger", label: "Inventory Ledger" },
   { href: "/inventory/purchase-orders", label: "Purchase Orders" },
   { href: "/inventory/suppliers", label: "Suppliers" },

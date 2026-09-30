@@ -7,7 +7,7 @@ import { isWorkersRuntime } from "@/lib/cf-env";
 // Units change only via deliberate admin action — a generous TTL is safe,
 // and every product/order/QC screen loads this list on mount.
 export async function GET() {
-  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "QC", "INVENTORY", "PROCUREMENT"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "FINANCE", "BILLING", "QC", "INVENTORY", "PROCUREMENT"]);
   if (isErrorResponse(session)) return session;
 
   if (isWorkersRuntime()) {
