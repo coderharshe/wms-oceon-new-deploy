@@ -65,11 +65,10 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // Fetch bank transactions
+    // Fetch ALL bank transactions — no take cap, required for accurate balance
     const allBankTxs = await db.bankTransaction.findMany({
       where,
       orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
-      take: 500,
     });
 
     // Also fetch cash drawer deposits and UPI settlements for reference
@@ -93,19 +92,23 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    // Calculate metrics for each account individually to prevent double counting
-    const accountSummaries = accounts.map((acc) => {
+    // Helper: match a transaction to a configured account
+    function matchTxToAccount(t: (typeof allBankTxs)[0], acc: (typeof accounts)[0]): boolean {
+      const tAcc = t.accountNumber?.trim().toLowerCase();
+      const tBank = t.bankName?.trim().toLowerCase();
       const accNumber = acc.accountNumber?.trim().toLowerCase();
       const accName = acc.name?.trim().toLowerCase();
+      const accBankName = acc.bankName?.trim().toLowerCase();
+      // Prefer exact account number match over name match (most reliable)
+      if (tAcc && accNumber && tAcc === accNumber) return true;
+      // Match by configured account name or bank name — only if account number absent
+      if (!tAcc && tBank && (tBank === accName || tBank === accBankName)) return true;
+      return false;
+    }
 
-      // Transactions belonging to this account
-      const txs = allBankTxs.filter((t) => {
-        const tAcc = t.accountNumber?.trim().toLowerCase();
-        const tBank = t.bankName?.trim().toLowerCase();
-        if (tAcc && accNumber && tAcc === accNumber) return true;
-        if (tBank && (tBank === accName || tBank === acc.bankName?.toLowerCase())) return true;
-        return false;
-      });
+    // Calculate metrics for each account individually to prevent double counting
+    const accountSummaries = accounts.map((acc) => {
+      const txs = allBankTxs.filter((t) => matchTxToAccount(t, acc));
 
       let deposits = 0;
       let withdrawals = 0;
@@ -152,17 +155,42 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Consolidated stats across active accounts
+    // Find orphan transactions — not matched to any configured account.
+    // These still affect the real bank balance so must be included in the consolidated total.
+    const matchedTxIds = new Set<string>();
+    for (const acc of accounts) {
+      for (const t of allBankTxs) {
+        if (matchTxToAccount(t, acc)) matchedTxIds.add(t.id);
+      }
+    }
+    const orphanTxs = allBankTxs.filter((t) => !matchedTxIds.has(t.id));
+    let orphanDeposits = 0;
+    let orphanWithdrawals = 0;
+    let orphanTransfersIn = 0;
+    let orphanTransfersOut = 0;
+    let orphanBankCharges = 0;
+    let orphanUnreconciledCount = 0;
+    let orphanUnreconciledAmount = 0;
+    for (const t of orphanTxs) {
+      const amt = Number(t.amount);
+      if (!t.reconciled) { orphanUnreconciledCount++; orphanUnreconciledAmount += amt; }
+      if (t.type === "BANK_CHARGES") orphanBankCharges += amt;
+      else if (t.type === "ADJUSTMENT") { if (t.isCredit) orphanTransfersIn += amt; else orphanTransfersOut += amt; }
+      else if (t.isCredit) orphanDeposits += amt;
+      else orphanWithdrawals += amt;
+    }
+
+    // Consolidated stats across active accounts + orphan transactions
     const activeAccounts = accountSummaries.filter((a) => a.active);
     const totalOpeningBalance = activeAccounts.reduce((sum, a) => sum + a.openingBalance, 0);
-    const totalDeposits = activeAccounts.reduce((sum, a) => sum + a.deposits, 0);
-    const totalWithdrawals = activeAccounts.reduce((sum, a) => sum + a.withdrawals, 0);
-    const totalTransfersIn = activeAccounts.reduce((sum, a) => sum + a.transfersIn, 0);
-    const totalTransfersOut = activeAccounts.reduce((sum, a) => sum + a.transfersOut, 0);
-    const totalBankCharges = activeAccounts.reduce((sum, a) => sum + a.bankCharges, 0);
+    const totalDeposits = activeAccounts.reduce((sum, a) => sum + a.deposits, 0) + orphanDeposits;
+    const totalWithdrawals = activeAccounts.reduce((sum, a) => sum + a.withdrawals, 0) + orphanWithdrawals;
+    const totalTransfersIn = activeAccounts.reduce((sum, a) => sum + a.transfersIn, 0) + orphanTransfersIn;
+    const totalTransfersOut = activeAccounts.reduce((sum, a) => sum + a.transfersOut, 0) + orphanTransfersOut;
+    const totalBankCharges = activeAccounts.reduce((sum, a) => sum + a.bankCharges, 0) + orphanBankCharges;
     const totalCurrentBalance = totalOpeningBalance + totalDeposits + totalTransfersIn - totalWithdrawals - totalTransfersOut - totalBankCharges;
-    const totalUnreconciledCount = activeAccounts.reduce((sum, a) => sum + a.unreconciledCount, 0);
-    const totalUnreconciledAmount = activeAccounts.reduce((sum, a) => sum + a.unreconciledAmount, 0);
+    const totalUnreconciledCount = activeAccounts.reduce((sum, a) => sum + a.unreconciledCount, 0) + orphanUnreconciledCount;
+    const totalUnreconciledAmount = activeAccounts.reduce((sum, a) => sum + a.unreconciledAmount, 0) + orphanUnreconciledAmount;
 
     // Filter transactions if specific account is selected
     let filteredTxs = allBankTxs;

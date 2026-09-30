@@ -175,17 +175,7 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const [expenses, customCategories, bankAccounts, customPaymentModes] = await Promise.all([
-      db.expense.findMany({
-        where,
-        include: {
-          warehouse: { select: { name: true, code: true } },
-          createdByUser: { select: { id: true, name: true, staffId: true, role: true } },
-          approvedByUser: { select: { id: true, name: true, staffId: true, role: true } },
-        },
-        orderBy: { date: "desc" },
-        take: 200,
-      }),
+    const [expenses, customCategories, bankAccounts, customPaymentModes] = await Promise.all([\n      db.expense.findMany({\n        where,\n        include: {\n          warehouse: { select: { name: true, code: true } },\n          createdByUser: { select: { id: true, name: true, staffId: true, role: true } },\n          approvedByUser: { select: { id: true, name: true, staffId: true, role: true } },\n        },\n        orderBy: { date: \"desc\" },\n        // No take cap — must count all expenses in the window to match dashboard totals\n      }),
       getCustomCategories(),
       getBankAccounts(),
       getCustomPaymentModes(),

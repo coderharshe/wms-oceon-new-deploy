@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
       cashDiff = latestCashSession ? Number(latestCashSession.difference || 0) : 0;
     }
 
-    // 3. Bank Balances & Management (Actual Till Date across Operating Accounts)
+    // 3. Bank Balances — uses SAME formula as /api/finance/bank to guarantee dashboard = ledger
     let bankAccountsConfig: any[] = [];
     try {
       const rawBankCfg = await getSetting("BANK_ACCOUNTS_CONFIG");
@@ -134,6 +134,7 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
+    // Fetch ALL bank transactions with no date limit — balance is always cumulative (till date)
     const allBankTxs = await db.bankTransaction.findMany({
       where,
       orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
@@ -142,47 +143,64 @@ export async function GET(req: NextRequest) {
     const unreconciledBankTx = allBankTxs.filter((tx) => !tx.reconciled);
     const unreconciledBankAmount = unreconciledBankTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
 
+    // Match helper — identical to bank ledger route
+    function matchTxToAccount(t: (typeof allBankTxs)[0], acc: any): boolean {
+      const tAcc = t.accountNumber?.trim().toLowerCase();
+      const tBank = t.bankName?.trim().toLowerCase();
+      const accNumber = acc.accountNumber?.trim().toLowerCase();
+      const accName = acc.name?.trim().toLowerCase();
+      const accBankName = acc.bankName?.trim().toLowerCase();
+      if (tAcc && accNumber && tAcc === accNumber) return true;
+      if (!tAcc && tBank && (tBank === accName || tBank === accBankName)) return true;
+      return false;
+    }
+
     let bankBal = 0;
     if (bankAccountsConfig.length > 0) {
-      const totalOpening = bankAccountsConfig.reduce((sum, a) => sum + (Number(a.openingBalance) || 0), 0);
-      let deposits = 0;
-      let withdrawals = 0;
-      let transfersIn = 0;
-      let transfersOut = 0;
-      let bankCharges = 0;
+      const totalOpening = bankAccountsConfig.reduce((sum: number, a: any) => sum + (Number(a.openingBalance) || 0), 0);
 
-      for (const t of allBankTxs) {
-        const amt = Number(t.amount) || 0;
-        if (t.type === "BANK_CHARGES") {
-          bankCharges += amt;
-        } else if (t.type === "ADJUSTMENT") {
-          if (t.isCredit) transfersIn += amt;
-          else transfersOut += amt;
-        } else if (t.isCredit) {
-          deposits += amt;
-        } else {
-          withdrawals += amt;
+      // Per-account mapped sums
+      let deposits = 0, withdrawals = 0, transfersIn = 0, transfersOut = 0, bankCharges = 0;
+
+      const matchedTxIds = new Set<string>();
+      for (const acc of bankAccountsConfig) {
+        for (const t of allBankTxs) {
+          if (!matchTxToAccount(t, acc)) continue;
+          matchedTxIds.add(t.id);
+          const amt = Number(t.amount) || 0;
+          if (t.type === "BANK_CHARGES") bankCharges += amt;
+          else if (t.type === "ADJUSTMENT") { if (t.isCredit) transfersIn += amt; else transfersOut += amt; }
+          else if (t.isCredit) deposits += amt;
+          else withdrawals += amt;
         }
       }
+
+      // Orphan transactions (not matched to any configured account) must still count
+      for (const t of allBankTxs) {
+        if (matchedTxIds.has(t.id)) continue;
+        const amt = Number(t.amount) || 0;
+        if (t.type === "BANK_CHARGES") bankCharges += amt;
+        else if (t.type === "ADJUSTMENT") { if (t.isCredit) transfersIn += amt; else transfersOut += amt; }
+        else if (t.isCredit) deposits += amt;
+        else withdrawals += amt;
+      }
+
       bankBal = totalOpening + deposits + transfersIn - withdrawals - transfersOut - bankCharges;
     } else {
-      const latestBank = await db.bankBalance.findFirst({
-        where,
-        orderBy: { businessDate: "desc" },
-      });
-      const baseOpening = latestBank ? Number(latestBank.openingBalance || latestBank.closingBalance || 0) : 0;
+      // No bank accounts configured — fall back to raw transaction net
       const netTxs = allBankTxs.reduce((sum, tx) => {
         const amt = Number(tx.amount) || 0;
         return sum + (tx.isCredit ? amt : -amt);
       }, 0);
-      bankBal = latestBank?.closingBalance ? Number(latestBank.closingBalance) : (baseOpening + netTxs);
+      bankBal = netTxs;
     }
+
 
     // 4. UPI / Digital Payments & Settlements
     const upiSettlements = await db.uPISettlement.findMany({
       where,
       orderBy: { collectionDate: "desc" },
-      take: 100,
+      // No take cap — older pending settlements must still count towards the total
     });
 
     const pendingUpiSettlements = upiSettlements.filter((s) => s.status === "PENDING");
@@ -293,7 +311,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 8. Accounts Payable & Supplier Payments
+    // 8. Accounts Payable — net balance (same formula as Payables Ledger, deducting voucher payments)
     const unpaidPurchaseBills = await db.purchaseBill.findMany({
       where: {
         ...where,
@@ -304,17 +322,44 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Fetch supplier payment vouchers to compute exact NET balance due per bill
+    const allPaymentVouchers = await db.voucher.findMany({
+      where: { type: "PAYMENT_VOUCHER", partyType: "SUPPLIER" },
+      select: { id: true, referenceNo: true, amount: true, paymentMode: true },
+    });
+    const voucherBillMap = new Map<string, typeof allPaymentVouchers>();
+    for (const v of allPaymentVouchers) {
+      if (v.referenceNo) {
+        const ref = v.referenceNo.trim().toLowerCase();
+        if (!voucherBillMap.has(ref)) voucherBillMap.set(ref, []);
+        voucherBillMap.get(ref)!.push(v);
+      }
+    }
+
     const distinctSuppliers = new Set<string>();
     let totalPayables = 0;
     let overduePayablesCount = 0;
 
     for (const pb of unpaidPurchaseBills) {
-      const tot = Number(pb.total);
-      totalPayables += tot;
+      const billTotal = Number(pb.total);
       distinctSuppliers.add(pb.supplierId);
-      if (pb.dueDate && new Date(pb.dueDate) < today) {
-        overduePayablesCount++;
-      }
+      if (pb.dueDate && new Date(pb.dueDate) < today) overduePayablesCount++;
+
+      // Match vouchers by supplierBillNo, grnNumber, or id (same logic as Payables Ledger)
+      const billKey = pb.supplierBillNo.trim().toLowerCase();
+      const grnKey = pb.grnNumber.trim().toLowerCase();
+      const idKey = pb.id.trim().toLowerCase();
+      const matchedVouchers = [
+        ...(voucherBillMap.get(billKey) || []),
+        ...(voucherBillMap.get(grnKey) || []),
+        ...(voucherBillMap.get(idKey) || []),
+      ];
+      const uniqueVouchers = Array.from(new Map(matchedVouchers.map((v) => [v.id, v])).values());
+      let voucherTotal = uniqueVouchers.reduce((sum, v) => sum + Number(v.amount), 0);
+      // If bill is PAID but no vouchers, assume bill total was paid (to avoid over-counting)
+      if (pb.paymentStatus === "PAID" && voucherTotal === 0) voucherTotal = billTotal;
+      const balanceDue = Math.max(0, billTotal - voucherTotal);
+      totalPayables += balanceDue;
     }
 
     const supplierPaymentVouchers = await db.voucher.findMany({
