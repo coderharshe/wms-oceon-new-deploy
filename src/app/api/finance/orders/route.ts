@@ -522,6 +522,7 @@ export async function POST(req: NextRequest) {
         if (!isCredit && totals.total.gt(0)) {
           const method = body.paymentMethod ?? "CASH";
           const pDetails = body.paymentDetails ?? {};
+          const payReqId = body.clientRequestId ? `${body.clientRequestId}-pay` : undefined;
           if (method === "SPLIT" && Array.isArray(pDetails.splits) && pDetails.splits.length > 0) {
             for (let idx = 0; idx < pDetails.splits.length; idx++) {
               const split = pDetails.splits[idx]!;
@@ -583,7 +584,7 @@ export async function POST(req: NextRequest) {
               orderId: ord!.id,
               upiReference: pDetails.upiReference,
               notes: pDetails.notes,
-              clientRequestId: body.clientRequestId,
+              clientRequestId: payReqId,
             });
           } else if (method === "BANK_TRANSFER") {
             await recordBankTransferPaymentDrizzle(tx, {
@@ -595,7 +596,7 @@ export async function POST(req: NextRequest) {
               bankReference: pDetails.bankReference,
               bankName: pDetails.bankName,
               notes: pDetails.notes,
-              clientRequestId: body.clientRequestId,
+              clientRequestId: payReqId,
             });
           } else if (method === "CHEQUE") {
             await recordChequePaymentDrizzle(tx, {
@@ -608,7 +609,7 @@ export async function POST(req: NextRequest) {
               chequeBank: pDetails.chequeBank,
               chequeDueDate: pDetails.chequeDueDate ? new Date(pDetails.chequeDueDate) : undefined,
               notes: pDetails.notes,
-              clientRequestId: body.clientRequestId,
+              clientRequestId: payReqId,
             });
           } else {
             // CASH
@@ -619,7 +620,7 @@ export async function POST(req: NextRequest) {
               userId: session.sub,
               warehouseId,
               orderId: ord!.id,
-              clientRequestId: body.clientRequestId,
+              clientRequestId: payReqId,
             });
           }
         }
@@ -825,6 +826,7 @@ export async function POST(req: NextRequest) {
       if (!isCredit && totals.total.gt(0)) {
         const method = body.paymentMethod ?? "CASH";
         const pDetails = body.paymentDetails ?? {};
+        const payReqId = body.clientRequestId ? `${body.clientRequestId}-pay` : undefined;
         if (method === "SPLIT" && Array.isArray(pDetails.splits) && pDetails.splits.length > 0) {
           for (let idx = 0; idx < pDetails.splits.length; idx++) {
             const split = pDetails.splits[idx]!;
@@ -886,7 +888,7 @@ export async function POST(req: NextRequest) {
             orderId: order.id,
             upiReference: pDetails.upiReference,
             notes: pDetails.notes,
-            clientRequestId: body.clientRequestId,
+            clientRequestId: payReqId,
           });
         } else if (method === "BANK_TRANSFER") {
           await recordBankTransferPayment(tx, {
@@ -898,7 +900,7 @@ export async function POST(req: NextRequest) {
             bankReference: pDetails.bankReference,
             bankName: pDetails.bankName,
             notes: pDetails.notes,
-            clientRequestId: body.clientRequestId,
+            clientRequestId: payReqId,
           });
         } else if (method === "CHEQUE") {
           await recordChequePayment(tx, {
@@ -911,7 +913,7 @@ export async function POST(req: NextRequest) {
             chequeBank: pDetails.chequeBank,
             chequeDueDate: pDetails.chequeDueDate ? new Date(pDetails.chequeDueDate) : undefined,
             notes: pDetails.notes,
-            clientRequestId: body.clientRequestId,
+            clientRequestId: payReqId,
           });
         } else {
           // CASH
@@ -922,7 +924,7 @@ export async function POST(req: NextRequest) {
             userId: session.sub,
             warehouseId,
             orderId: order.id,
-            clientRequestId: body.clientRequestId,
+            clientRequestId: payReqId,
           });
         }
       }
