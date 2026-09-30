@@ -155,42 +155,32 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Find orphan transactions — not matched to any configured account.
-    // These still affect the real bank balance so must be included in the consolidated total.
-    const matchedTxIds = new Set<string>();
-    for (const acc of accounts) {
-      for (const t of allBankTxs) {
-        if (matchTxToAccount(t, acc)) matchedTxIds.add(t.id);
-      }
-    }
-    const orphanTxs = allBankTxs.filter((t) => !matchedTxIds.has(t.id));
-    let orphanDeposits = 0;
-    let orphanWithdrawals = 0;
-    let orphanTransfersIn = 0;
-    let orphanTransfersOut = 0;
-    let orphanBankCharges = 0;
-    let orphanUnreconciledCount = 0;
-    let orphanUnreconciledAmount = 0;
-    for (const t of orphanTxs) {
-      const amt = Number(t.amount);
-      if (!t.reconciled) { orphanUnreconciledCount++; orphanUnreconciledAmount += amt; }
-      if (t.type === "BANK_CHARGES") orphanBankCharges += amt;
-      else if (t.type === "ADJUSTMENT") { if (t.isCredit) orphanTransfersIn += amt; else orphanTransfersOut += amt; }
-      else if (t.isCredit) orphanDeposits += amt;
-      else orphanWithdrawals += amt;
-    }
-
-    // Consolidated stats across active accounts + orphan transactions
+    // ── CONSOLIDATED TOTALS ── computed as a SINGLE PASS through ALL transactions
+    // This guarantees the consolidated balance = ledger running balance (no double-counting of
+    // transactions that match multiple account names, no orphan exclusions).
     const activeAccounts = accountSummaries.filter((a) => a.active);
     const totalOpeningBalance = activeAccounts.reduce((sum, a) => sum + a.openingBalance, 0);
-    const totalDeposits = activeAccounts.reduce((sum, a) => sum + a.deposits, 0) + orphanDeposits;
-    const totalWithdrawals = activeAccounts.reduce((sum, a) => sum + a.withdrawals, 0) + orphanWithdrawals;
-    const totalTransfersIn = activeAccounts.reduce((sum, a) => sum + a.transfersIn, 0) + orphanTransfersIn;
-    const totalTransfersOut = activeAccounts.reduce((sum, a) => sum + a.transfersOut, 0) + orphanTransfersOut;
-    const totalBankCharges = activeAccounts.reduce((sum, a) => sum + a.bankCharges, 0) + orphanBankCharges;
-    const totalCurrentBalance = totalOpeningBalance + totalDeposits + totalTransfersIn - totalWithdrawals - totalTransfersOut - totalBankCharges;
-    const totalUnreconciledCount = activeAccounts.reduce((sum, a) => sum + a.unreconciledCount, 0) + orphanUnreconciledCount;
-    const totalUnreconciledAmount = activeAccounts.reduce((sum, a) => sum + a.unreconciledAmount, 0) + orphanUnreconciledAmount;
+
+    let consDep = 0, consWit = 0, consTin = 0, consTout = 0, consChrg = 0;
+    let consUnrecCount = 0, consUnrecAmt = 0;
+    for (const t of allBankTxs) {
+      const amt = Number(t.amount);
+      if (!t.reconciled) { consUnrecCount++; consUnrecAmt += amt; }
+      if (t.type === "BANK_CHARGES") consChrg += amt;
+      else if (t.type === "ADJUSTMENT") { if (t.isCredit) consTin += amt; else consTout += amt; }
+      else if (t.isCredit) consDep += amt;
+      else consWit += amt;
+    }
+
+    // totalCurrentBalance = opening + net(all txs) — identical to ledger running balance end value
+    const totalCurrentBalance = totalOpeningBalance + consDep + consTin - consWit - consTout - consChrg;
+    const totalDeposits = consDep;
+    const totalWithdrawals = consWit;
+    const totalTransfersIn = consTin;
+    const totalTransfersOut = consTout;
+    const totalBankCharges = consChrg;
+    const totalUnreconciledCount = consUnrecCount;
+    const totalUnreconciledAmount = consUnrecAmt;
 
     // Filter transactions if specific account is selected
     let filteredTxs = allBankTxs;

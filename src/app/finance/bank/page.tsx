@@ -594,7 +594,7 @@ export default function BankManagementPage() {
                 className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${selectedAccountId === "ALL" ? "bg-accent text-white shadow-sm" : "bg-paper border border-line text-ink hover:bg-surface-hi"
                   }`}
               >
-                🏛️ All Consolidated ({rs(data.accounts.reduce((sum, a) => sum + a.currentBalance, 0))})
+                🏛️ All Consolidated ({rs(data.summary.currentBalance)})
               </button>
 
               {data.accounts.map((acc) => (

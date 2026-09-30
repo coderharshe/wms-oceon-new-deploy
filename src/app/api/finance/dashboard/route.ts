@@ -140,60 +140,24 @@ export async function GET(req: NextRequest) {
       orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
     });
 
-    const unreconciledBankTx = allBankTxs.filter((tx) => !tx.reconciled);
-    const unreconciledBankAmount = unreconciledBankTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-
-    // Match helper — identical to bank ledger route
-    function matchTxToAccount(t: (typeof allBankTxs)[0], acc: any): boolean {
-      const tAcc = t.accountNumber?.trim().toLowerCase();
-      const tBank = t.bankName?.trim().toLowerCase();
-      const accNumber = acc.accountNumber?.trim().toLowerCase();
-      const accName = acc.name?.trim().toLowerCase();
-      const accBankName = acc.bankName?.trim().toLowerCase();
-      if (tAcc && accNumber && tAcc === accNumber) return true;
-      if (!tAcc && tBank && (tBank === accName || tBank === accBankName)) return true;
-      return false;
-    }
 
     let bankBal = 0;
-    if (bankAccountsConfig.length > 0) {
-      const totalOpening = bankAccountsConfig.reduce((sum: number, a: any) => sum + (Number(a.openingBalance) || 0), 0);
+    const totalOpening = bankAccountsConfig.reduce((sum: number, a: any) => sum + (Number(a.openingBalance) || 0), 0);
 
-      // Per-account mapped sums
-      let deposits = 0, withdrawals = 0, transfersIn = 0, transfersOut = 0, bankCharges = 0;
-
-      const matchedTxIds = new Set<string>();
-      for (const acc of bankAccountsConfig) {
-        for (const t of allBankTxs) {
-          if (!matchTxToAccount(t, acc)) continue;
-          matchedTxIds.add(t.id);
-          const amt = Number(t.amount) || 0;
-          if (t.type === "BANK_CHARGES") bankCharges += amt;
-          else if (t.type === "ADJUSTMENT") { if (t.isCredit) transfersIn += amt; else transfersOut += amt; }
-          else if (t.isCredit) deposits += amt;
-          else withdrawals += amt;
-        }
-      }
-
-      // Orphan transactions (not matched to any configured account) must still count
-      for (const t of allBankTxs) {
-        if (matchedTxIds.has(t.id)) continue;
-        const amt = Number(t.amount) || 0;
-        if (t.type === "BANK_CHARGES") bankCharges += amt;
-        else if (t.type === "ADJUSTMENT") { if (t.isCredit) transfersIn += amt; else transfersOut += amt; }
-        else if (t.isCredit) deposits += amt;
-        else withdrawals += amt;
-      }
-
-      bankBal = totalOpening + deposits + transfersIn - withdrawals - transfersOut - bankCharges;
-    } else {
-      // No bank accounts configured — fall back to raw transaction net
-      const netTxs = allBankTxs.reduce((sum, tx) => {
-        const amt = Number(tx.amount) || 0;
-        return sum + (tx.isCredit ? amt : -amt);
-      }, 0);
-      bankBal = netTxs;
+    // Single-pass through ALL transactions — same formula as bank route consolidated view.
+    // No per-account grouping to avoid double-counting transactions that match multiple account names.
+    let bDep = 0, bWit = 0, bTin = 0, bTout = 0, bChrg = 0;
+    const unreconciledBankTx: typeof allBankTxs = [];
+    let unreconciledBankAmount = 0;
+    for (const t of allBankTxs) {
+      const amt = Number(t.amount) || 0;
+      if (!t.reconciled) { unreconciledBankTx.push(t); unreconciledBankAmount += amt; }
+      if (t.type === "BANK_CHARGES") bChrg += amt;
+      else if (t.type === "ADJUSTMENT") { if (t.isCredit) bTin += amt; else bTout += amt; }
+      else if (t.isCredit) bDep += amt;
+      else bWit += amt;
     }
+    bankBal = totalOpening + bDep + bTin - bWit - bTout - bChrg;
 
 
     // 4. UPI / Digital Payments & Settlements
