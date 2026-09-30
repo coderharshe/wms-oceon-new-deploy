@@ -219,6 +219,9 @@ export function ModifyBill({
           setConflictVersion(body.currentVersion);
           onSaved(); // show what the bill is now, behind the editor
         }
+        if (res.status === 403) {
+          return setError("Permission denied (Forbidden). You need Billing, Finance, or Manager role to modify bills.");
+        }
         return setError(typeof body.error === "string" ? body.error : "Could not modify the bill");
       }
       close(null);
@@ -235,7 +238,7 @@ export function ModifyBill({
         <button className="btn" disabled={busy || disabled} onClick={start}>
           Modify Bill
         </button>
-        {error && <ErrorNote error={error} onDismiss={() => setError(null)} />}
+        {error && <ErrorNote error={error} onRetry={start} onDismiss={() => setError(null)} />}
         {notice && <p className="mt-1 text-sm text-muted">{notice}</p>}
       </>
     );
@@ -369,7 +372,7 @@ export function ModifyBill({
           onChange={(e) => setReason(e.target.value)}
         />
       </div>
-      {error && <ErrorNote error={error} onDismiss={() => setError(null)} />}
+      {error && <ErrorNote error={error} onRetry={save} onDismiss={() => setError(null)} />}
       <div className="flex gap-2">
         <button className="btn-primary" disabled={busy} onClick={save}>
           {conflictVersion != null ? `Save anyway on version ${conflictVersion}` : "Save Changes"}

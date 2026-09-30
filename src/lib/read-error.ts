@@ -19,10 +19,13 @@ export function inferErrorFix(message: string): ErrorFix | undefined {
   if (lower.includes("session") || lower.includes("expired") || lower.includes("unauthorized") || lower.includes("sign in") || lower.includes("login") || lower.includes("credentials")) {
     return SIGN_IN_AGAIN;
   }
+  if (lower.includes("forbidden") || lower.includes("access denied") || lower.includes("not allowed") || lower.includes("permission")) {
+    return { label: "🔐 Re-login / Switch Role", href: "/login" };
+  }
   if (lower.includes("warehouse")) {
     return { label: "🏢 Choose / Open Warehouses", href: "/admin/warehouses" };
   }
-  if (lower.includes("staff id") || lower.includes("user") || lower.includes("password") || lower.includes("role") || lower.includes("permission")) {
+  if (lower.includes("staff id") || lower.includes("user") || lower.includes("password") || lower.includes("role")) {
     return { label: "👥 User Accounts", href: "/admin/users" };
   }
   if (lower.includes("stock") || lower.includes("inventory") || lower.includes("out of stock") || lower.includes("insufficient") || lower.includes("shortage")) {
@@ -40,7 +43,7 @@ export function inferErrorFix(message: string): ErrorFix | undefined {
   if (lower.includes("gstin") || lower.includes("tax") || lower.includes("gst") || lower.includes("upi") || lower.includes("settings") || lower.includes("invoice prefix") || lower.includes("printer")) {
     return { label: "⚙️ System Settings", href: "/admin/settings" };
   }
-  if (lower.includes("cash") || lower.includes("drawer") || lower.includes("session") || lower.includes("bank") || lower.includes("reconciliation") || lower.includes("float")) {
+  if (lower.includes("cash") || lower.includes("drawer") || lower.includes("bank") || lower.includes("reconciliation") || lower.includes("float")) {
     return { label: "💵 Cash & Bank Register", href: "/admin/cash" };
   }
   if (lower.includes("qc") || lower.includes("quality") || lower.includes("inspection") || lower.includes("rejection")) {
@@ -53,7 +56,10 @@ export function inferErrorFix(message: string): ErrorFix | undefined {
     return { label: "💳 Payments & Vouchers", href: "/finance/vouchers" };
   }
   if (lower.includes("network") || lower.includes("offline") || lower.includes("econnrefused") || lower.includes("timeout")) {
-    return { label: "⚡ Offline Billing Mode", href: "/finance/orders/new" };
+    return { label: "⚡ Offline Billing Mode", href: "/billing/new" };
+  }
+  if (lower.includes("bill") || lower.includes("order") || lower.includes("modify")) {
+    return { label: "📋 Bills & Orders", href: "/billing/orders" };
   }
   return undefined;
 }

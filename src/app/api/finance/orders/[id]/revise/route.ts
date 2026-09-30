@@ -53,9 +53,9 @@ class VersionConflictError extends Error {
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  // Manager included deliberately: a manager must be able to correct a bill
-  // without borrowing a finance login, and the version records who did it.
-  const session = await requireRole(["ADMIN", "FINANCE", "MANAGER"]);
+  // Manager and Billing included: counter billing staff and managers must be able
+  // to correct a bill, and the version records who did it.
+  const session = await requireRole(["ADMIN", "FINANCE", "BILLING", "MANAGER"]);
   if (isErrorResponse(session)) return session;
 
   const { id } = await params;
