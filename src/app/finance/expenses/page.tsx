@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useApiGet } from "@/lib/useApiGet";
 import { ErrorRetry } from "@/components/ErrorRetry";
 import { SkeletonTable } from "@/components/Skeleton";
@@ -77,25 +78,11 @@ export default function ExpensesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [q, setQ] = useState("");
 
-  // Record Modal State
-  const [showModal, setShowModal] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("RENT");
-  const [customCategoryName, setCustomCategoryName] = useState("");
-  const [customCategoryIcon, setCustomCategoryIcon] = useState("⚡");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [vendor, setVendor] = useState("");
-  const [invoiceProof, setInvoiceProof] = useState("");
-  const [paymentMode, setPaymentMode] = useState<string>("BANK_TRANSFER");
-  const [customPaymentMode, setCustomPaymentMode] = useState("");
-  const [account, setAccount] = useState("");
-  const [customAccount, setCustomAccount] = useState("");
-  const [notes, setNotes] = useState("");
-
   // Manage Custom Types Modal State
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("⚡");
+  const [categorySaving, setCategorySaving] = useState(false);
   const [categoryModalError, setCategoryModalError] = useState<string | null>(null);
 
   // Adjust Expense Modal State
@@ -116,9 +103,6 @@ export default function ExpensesPage() {
   const [adjustReason, setAdjustReason] = useState("");
   const [adjustSaving, setAdjustSaving] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
-
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
   const { data, loading, error, reload } = useApiGet<ExpenseApiResponse>(
     `/api/finance/expenses?range=${range}${selectedCategory !== "all" ? `&category=${selectedCategory}` : ""}`
@@ -147,88 +131,6 @@ export default function ExpensesPage() {
 
     return matchesSearch;
   });
-
-  const handleCreateExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const amt = parseFloat(amount);
-    if (isNaN(amt) || amt <= 0) {
-      setFormError("Please enter a valid expense amount");
-      return;
-    }
-
-    if (!vendor.trim()) {
-      setFormError("Please enter the vendor / recipient name");
-      return;
-    }
-
-    if (category === "__NEW_CUSTOM__" && !customCategoryName.trim()) {
-      setFormError("Please enter the name for your new custom expense category");
-      return;
-    }
-
-    if (paymentMode === "__CUSTOM_MODE__" && !customPaymentMode.trim()) {
-      setFormError("Please enter the custom payment mode");
-      return;
-    }
-
-    if (paymentMode !== "CASH" && account === "__CUSTOM_ACCOUNT__" && !customAccount.trim()) {
-      setFormError("Please enter the custom debited account name");
-      return;
-    }
-
-    setSaving(true);
-    setFormError(null);
-
-    try {
-      const isNewCustomCat = category === "__NEW_CUSTOM__";
-      const isCustomMode = paymentMode === "__CUSTOM_MODE__";
-      const isCustomAcc = account === "__CUSTOM_ACCOUNT__";
-
-      const selectedAccName = isCustomAcc
-        ? customAccount.trim()
-        : account || userAccounts[0]?.name || "Primary Bank Account";
-
-      const payload: any = {
-        action: "RECORD",
-        amount: amt,
-        category: isNewCustomCat ? customCategoryName.trim() : category,
-        customCategoryName: isNewCustomCat ? customCategoryName.trim() : undefined,
-        customCategoryIcon: isNewCustomCat ? customCategoryIcon : undefined,
-        date,
-        vendor: vendor.trim(),
-        invoiceProof: invoiceProof.trim(),
-        paymentMode: isCustomMode ? "BANK_TRANSFER" : paymentMode,
-        customPaymentMode: isCustomMode ? customPaymentMode.trim() : undefined,
-        account: paymentMode === "CASH" ? "Cash" : selectedAccName,
-        customAccount: isCustomAcc ? customAccount.trim() : undefined,
-        notes: notes.trim(),
-      };
-
-      const res = await fetch("/api/finance/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || "Failed to record expense");
-
-      setShowModal(false);
-      setAmount("");
-      setVendor("");
-      setInvoiceProof("");
-      setNotes("");
-      setCustomCategoryName("");
-      setCustomCategoryIcon("⚡");
-      setCustomPaymentMode("");
-      setCustomAccount("");
-      reload();
-    } catch (err: any) {
-      setFormError(err.message || "Failed to save expense");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleOpenAdjustModal = (exp: ExpenseItem) => {
     setAdjustingExpense(exp);
@@ -368,7 +270,7 @@ export default function ExpensesPage() {
       return;
     }
 
-    setSaving(true);
+    setCategorySaving(true);
     setCategoryModalError(null);
 
     try {
@@ -392,7 +294,7 @@ export default function ExpensesPage() {
     } catch (err: any) {
       setCategoryModalError(err.message || "Failed to add category");
     } finally {
-      setSaving(false);
+      setCategorySaving(false);
     }
   };
 
@@ -431,9 +333,6 @@ export default function ExpensesPage() {
       alert(err.message || "Approval failed");
     }
   };
-
-  const parsedAmt = parseFloat(amount);
-  const exceedsApprovalLimit = !isNaN(parsedAmt) && parsedAmt > 10000;
 
   return (
     <div className="space-y-5">
@@ -490,26 +389,37 @@ export default function ExpensesPage() {
             ⚙️ Manage Expense Types
           </button>
 
-          <button
-            onClick={() => {
-              setAmount("");
-              setVendor("");
-              setInvoiceProof("");
-              setNotes("");
-              setCategory(categoriesList[0]?.key || "RENT");
-              setCustomCategoryName("");
-              setCustomCategoryIcon("⚡");
-              setPaymentMode("BANK_TRANSFER");
-              setCustomPaymentMode("");
-              setAccount(userAccounts[0]?.name || "");
-              setCustomAccount("");
-              setShowModal(true);
-              setFormError(null);
-            }}
-            className="px-4 py-2 text-xs font-bold rounded-lg bg-accent text-white hover:bg-accent/90 shadow-md flex items-center gap-1.5 transition-all"
+          <Link
+            href="/finance/cash"
+            className="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm flex items-center gap-1.5 transition-all"
           >
-            + Record Expense
-          </button>
+            💵 Cash Expense (Till) →
+          </Link>
+          <Link
+            href="/finance/bank"
+            className="px-3 py-2 text-xs font-bold rounded-lg bg-sky-600 text-white hover:bg-sky-700 shadow-sm flex items-center gap-1.5 transition-all"
+          >
+            🏦 Bank / Online Expense →
+          </Link>
+        </div>
+      </div>
+
+      {/* Workflow Guidance */}
+      <div className="bg-surface p-3 rounded-xl border border-line flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-base">💡</span>
+          <span className="text-muted">
+            All expenses are logged at payment source: cash expenses from <strong className="text-ink">Cash Drawer</strong>, and bank/UPI expenses from <strong className="text-ink">Bank Management</strong>.
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/finance/cash" className="text-xs text-emerald-600 font-bold hover:underline">
+            Go to Cash Drawer →
+          </Link>
+          <span className="text-muted">•</span>
+          <Link href="/finance/bank" className="text-xs text-sky-600 font-bold hover:underline">
+            Go to Bank Ledger →
+          </Link>
         </div>
       </div>
 
@@ -788,340 +698,6 @@ export default function ExpensesPage() {
           </tbody>
         </table>
       </div>
-
-      {/* RECORD EXPENSE MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="card w-full max-w-lg bg-surface border border-line p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-line pb-3">
-              <div>
-                <h3 className="text-base font-bold text-ink">Record Business Expense</h3>
-                <p className="text-xs text-muted">Log operational expenditure with vendor, account, and proof details</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-muted hover:text-ink text-sm p-1">
-                ✕
-              </button>
-            </div>
-
-            {formError && (
-              <div className="p-3 rounded-lg bg-bad/15 text-bad border border-bad/30 text-xs font-semibold">
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateExpense} className="space-y-3 text-xs">
-              {/* Row 1: Amount & Category */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Expense Amount (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="e.g. 15000"
-                    className="w-full p-2 rounded-lg border border-line bg-surface-hi font-bold text-ink text-sm"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block font-semibold text-ink">Category *</label>
-                    <button
-                      type="button"
-                      onClick={() => setCategory("__NEW_CUSTOM__")}
-                      className="text-[10px] text-accent hover:underline font-bold"
-                    >
-                      + Custom
-                    </button>
-                  </div>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-line bg-surface-hi text-xs font-medium"
-                  >
-                    <optgroup label="Standard Categories">
-                      {categoriesList.filter((c) => !c.isCustom).map((c) => (
-                        <option key={c.key} value={c.key}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                    {categoriesList.some((c) => c.isCustom) && (
-                      <optgroup label="Created Custom Types">
-                        {categoriesList.filter((c) => c.isCustom).map((c) => (
-                          <option key={c.key} value={c.key}>
-                            {c.label} (Custom)
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    <optgroup label="Add Custom">
-                      <option value="__NEW_CUSTOM__">➕ Add Custom Category...</option>
-                    </optgroup>
-                  </select>
-                </div>
-              </div>
-
-              {/* Dynamic Custom Expense Category Input */}
-              {category === "__NEW_CUSTOM__" && (
-                <div className="bg-accent/5 border border-accent/30 p-3 rounded-lg space-y-2 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-accent">✨ Custom Category Name</span>
-                    <button
-                      type="button"
-                      onClick={() => setCategory(categoriesList[0]?.key || "RENT")}
-                      className="text-[10px] text-muted hover:text-ink"
-                    >
-                      Cancel Custom
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2 items-center">
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-semibold text-muted mb-0.5">Icon</label>
-                      <div className="flex flex-wrap gap-1 bg-surface p-1 rounded border border-line">
-                        {SUGGESTED_ICONS.slice(0, 4).map((ic) => (
-                          <button
-                            key={ic}
-                            type="button"
-                            onClick={() => setCustomCategoryIcon(ic)}
-                            className={`p-1 text-xs rounded ${customCategoryIcon === ic ? "bg-accent/20 font-bold" : "hover:bg-surface-hi"}`}
-                          >
-                            {ic}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="col-span-3">
-                      <label className="block text-[10px] font-semibold text-ink mb-0.5">Category Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={customCategoryName}
-                        onChange={(e) => setCustomCategoryName(e.target.value)}
-                        placeholder="e.g. Tea & Snacks / Generator Fuel / Legal Fees"
-                        className="w-full p-2 rounded-lg border border-accent/40 bg-surface text-xs font-semibold text-ink focus:outline-none focus:border-accent"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {exceedsApprovalLimit && (
-                <div className="bg-purple-500/10 border border-purple-500/30 p-2.5 rounded-lg text-purple-700 text-[11px] font-semibold flex items-center gap-2">
-                  <span>🛡️</span>
-                  <span>Amount exceeds ₹10,000 threshold &mdash; will route to Manager / Admin for sign-off.</span>
-                </div>
-              )}
-
-              {/* Row 2: Date & Vendor */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Expense Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-line bg-surface-hi"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Vendor / Receiver Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={vendor}
-                    onChange={(e) => setVendor(e.target.value)}
-                    placeholder="e.g. Tata Power / Landlord Ramesh / Petty Cash"
-                    className="w-full p-2 rounded-lg border border-line bg-surface-hi"
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Payment Mode & Debited Account */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block font-semibold text-ink">Payment Mode *</label>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMode("__CUSTOM_MODE__")}
-                      className="text-[10px] text-accent hover:underline font-bold"
-                    >
-                      + Custom
-                    </button>
-                  </div>
-                  <select
-                    value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-line bg-surface-hi"
-                  >
-                    <optgroup label="Standard Modes">
-                      <option value="BANK_TRANSFER">Bank Transfer (NEFT / RTGS)</option>
-                      <option value="UPI">UPI Transfer</option>
-                      <option value="CASH">Cash</option>
-                      <option value="CHEQUE">Cheque</option>
-                    </optgroup>
-                    {data?.customPaymentModes && data.customPaymentModes.length > 0 && (
-                      <optgroup label="Saved Custom Modes">
-                        {data.customPaymentModes.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    <optgroup label="Add Custom">
-                      <option value="__CUSTOM_MODE__">➕ Custom Payment Mode...</option>
-                    </optgroup>
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block font-semibold text-ink">Debited Account *</label>
-                    {paymentMode !== "CASH" && (
-                      <button
-                        type="button"
-                        onClick={() => setAccount("__CUSTOM_ACCOUNT__")}
-                        className="text-[10px] text-accent hover:underline font-bold"
-                      >
-                        + Custom
-                      </button>
-                    )}
-                  </div>
-                  {paymentMode === "CASH" ? (
-                    <input
-                      type="text"
-                      disabled
-                      value="Cash Drawer (Daily Till)"
-                      className="w-full p-2 rounded-lg border border-line bg-surface-hi/50 text-muted font-medium"
-                    />
-                  ) : (
-                    <select
-                      value={account}
-                      onChange={(e) => setAccount(e.target.value)}
-                      className="w-full p-2 rounded-lg border border-line bg-surface-hi"
-                    >
-                      {userAccounts.length === 0 ? (
-                        <option value="">No registered bank accounts found</option>
-                      ) : (
-                        <optgroup label="My Created Bank Accounts">
-                          {userAccounts.map((acc) => (
-                            <option key={acc.id} value={acc.name}>
-                              {acc.name} {acc.accountNumber && acc.accountNumber !== "Custom" ? `(${acc.accountNumber.slice(-4)})` : ""}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      <optgroup label="Add Custom">
-                        <option value="__CUSTOM_ACCOUNT__">➕ Custom / Other Account...</option>
-                      </optgroup>
-                    </select>
-                  )}
-                </div>
-              </div>
-
-              {/* Dynamic Custom Payment Mode Input */}
-              {paymentMode === "__CUSTOM_MODE__" && (
-                <div className="bg-accent/5 border border-accent/30 p-2.5 rounded-lg space-y-1.5 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-bold text-accent">✨ Specify Custom Payment Mode *</label>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMode("BANK_TRANSFER")}
-                      className="text-[10px] text-muted hover:text-ink"
-                    >
-                      Cancel Custom
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={customPaymentMode}
-                    onChange={(e) => setCustomPaymentMode(e.target.value)}
-                    placeholder="e.g. Corporate Credit Card, Director Personal Loan, Forex, Demand Draft"
-                    className="w-full p-2 rounded-lg border border-accent/40 bg-surface text-xs font-semibold text-ink focus:outline-none"
-                    autoFocus
-                  />
-                </div>
-              )}
-
-              {/* Dynamic Custom Debited Account Input */}
-              {paymentMode !== "CASH" && account === "__CUSTOM_ACCOUNT__" && (
-                <div className="bg-accent/5 border border-accent/30 p-2.5 rounded-lg space-y-1.5 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-bold text-accent">✨ Specify Custom Debited Account *</label>
-                    <button
-                      type="button"
-                      onClick={() => setAccount(userAccounts[0]?.name || "")}
-                      className="text-[10px] text-muted hover:text-ink"
-                    >
-                      Cancel Custom
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={customAccount}
-                    onChange={(e) => setCustomAccount(e.target.value)}
-                    placeholder="e.g. ICICI OD Account (5540), Director Personal UPI, Petty Wallet"
-                    className="w-full p-2 rounded-lg border border-accent/40 bg-surface text-xs font-semibold text-ink focus:outline-none"
-                    autoFocus
-                  />
-                </div>
-              )}
-
-              {/* Row 4: Invoice / Receipt Proof */}
-              <div>
-                <label className="block font-semibold text-ink mb-1">Invoice / Receipt Proof Reference #</label>
-                <input
-                  type="text"
-                  value={invoiceProof}
-                  onChange={(e) => setInvoiceProof(e.target.value)}
-                  placeholder="e.g. BILL-9481 / INV-2026-08 / UTR-49102"
-                  className="w-full p-2 rounded-lg border border-line bg-surface-hi"
-                />
-              </div>
-
-              {/* Row 5: Description / Notes */}
-              <div>
-                <label className="block font-semibold text-ink mb-1">Description / Notes</label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Monthly warehouse rent payment for September"
-                  className="w-full p-2 rounded-lg border border-line bg-surface-hi"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-line">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-lg border border-line text-muted hover:text-ink font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 rounded-lg bg-accent text-white font-bold hover:bg-accent/90 disabled:opacity-50 shadow-md"
-                >
-                  {saving ? "Saving..." : "✓ Save & Post Expense"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ADJUST EXPENSE MODAL */}
       {showAdjustModal && adjustingExpense && (
@@ -1556,10 +1132,10 @@ export default function ExpensesPage() {
 
               <button
                 type="submit"
-                disabled={saving}
+                disabled={categorySaving}
                 className="w-full py-2 rounded-lg bg-accent text-white font-bold hover:bg-accent/90 disabled:opacity-50 text-xs shadow-xs"
               >
-                {saving ? "Creating..." : "+ Add Expense Category"}
+                {categorySaving ? "Creating..." : "+ Add Expense Category"}
               </button>
             </form>
 

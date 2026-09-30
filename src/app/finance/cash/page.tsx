@@ -47,12 +47,22 @@ type CashCountHistory = {
   note: string | null;
 };
 
+type BankAccountDef = {
+  id: string;
+  name: string;
+  bankName: string;
+  accountNumber: string;
+  accountType?: string;
+  isDefault?: boolean;
+};
+
 type TodayCashData = {
   today: string;
   open: { id: string; businessDate: string; openedAt: string; openingCash: string; bills: number } | null;
   formula: CashFormula;
   ledger: CashLedgerEntry[];
   counts: CashCountHistory[];
+  bankAccounts?: BankAccountDef[];
   dateRange?: {
     preset: DateRangePreset;
     startDateStr: string;
@@ -110,7 +120,8 @@ export default function CashManagementPage() {
   const [showBankDepositModal, setShowBankDepositModal] = useState(false);
   const [depositForm, setDepositForm] = useState({
     amount: "",
-    bankName: "Main Bank Account",
+    bankAccountId: "",
+    customBankName: "",
     narration: "",
   });
 
@@ -258,12 +269,18 @@ export default function CashManagementPage() {
       return;
     }
 
+    const selectedBank = data?.bankAccounts?.find((b) => b.id === depositForm.bankAccountId);
+    const targetBankName = selectedBank
+      ? `${selectedBank.name || selectedBank.bankName}`
+      : depositForm.customBankName.trim() || "Main Bank Account";
+    const targetAccNumber = selectedBank?.accountNumber || "";
+
     setModalSaving(true);
     setModalError(null);
 
-    const noteText = `[Bank Deposit] Deposited to: ${depositForm.bankName}${
-      depositForm.narration.trim() ? ` — ${depositForm.narration.trim()}` : ""
-    }`;
+    const noteText = `[Bank Deposit] Deposited to: ${targetBankName}${
+      targetAccNumber ? ` (${targetAccNumber})` : ""
+    }${depositForm.narration.trim() ? ` — ${depositForm.narration.trim()}` : ""}`;
 
     try {
       const res = await fetch("/api/finance/cash/transactions", {
@@ -273,6 +290,9 @@ export default function CashManagementPage() {
           type: "BANK_DEPOSIT",
           amount: amt,
           note: noteText,
+          bankAccountId: selectedBank?.id || undefined,
+          bankName: selectedBank?.bankName || targetBankName,
+          accountNumber: targetAccNumber,
         }),
       });
 
@@ -280,7 +300,7 @@ export default function CashManagementPage() {
       if (!res.ok) throw new Error(dataRes.error || "Failed to record bank deposit");
 
       setShowBankDepositModal(false);
-      setDepositForm({ amount: "", bankName: "Main Bank Account", narration: "" });
+      setDepositForm({ amount: "", bankAccountId: "", customBankName: "", narration: "" });
       load();
     } catch (err: any) {
       setModalError(err.message || "Error saving bank deposit");
@@ -381,6 +401,13 @@ export default function CashManagementPage() {
             type="button"
             onClick={() => {
               setModalError(null);
+              const defaultBank = data?.bankAccounts?.find((b) => b.isDefault) || data?.bankAccounts?.[0];
+              setDepositForm({
+                amount: "",
+                bankAccountId: defaultBank ? defaultBank.id : "custom",
+                customBankName: defaultBank ? "" : "Main Bank Account",
+                narration: "",
+              });
               setShowBankDepositModal(true);
             }}
             className="btn text-xs font-semibold py-1.5 px-3 flex items-center gap-1.5 hover:bg-surface-2"
@@ -945,14 +972,35 @@ export default function CashManagementPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-ink mb-1">Target Bank Name / Account</label>
-                <input
-                  type="text"
-                  placeholder="e.g. HDFC Current A/C, SBI Branch"
-                  className="w-full text-xs"
-                  value={depositForm.bankName}
-                  onChange={(e) => setDepositForm({ ...depositForm, bankName: e.target.value })}
-                />
+                <label className="block font-bold text-ink mb-1">Target Bank Account *</label>
+                {data?.bankAccounts && data.bankAccounts.length > 0 ? (
+                  <select
+                    className="w-full text-xs font-medium"
+                    value={depositForm.bankAccountId}
+                    onChange={(e) => setDepositForm({ ...depositForm, bankAccountId: e.target.value })}
+                  >
+                    {data.bankAccounts.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name || b.bankName} — A/C: {b.accountNumber} ({b.bankName}) {b.isDefault ? "★ Default" : ""}
+                      </option>
+                    ))}
+                    <option value="custom">+ Other / Custom Bank Account</option>
+                  </select>
+                ) : null}
+
+                {(depositForm.bankAccountId === "custom" || !data?.bankAccounts || data.bankAccounts.length === 0) && (
+                  <div className="mt-2">
+                    <label className="block font-medium text-muted mb-0.5">Bank / Account Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC Current A/C, SBI Branch"
+                      className="w-full text-xs"
+                      required={depositForm.bankAccountId === "custom" || !data?.bankAccounts?.length}
+                      value={depositForm.customBankName}
+                      onChange={(e) => setDepositForm({ ...depositForm, customBankName: e.target.value })}
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

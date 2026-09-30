@@ -208,7 +208,7 @@ export default function FinanceDashboardPage() {
             + New Voucher
           </Link>
           <Link href="/finance/expenses" className="btn text-xs font-semibold">
-            + Log Expense
+            🧾 Expenses
           </Link>
         </div>
       </div>

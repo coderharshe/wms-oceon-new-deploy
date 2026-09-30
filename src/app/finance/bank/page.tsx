@@ -197,7 +197,7 @@ export default function BankManagementPage() {
         body: JSON.stringify({
           action: "RECORD_TRANSACTION",
           businessDate: outsideInflowForm.businessDate,
-          type: "DIRECT_DEPOSIT",
+          type: "CUSTOMER_TRANSFER",
           amount: Number(outsideInflowForm.amount),
           isCredit: true,
           utrReference: outsideInflowForm.utrReference.trim() || null,
@@ -1006,7 +1006,7 @@ export default function BankManagementPage() {
                     }}
                   >
                     <option value="CUSTOMER_TRANSFER">Customer Transfer (NEFT/RTGS/IMPS)</option>
-                    <option value="DIRECT_DEPOSIT">Cash Drawer Deposit</option>
+                    <option value="DIRECT_DEPOSIT">💵 Cash Drawer Deposit (Auto-decreases Cash Drawer)</option>
                     <option value="UPI_COLLECTION">UPI Settlement</option>
                     <option value="CHEQUE_CLEARANCE">Cheque Clearance</option>
                     <option value="SUPPLIER_PAYMENT">Supplier Payout</option>
@@ -1027,6 +1027,12 @@ export default function BankManagementPage() {
                   </select>
                 </div>
               </div>
+
+              {txForm.type === "DIRECT_DEPOSIT" && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded text-[11px] text-emerald-800 font-medium">
+                  💵 <strong>Cash Drawer Deposit:</strong> This transaction will credit this bank account and <strong>automatically deduct the cash from your Cash in Drawer</strong> (EOD Till).
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>

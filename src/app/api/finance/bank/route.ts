@@ -4,6 +4,8 @@ import { requireRole, isErrorResponse } from "@/lib/guard";
 import { getDb } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings";
 import { resolveDateRange } from "@/lib/date-filter";
+import { inTransaction } from "@/lib/cash-db";
+import { recordCashMovement, auditQ } from "@/lib/cash";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -341,9 +343,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Valid amount is required" }, { status: 400 });
       }
 
+      let resolvedWhId = warehouseId;
+      if (!resolvedWhId || resolvedWhId === "none" || resolvedWhId === "default") {
+        if (session.warehouseId) {
+          resolvedWhId = session.warehouseId;
+        } else {
+          const u = await db.user.findUnique({ where: { id: session.sub }, select: { warehouseId: true } });
+          if (u?.warehouseId) {
+            resolvedWhId = u.warehouseId;
+          } else {
+            const firstWh = await db.warehouse.findFirst({ where: { active: true } });
+            resolvedWhId = firstWh?.id || "default";
+          }
+        }
+      }
+
       const tx = await db.bankTransaction.create({
         data: {
-          warehouseId,
+          warehouseId: resolvedWhId !== "default" ? resolvedWhId : warehouseId,
           businessDate: businessDate ? new Date(businessDate) : new Date(),
           type: type || "DIRECT_DEPOSIT",
           amount: Number(amount),
@@ -357,6 +374,38 @@ export async function POST(req: NextRequest) {
           recordedByUserId: session.sub,
         },
       });
+
+      // If this transaction is a CASH DEPOSIT from drawer to bank (DIRECT_DEPOSIT or CASH_DEPOSIT with isCredit=true),
+      // automatically record a BANK_DEPOSIT cash movement to reduce the cash in drawer!
+      if ((type === "DIRECT_DEPOSIT" || type === "CASH_DEPOSIT") && (isCredit === true || isCredit === undefined)) {
+        try {
+          if (resolvedWhId && resolvedWhId !== "default" && resolvedWhId !== "none") {
+            await inTransaction(async (q) => {
+              const depositNote = notes || `Cash deposit to ${bankName || "Bank"}${accountNumber ? ` (${accountNumber})` : ""}`;
+              const cashRow = await recordCashMovement(q, {
+                warehouseId: resolvedWhId,
+                userId: session.sub,
+                type: "BANK_DEPOSIT",
+                amount: Number(amount),
+                note: depositNote,
+                referenceId: tx.id,
+              });
+              await auditQ(q, {
+                userId: session.sub,
+                role: session.role,
+                warehouseId: resolvedWhId,
+                action: "CASH_TRANSACTION_RECORDED",
+                entityType: "CashTransaction",
+                entityId: cashRow.id,
+                newValue: { type: "BANK_DEPOSIT", amount: Number(amount), bankTransactionId: tx.id },
+                reason: depositNote,
+              });
+            });
+          }
+        } catch (cashErr) {
+          console.error("Failed to automatically decrease cash drawer for bank deposit:", cashErr);
+        }
+      }
 
       return NextResponse.json({ success: true, transaction: tx });
     }

@@ -3,6 +3,7 @@ import { requireRole, isErrorResponse } from "@/lib/guard";
 import { inTransaction } from "@/lib/cash-db";
 import { businessDateString, businessTz } from "@/lib/business-date";
 import { resolveDateRange } from "@/lib/date-filter";
+import { getSetting } from "@/lib/settings";
 
 export async function GET(req: NextRequest) {
   const session = await requireRole(["ADMIN", "MANAGER", "FINANCE"]);
@@ -106,6 +107,17 @@ export async function GET(req: NextRequest) {
          AND "closedAt" <= ${dateRange.endDate.toISOString()}::timestamptz
        ORDER BY "closedAt" DESC`;
 
+    let bankAccounts: { id: string; name: string; bankName: string; accountNumber: string; accountType: string; isDefault?: boolean }[] = [];
+    try {
+      const rawBank = await getSetting("BANK_ACCOUNTS_CONFIG");
+      if (rawBank) {
+        const parsed = JSON.parse(rawBank);
+        if (Array.isArray(parsed)) {
+          bankAccounts = parsed.filter((a: any) => a && typeof a === "object" && a.active !== false);
+        }
+      }
+    } catch {}
+
     return {
       open: open ?? null,
       formula: {
@@ -124,6 +136,7 @@ export async function GET(req: NextRequest) {
       },
       ledger,
       counts,
+      bankAccounts,
       today: businessDateString(),
       dateRange: {
         preset: dateRange.preset,
